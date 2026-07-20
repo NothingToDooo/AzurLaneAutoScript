@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from module.adapters.campaign_event_ui import build_campaign_event_ui_services
-from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
 from module.adapters.campaign_runtime_navigation import (
     CampaignNavigationPlanExecutor,
     Event20240912NavigationPlan,
@@ -13,7 +12,6 @@ from module.adapters.campaign_runtime_navigation import (
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
 )
 from module.adapters.campaign_runtime_special_event_ui import (
     Event20230817UiExecutor,
@@ -292,34 +290,6 @@ def test_event_20240815_story_entrance_falls_back_after_stage_ocr_failure() -> N
     runtime.transition_calls.clear()
     assert services.map_transition.handle_stage_return(runtime) is False
     assert runtime.transition_calls == ["handle-stage-return"]
-
-
-def test_event_ui_operations_and_declarative_transition_facades_are_removed() -> None:
-    removed = {
-        "ENSURE_NO_STAGE_ENTRANCE": "ensure_no_stage_entrance",
-        "EVENT_20230817_STORY": "event_20230817_story",
-        "GET_STORY_BUTTON": "get_story_button",
-        "GET_STORY_ENTRANCE": "get_story_entrance",
-        "HANDLE_CAMPAIGN_UI_ADDITIONAL": "handle_campaign_ui_additional",
-        "HANDLE_CHAPTER_ADDITIONAL": "handle_chapter_additional",
-        "HANDLE_EXP_INFO": "handle_exp_info",
-        "HANDLE_GET_CHAPTER_ADDITIONAL": "handle_get_chapter_additional",
-        "HANDLE_STORY_ENTRANCE": "handle_story_entrance",
-        "EVENT_ANIMATION_END": "event_animation_end",
-        "HANDLE_IN_STAGE": "handle_in_stage",
-        "IS_EVENT_ANIMATION": "is_event_animation",
-        "IS_STAGE_PAGE_HAS_ENTRANCE": "is_stage_page_has_entrance",
-    }
-
-    assert all(not hasattr(RuntimeOperation, enum_name) for enum_name in removed)
-    assert all(method_name not in vars(DeclarativeCampaignMapRuntime) for method_name in removed.values())
-    assert not hasattr(CampaignRuntimeProfileManager, "event_ui")
-    public_methods = {
-        name
-        for name, value in vars(DeclarativeCampaignMapRuntime).items()
-        if callable(value) and not name.startswith("_")
-    }
-    assert len(public_methods) <= 30
 
 
 def test_event_ui_profile_options_have_no_string_dispatched_operations() -> None:

@@ -7,6 +7,7 @@ from module.adapters.campaign_map_observer import build_campaign_map_observer
 from module.adapters.campaign_map_swipe import build_campaign_map_swipe_service
 from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
 from module.adapters.campaign_program_capabilities import build_campaign_program_capability_reader
+from module.adapters.campaign_runtime_hard import build_campaign_clear_mode_behavior
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
@@ -57,6 +58,7 @@ def _validate_executor_contracts(
     for profile in profiles.profiles.values():
         try:
             manager = CampaignRuntimeProfileManager(profile, executors)
+            build_campaign_clear_mode_behavior(manager.executor_instances(RuntimeExecutorKind.HARD_MODE))
             build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
             build_campaign_map_observer(
                 manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),

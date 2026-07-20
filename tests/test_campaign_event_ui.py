@@ -7,17 +7,14 @@ from module.adapters.campaign_event_ui import (
     CampaignEventCombatResultContributor,
     CampaignEventStageRecoveryContributor,
     CampaignEventUiContributor,
-    CampaignEventUiExecutor,
     CampaignMapTransitionContributor,
     EventCombatResultNext,
     EventStageRecoveryNext,
     MapTransitionNext,
     build_campaign_event_ui_services,
 )
-from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileError, RuntimeOperation
+from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileError
 from module.campaign.event_navigation import EventCampaignNavigation
-from module.content.errors import ContentValidationError
-from module.content.runtime_profile import RuntimeExecutorKind
 from module.exception import CampaignNameError
 from module.map.assets import WITHDRAW
 from module.ui.page import page_campaign_menu, page_event, page_main
@@ -502,16 +499,3 @@ def test_combat_end_policy_requires_a_waitable_final_animation_owner() -> None:
 
     with pytest.raises(CampaignRuntimeProfileError, match="typed animation wait provider"):
         build_campaign_event_ui_services((source,))
-
-
-def test_event_ui_executor_rejects_string_dispatched_event_ui_methods() -> None:
-    with pytest.raises(ContentValidationError, match="forbids string-dispatched event_ui"):
-        CampaignEventUiExecutor(
-            {RuntimeExecutorKind.EVENT_UI},
-            CampaignEventUiContributor(),
-            other_methods={
-                RuntimeExecutorKind.EVENT_UI: {
-                    RuntimeOperation.CLEAR_BOSS: lambda runtime: runtime,
-                }
-            },
-        )

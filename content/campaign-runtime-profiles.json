@@ -5,14 +5,7 @@
         {
           "implementation": "hard_mode/campaign_clear_mode",
           "kind": "hard_mode",
-          "options": {
-            "expected_end": "in_stage",
-            "operations": [
-              "_expected_end",
-              "clear_boss",
-              "equipment_take_off_when_finished"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "campaign_hard/campaign_hard/campaign"

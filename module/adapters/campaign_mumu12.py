@@ -40,14 +40,16 @@ from module.adapters.campaign_program_mumu12 import (
     build_mumu12_battle_program_port,
     read_mumu12_battle_program_mode,
 )
-from module.adapters.campaign_runtime_hard import CampaignClearModeExecutor
+from module.adapters.campaign_runtime_hard import (
+    CampaignClearModeExecutor,
+    build_campaign_clear_mode_behavior,
+)
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
@@ -473,6 +475,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
     _event_ui_services: CampaignEventUiServices
     _clear_mode_config_service: CampaignClearModeConfigService
+    _hard_behavior: CampaignClearModeExecutor | None
     _map_initialization_service: CampaignMapInitializationService
     _configured_boss_fleet: int
     _profile_fleet_preparation_service: FleetPreparationService
@@ -500,6 +503,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             definition.runtime_profile,
             _RUNTIME_EXECUTOR_REGISTRY,
         )
+        self._hard_behavior = build_campaign_clear_mode_behavior(
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.HARD_MODE)
+        )
         self.MAP = compile_campaign_map(definition)
         self._runtime_profile.install_map_grid(self.MAP)
         camera_grid_class = self._runtime_profile.camera_grid_class
@@ -517,6 +523,8 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         super().__init__(config=config, device=device)
         self._runtime_profile.apply_runtime_thresholds(self)
         self._runtime_profile.bind(self, self.MAP)
+        if self._hard_behavior is not None:
+            self._hard_behavior.apply_runtime_config(self)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
         self._map_initialization_service = build_campaign_map_initialization_service(
             self._runtime_profile.executor_instances_in_profile_order()
@@ -548,16 +556,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def configured_boss_fleet(self) -> int:
         return self._configured_boss_fleet
 
-    @staticmethod
-    def _missing_runtime_base(
-        operation: RuntimeOperation,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        del args, kwargs
-        message = f"runtime operation has no fixed base implementation: {operation.value}"
-        raise CampaignRuntimeProfileError(message)
-
     def _map_transition_expected_end(self, expected: str) -> CombatEnd | None:
         transition_override = self._map_transition_ui.combat_end_override(self)
         if transition_override is not None:
@@ -565,13 +563,10 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         return CampaignEngine._expected_end(self, expected)  # ruff:ignore[private-member-access] - 固定调用引擎基线。
 
     def _expected_end(self, expected: str) -> CombatEnd | None:
-        result = self._runtime_profile.hard.invoke(
-            RuntimeOperation.EXPECTED_END,
-            self,
-            lambda value: self._map_transition_expected_end(cast("str", value)),
-            expected,
-        )
-        return cast("CombatEnd | None", result)
+        behavior = self._hard_behavior
+        if behavior is not None:
+            return behavior.expected_end(expected)
+        return self._map_transition_expected_end(expected)
 
     def handle_clear_mode_config_cover(self) -> bool:
         handled = CampaignEngine.handle_clear_mode_config_cover(self)
@@ -592,27 +587,10 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         )
 
     def clear_boss(self) -> bool:
-        result = self._runtime_profile.hard.invoke(
-            RuntimeOperation.CLEAR_BOSS,
-            self,
-            lambda: self._runtime_profile.mechanic.invoke(
-                RuntimeOperation.CLEAR_BOSS,
-                self,
-                lambda: CampaignEngine.clear_boss(self),
-            ),
-        )
-        return bool(result)
-
-    def equipment_take_off_when_finished(self) -> bool:
-        result = self._runtime_profile.hard.invoke(
-            RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
-            self,
-            partial(
-                self._missing_runtime_base,
-                RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
-            ),
-        )
-        return bool(result)
+        behavior = self._hard_behavior
+        if behavior is not None:
+            return behavior.clear_boss(self)
+        return CampaignEngine.clear_boss(self)
 
     def handle_submarine_support_popup(self) -> bool:
         return self._submarine_services.popup.handle(self)
@@ -688,6 +666,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         """完成一次困难图结算；hard clear-mode 的一次 attempt 是最小可恢复业务单元。"""
 
         cancellation.raise_if_requested()
+        if self._hard_behavior is None:
+            message = "hard campaign attempt requires the typed clear-mode behavior"
+            raise CampaignRuntimeProfileError(message)
         self.session_variant = CampaignRunVariant.LOOP
         self.map_is_clear_mode = True
         self._runtime_profile_lease.start()
@@ -710,11 +691,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         self._runtime_profile_lease.close(RuntimeSessionOutcome.COMPLETED)
 
     def _execute_hard_attempt_body(self, entrance: Button, cancellation: CancellationSource) -> None:
-        hard_mode = self._runtime_profile.executor_instance(RuntimeExecutorKind.HARD_MODE)
-        if not isinstance(hard_mode, CampaignClearModeExecutor):
-            message = "hard campaign attempt requires the typed clear-mode executor"
-            raise CampaignRuntimeProfileError(message)
-        hard_mode.prepare_attempt(entrance)
         entrance.area = entrance.button
         self.enter_map(entrance, mode="hard")
         if not self.map_is_auto_search:

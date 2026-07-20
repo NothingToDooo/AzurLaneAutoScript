@@ -22,7 +22,6 @@ from module.adapters.campaign_runtime_implementations import (
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
     RuntimeSessionOutcome,
 )
 from module.application import AbortToken
@@ -66,25 +65,14 @@ class _Runtime:
 
     def __init__(
         self,
-        manager: CampaignRuntimeProfileManager,
         *,
         clear_mode: bool,
         support_empty: bool,
     ) -> None:
-        self.manager = manager
         self.map_is_clear_mode = clear_mode
         self.support_empty = support_empty
         self.config = _Config()
         self.combat_calls = 0
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        return self.manager.invoke_super(operation, self, *args, **kwargs)
 
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool:
         del button, offset
@@ -245,7 +233,6 @@ def test_real_chapter_16_map_init_updates_live_override_and_reset_clears_it(
     manager = _production_manager(stage_id)
     reader = _reader(manager)
     runtime = _Runtime(
-        manager,
         clear_mode=clear_mode,
         support_empty=support_empty,
     )

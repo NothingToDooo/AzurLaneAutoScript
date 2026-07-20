@@ -1,4 +1,3 @@
-from dataclasses import fields
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
@@ -12,10 +11,7 @@ from module.adapters.campaign_runtime_implementations import (
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileManager,
-    RuntimeExecutorInstance,
-    RuntimeOperation,
     RuntimeSessionOutcome,
-    RuntimeStateSeed,
 )
 from module.adapters.gems_mumu12 import (
     GemsHardPreparationError,
@@ -374,18 +370,6 @@ def test_declarative_runtime_installs_the_real_profile_preparation_service(
     assert runtime._fleet_preparation_service is runtime._profile_fleet_preparation_service  # ruff:ignore[private-member-access] - 删除生产 wiring 时必须失败。
     assert runtime._profile_fleet_preparation_service.prepare(preparation)  # ruff:ignore[private-member-access] - 用纯内存 primitive 验证真实 profile 链。
     assert runtime._runtime_profile.support_fleet_status(AbortToken()) is expected_status  # ruff:ignore[private-member-access] - 状态必须来自 runtime 持有的真实 manager。
-
-
-def test_old_fleet_preparation_runtime_surfaces_are_removed() -> None:
-    assert "FLEET_PREPARATION" not in RuntimeOperation.__members__
-    assert "fleet_preparation" not in DeclarativeCampaignMapRuntime.__dict__
-    assert "_base_fleet_preparation" not in DeclarativeCampaignMapRuntime.__dict__
-    assert {field.name for field in fields(RuntimeStateSeed)} == {"use_single_fleet_override"}
-    assert not hasattr(RuntimeExecutorInstance, "use_support_fleet")
-    assert not hasattr(RuntimeExecutorInstance, "set_use_support_fleet")
-    assert not hasattr(RuntimeExecutorInstance, "disable_support_fleet")
-    assert hasattr(RuntimeExecutorInstance, "current_use_support_fleet")
-    assert not hasattr(CampaignRuntimeProfileManager, "disable_support_fleet")
 
 
 def test_real_hard_profiles_do_not_cross_the_pre_session_support_observation_boundary(

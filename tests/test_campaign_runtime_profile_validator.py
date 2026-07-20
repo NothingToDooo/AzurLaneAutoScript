@@ -6,6 +6,13 @@ import pytest
 
 from dev_tools.campaign_runtime_profile_validator import validate_campaign_content
 from module.adapters.campaign_profiles import validate_mumu12_campaign_runtime_profiles
+from module.adapters.campaign_runtime_profile import (
+    CampaignRuntimeExecutorRegistry,
+    RuntimeExecutorBuildContext,
+    RuntimeExecutorFactoryDescriptor,
+    RuntimeExecutorInstance,
+    RuntimeExecutorOptionsSchema,
+)
 from module.content.errors import ContentValidationError
 from module.content.manifest import load_default_event_manifests
 from module.content.models import StageRef, StageSpec
@@ -138,6 +145,55 @@ def test_production_validator_rejects_expected_end_policy_without_waitable_anima
         validate_mumu12_campaign_runtime_profiles(stages, profiles)
 
 
+def test_production_validator_builds_and_rejects_an_untyped_hard_behavior() -> None:
+    implementation_id = RuntimeImplementationId("hard_mode/untyped")
+    extension = CampaignRuntimeExtension(
+        CampaignRuntimeExtensionId("event_test/t1/hard"),
+        (
+            RuntimeExecutorBinding(
+                RuntimeExecutorKind.HARD_MODE,
+                implementation_id,
+                {},
+            ),
+        ),
+    )
+    profiles = CampaignRuntimeProfileRegistry(
+        (extension,),
+        (
+            CampaignRuntimeProfile.core(),
+            CampaignRuntimeProfile(
+                CampaignRuntimeProfileId("invalid_hard_behavior"),
+                (extension,),
+            ),
+        ),
+    )
+    stages = (
+        StageSpec(StageRef("campaign_main", "1-1"), "stages/1-1.yaml"),
+        StageSpec(
+            StageRef("event_test", "t1"),
+            "stages/t1.yaml",
+            runtime_profile_id=CampaignRuntimeProfileId("invalid_hard_behavior"),
+        ),
+    )
+
+    def build_untyped(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+        del context
+        return RuntimeExecutorInstance({RuntimeExecutorKind.HARD_MODE})
+
+    executors = CampaignRuntimeExecutorRegistry(
+        (
+            RuntimeExecutorFactoryDescriptor(
+                implementation_id,
+                {RuntimeExecutorKind.HARD_MODE: RuntimeExecutorOptionsSchema()},
+                build_untyped,
+            ),
+        )
+    )
+
+    with pytest.raises(ContentValidationError, match=r"not executable.*must provide CampaignClearModeExecutor"):
+        validate_mumu12_campaign_runtime_profiles(stages, profiles, executors)
+
+
 def test_representative_special_gameplay_is_bound_by_typed_profiles(
     packs_by_id: Mapping[str, EventPack],
     profile_registry: CampaignRuntimeProfileRegistry,
@@ -149,6 +205,7 @@ def test_representative_special_gameplay_is_bound_by_typed_profiles(
     hard_executor = hard.extensions[0].executors[0]
     assert hard_executor.kind is RuntimeExecutorKind.HARD_MODE
     assert hard_executor.implementation_id.value == "hard_mode/campaign_clear_mode"
+    assert not hard_executor.options
 
     event_ball = _executors(profile_registry, "event_20200917_cn/campaign_base/campaign_base")[
         RuntimeExecutorKind.NAVIGATION

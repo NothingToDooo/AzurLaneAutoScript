@@ -24,7 +24,6 @@ from module.adapters.campaign_mumu12 import (
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
-    RuntimeOperation,
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
@@ -133,10 +132,10 @@ from module.map.map_fleet_preparation import STANDARD_FLEET_PREPARATION_SERVICE
 from module.ui.page import page_campaign_menu, page_event
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Iterator
 
     from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionRuntime
-    from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
+    from module.adapters.campaign_runtime_hard import CampaignClearModeExecutor
     from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
     from module.config.config_generated import ConfigOverrides
@@ -369,35 +368,32 @@ class _ExpectedEndTransitionProbe:
         return self.override
 
 
-class _ExpectedEndHardFacet:
-    _DELEGATE = object()
+class _ExpectedEndHardBehavior:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
 
-    def __init__(self, result: object = _DELEGATE) -> None:
-        self.result = result
-        self.calls: list[tuple[RuntimeOperation, str]] = []
+    def expected_end(self, expected: str) -> str:
+        self.calls.append(expected)
+        return "in_stage"
 
-    def invoke(
-        self,
-        operation: RuntimeOperation,
-        runtime: object,
-        fallback: Callable[[str], object],
-        expected: str,
-    ) -> object:
-        del runtime
-        self.calls.append((operation, expected))
-        if self.result is not self._DELEGATE:
-            return self.result
-        return fallback(expected)
+
+class _ClearBossHardBehavior:
+    def __init__(self) -> None:
+        self.calls: list[object] = []
+
+    def clear_boss(self, runtime: object) -> bool:
+        self.calls.append(runtime)
+        return True
 
 
 def _expected_end_runtime(
-    hard: _ExpectedEndHardFacet,
+    hard: _ExpectedEndHardBehavior | None,
     transition: _ExpectedEndTransitionProbe,
 ) -> DeclarativeCampaignMapRuntime:
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    runtime._runtime_profile = cast(  # ruff:ignore[private-member-access] - 构造最小 expected-end runtime。
-        "CampaignRuntimeProfileManager",
-        SimpleNamespace(hard=hard),
+    runtime._hard_behavior = cast(  # ruff:ignore[private-member-access] - 构造最小 expected-end runtime。
+        "CampaignClearModeExecutor | None",
+        hard,
     )
     runtime._map_transition_ui = cast(  # ruff:ignore[private-member-access] - 注入可观察 transition probe。
         "MapTransitionUi",
@@ -408,38 +404,35 @@ def _expected_end_runtime(
 
 
 def test_expected_end_keeps_hard_override_outside_typed_transition() -> None:
-    hard = _ExpectedEndHardFacet("in_stage")
+    hard = _ExpectedEndHardBehavior()
     transition = _ExpectedEndTransitionProbe(lambda: True)
     runtime = _expected_end_runtime(hard, transition)
 
     result = DeclarativeCampaignMapRuntime._expected_end(runtime, "no_searching")  # ruff:ignore[private-member-access]
 
     assert result == "in_stage"
-    assert hard.calls == [(RuntimeOperation.EXPECTED_END, "no_searching")]
+    assert hard.calls == ["no_searching"]
     assert transition.calls == 0
 
 
-def test_expected_end_uses_typed_transition_callback_inside_hard_fallback() -> None:
+def test_normal_expected_end_uses_typed_transition_callback() -> None:
     def callback() -> bool:
         return True
 
-    hard = _ExpectedEndHardFacet()
     transition = _ExpectedEndTransitionProbe(callback)
-    runtime = _expected_end_runtime(hard, transition)
+    runtime = _expected_end_runtime(None, transition)
 
     result = DeclarativeCampaignMapRuntime._expected_end(runtime, "no_searching")  # ruff:ignore[private-member-access]
 
     assert result is callback
-    assert hard.calls == [(RuntimeOperation.EXPECTED_END, "no_searching")]
     assert transition.calls == 1
 
 
 def test_expected_end_delegates_to_campaign_engine_after_typed_transition_miss(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    hard = _ExpectedEndHardFacet()
     transition = _ExpectedEndTransitionProbe(None)
-    runtime = _expected_end_runtime(hard, transition)
+    runtime = _expected_end_runtime(None, transition)
     baseline_calls: list[str] = []
 
     def baseline(_runtime: object, expected: str) -> str:
@@ -453,6 +446,95 @@ def test_expected_end_delegates_to_campaign_engine_after_typed_transition_miss(
     assert result == "with_searching"
     assert baseline_calls == ["no_searching"]
     assert transition.calls == 1
+
+
+def test_clear_boss_uses_typed_hard_behavior_before_campaign_engine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = object.__new__(DeclarativeCampaignMapRuntime)
+    behavior = _ClearBossHardBehavior()
+    runtime._hard_behavior = cast(  # ruff:ignore[private-member-access] - 构造最小 clear-boss runtime。
+        "CampaignClearModeExecutor",
+        behavior,
+    )
+    baseline_calls: list[object] = []
+
+    def baseline(instance: object) -> bool:
+        baseline_calls.append(instance)
+        return False
+
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "clear_boss", baseline)
+
+    assert DeclarativeCampaignMapRuntime.clear_boss(runtime)
+    assert behavior.calls == [runtime]
+    assert baseline_calls == []
+
+
+def test_clear_boss_without_hard_behavior_uses_campaign_engine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = object.__new__(DeclarativeCampaignMapRuntime)
+    runtime._hard_behavior = None  # ruff:ignore[private-member-access] - 构造最小 normal clear-boss runtime。
+    baseline_calls: list[object] = []
+
+    def baseline(instance: object) -> bool:
+        baseline_calls.append(instance)
+        return True
+
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "clear_boss", baseline)
+
+    assert DeclarativeCampaignMapRuntime.clear_boss(runtime)
+    assert baseline_calls == [runtime]
+
+
+def test_hard_attempt_requires_typed_behavior_before_mutating_runtime() -> None:
+    runtime = object.__new__(DeclarativeCampaignMapRuntime)
+    runtime._hard_behavior = None  # ruff:ignore[private-member-access] - 构造缺失 hard capability 的最小 runtime。
+    runtime.session_variant = CampaignRunVariant.NORMAL
+    runtime.map_is_clear_mode = False
+
+    with pytest.raises(CampaignRuntimeProfileError, match="typed clear-mode behavior"):
+        DeclarativeCampaignMapRuntime.execute_hard_attempt(
+            runtime,
+            Button(area=(), color=(), button=(), name="hard"),
+            AbortToken(),
+        )
+
+    assert runtime.session_variant is CampaignRunVariant.NORMAL
+    assert runtime.map_is_clear_mode is False
+
+
+def test_real_hard_runtime_wires_and_applies_the_manager_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = in_memory_config("campaign-hard-behavior-wiring", {})
+    config.replace_runtime_overlay(MAP_HAS_AMBUSH=True)
+    assert config.MAP_HAS_AMBUSH is True
+    definition = compose_campaign_attempt_definition(
+        load_default_stage(StageRef("campaign_main", "8-1")),
+        CampaignDifficulty.HARD,
+    )
+    runtime = DeclarativeCampaignMapRuntime(config, object.__new__(Device), definition)
+    transition = _ExpectedEndTransitionProbe(lambda: True)
+    runtime._map_transition_ui = cast(  # ruff:ignore[private-member-access] - hard behavior 必须绕过 transition。
+        "MapTransitionUi",
+        transition,
+    )
+    baseline_calls: list[str] = []
+
+    def baseline(_runtime: object, expected: str) -> str:
+        baseline_calls.append(expected)
+        return "with_searching"
+
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "_expected_end", baseline)
+
+    assert runtime._hard_behavior is runtime._runtime_profile.executor_instance(  # ruff:ignore[private-member-access] - 必须复用 manager 编译出的同一实例。
+        RuntimeExecutorKind.HARD_MODE
+    )
+    assert runtime.config.MAP_HAS_AMBUSH is False
+    assert runtime._expected_end("no_searching") == "in_stage"  # ruff:ignore[private-member-access] - 验证真实 runtime 优先级。
+    assert transition.calls == 0
+    assert baseline_calls == []
 
 
 def _definition() -> CampaignStageDefinition:

@@ -1,6 +1,7 @@
 import pytest
 
 from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
+from module.adapters.campaign_runtime_hard import CampaignClearModeExecutor
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeSessionOutcome,
@@ -57,6 +58,7 @@ def _hard_runtime(manager: _SessionManager) -> DeclarativeCampaignMapRuntime:
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
     lease = RuntimeProfileLease(manager)
     manager.lease = lease
+    vars(runtime)["_hard_behavior"] = object.__new__(CampaignClearModeExecutor)
     vars(runtime)["_runtime_profile_lease"] = lease
     return runtime
 

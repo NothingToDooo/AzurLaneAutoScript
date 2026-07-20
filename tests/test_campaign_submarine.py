@@ -4,18 +4,15 @@ from typing import TYPE_CHECKING
 import pytest
 from config_factory import in_memory_config
 
-import module.adapters.campaign_runtime_mechanics as mechanics_module
 from module.adapters.campaign_map_initialization import CampaignMapInitializationService
 from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionOwner
 from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
 from module.adapters.campaign_runtime_implementations import (
-    default_campaign_runtime_executor_descriptors,
     load_default_campaign_runtime_executor_registry,
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
@@ -38,9 +35,6 @@ from module.content.runtime_profile import (
     RuntimeExecutorBinding,
     RuntimeExecutorKind,
     RuntimeImplementationId,
-)
-from module.content.runtime_profile_catalog import (
-    load_default_campaign_runtime_profile_registry as load_default_profile_registry,
 )
 from module.content.stage_loader import load_default_stage
 from module.device.device import Device
@@ -400,21 +394,3 @@ def test_real_chapter_16_profiles_wire_only_the_early_submarine_services(
     assert (_POPUP_ID in implementation_ids) is expected_submarine
     assert (_FRESH_COMBAT_ID in implementation_ids) is expected_submarine
     assert _OLD_ID not in implementation_ids
-
-
-def test_old_submarine_runtime_surfaces_are_removed() -> None:
-    implementation_ids = {
-        descriptor.implementation_id.value for descriptor in default_campaign_runtime_executor_descriptors()
-    }
-
-    assert "HANDLE_SUBMARINE_SUPPORT_POPUP" not in RuntimeOperation.__members__
-    assert _OLD_ID not in implementation_ids
-    assert _POPUP_ID in implementation_ids
-    assert _FRESH_COMBAT_ID in implementation_ids
-    assert not hasattr(mechanics_module, "SubmarineFreshEntryExecutor")
-    mechanic_host = vars(mechanics_module)["_MechanicRuntimeHost"]
-    for removed in ("FUNCTION_NAME_BASE", "handle_popup_confirm", "combat"):
-        assert not hasattr(mechanic_host, removed)
-
-    extension_ids = {extension_id.value for extension_id in load_default_profile_registry().extensions}
-    assert "campaign_main/campaign_16_base_submarine/campaign_base" not in extension_ids

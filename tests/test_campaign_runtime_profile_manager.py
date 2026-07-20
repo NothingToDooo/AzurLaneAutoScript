@@ -10,7 +10,6 @@ from module.adapters.campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
     RuntimeSessionOutcome,
     RuntimeStateSeed,
 )
@@ -35,10 +34,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from typing import Unpack
 
-    from module.adapters.campaign_runtime_profile import (
-        RuntimeExecutorFactory,
-        RuntimeMethod,
-    )
+    from module.adapters.campaign_runtime_profile import RuntimeExecutorFactory
     from module.config.config_generated import ConfigOverrides
 
 
@@ -55,24 +51,6 @@ class _Runtime:
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.0
     MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = 0.0
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.0
-
-    def __init__(self) -> None:
-        self.manager: CampaignRuntimeProfileManager | None = None
-        self.trace: list[str] = []
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        value: int,
-    ) -> int:
-        if self.manager is None:
-            message = "runtime manager is not installed"
-            raise AssertionError(message)
-        result = self.manager.invoke_super(operation, self, value)
-        if type(result) is not int:
-            message = "test runtime expected an integer result"
-            raise AssertionError(message)
-        return result
 
 
 class _MapGrid(GridInfo):
@@ -220,92 +198,14 @@ def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
     }
 
 
-def test_same_kind_composes_base_to_derived_as_an_around_chain() -> None:
-    operation = RuntimeOperation.EXPECTED_END
-
-    def base(runtime: object, value: object) -> object:
-        typed = runtime if isinstance(runtime, _Runtime) else None
-        if typed is None or type(value) is not int:
-            message = "invalid base test call"
-            raise AssertionError(message)
-        typed.trace.append("base:before")
-        result = typed.runtime_super(operation, value + 1)
-        typed.trace.append("base:after")
-        return result + 10
-
-    def derived(runtime: object, value: object) -> object:
-        typed = runtime if isinstance(runtime, _Runtime) else None
-        if typed is None or type(value) is not int:
-            message = "invalid derived test call"
-            raise AssertionError(message)
-        typed.trace.append("derived:before")
-        result = typed.runtime_super(operation, value + 1)
-        typed.trace.append("derived:after")
-        return result + 100
-
-    def descriptor(name: str, method: RuntimeMethod) -> RuntimeExecutorFactoryDescriptor:
-        def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-            del context
-            return RuntimeExecutorInstance(
-                {RuntimeExecutorKind.ENGINE_EXTENSION},
-                methods={
-                    RuntimeExecutorKind.ENGINE_EXTENSION: {
-                        operation: method,
-                    }
-                },
-            )
-
-        return _descriptor(
-            name,
-            {RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema()},
-            factory,
-        )
-
-    manager = CampaignRuntimeProfileManager(
-        _profile(
-            _extension("base", _binding("base", RuntimeExecutorKind.ENGINE_EXTENSION)),
-            _extension(
-                "derived",
-                _binding("derived", RuntimeExecutorKind.ENGINE_EXTENSION),
-            ),
-        ),
-        CampaignRuntimeExecutorRegistry((descriptor("base", base), descriptor("derived", derived))),
-    )
-    runtime = _Runtime()
-    runtime.manager = manager
-
-    result = manager.engine.invoke(
-        operation,
-        runtime,
-        lambda value: value * 2,
-        1,
-    )
-
-    assert result == 116
-    assert runtime.trace == [
-        "derived:before",
-        "base:before",
-        "base:after",
-        "derived:after",
-    ]
-
-
-def test_derived_executor_can_short_circuit_without_calling_next() -> None:
-    operation = RuntimeOperation.CLEAR_BOSS
-    called: list[str] = []
+def test_executor_lookups_preserve_profile_order() -> None:
+    created: list[RuntimeExecutorInstance] = []
 
     def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-        name = context.implementation_id.value
-
-        def method(runtime: object) -> object:
-            del runtime
-            called.append(name)
-            return None
-
-        return RuntimeExecutorInstance(
-            {RuntimeExecutorKind.MAP_MECHANIC},
-            methods={RuntimeExecutorKind.MAP_MECHANIC: {operation: method}},
-        )
+        del context
+        instance = RuntimeExecutorInstance({RuntimeExecutorKind.MAP_MECHANIC})
+        created.append(instance)
+        return instance
 
     schemas = {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()}
     manager = CampaignRuntimeProfileManager(
@@ -324,9 +224,8 @@ def test_derived_executor_can_short_circuit_without_calling_next() -> None:
         ),
     )
 
-    manager.mechanic.invoke(operation, object(), lambda: called.append("fallback"))
-
-    assert called == ["derived"]
+    assert manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC) == tuple(created)
+    assert manager.executor_instances_in_profile_order() == tuple(created)
 
 
 @pytest.mark.parametrize(

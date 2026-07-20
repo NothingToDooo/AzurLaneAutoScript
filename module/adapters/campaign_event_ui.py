@@ -21,15 +21,10 @@ from module.handler.map_transition_ui import (
     WaitableMapTransitionAnimation,
 )
 
-from .campaign_runtime_profile import (
-    CampaignRuntimeProfileError,
-    RuntimeExecutorInstance,
-    RuntimeMethod,
-    RuntimeOperation,
-)
+from .campaign_runtime_profile import CampaignRuntimeProfileError, RuntimeExecutorInstance
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Mapping
+    from collections.abc import Callable, Iterable
 
 
 class EventStageRecovery(Protocol):
@@ -87,7 +82,7 @@ class CampaignEventUiContributorSource(Protocol):
 
 
 class CampaignEventUiExecutor(RuntimeExecutorInstance):
-    """提供 typed event UI，并允许同一 owner 暴露非 EVENT_UI facet。"""
+    """提供 typed event UI，并允许同一 owner 暴露其他 typed facet。"""
 
     __slots__ = ("_event_ui_contributor",)
 
@@ -95,8 +90,6 @@ class CampaignEventUiExecutor(RuntimeExecutorInstance):
         self,
         supported_kinds: Iterable[RuntimeExecutorKind],
         contributor: CampaignEventUiContributor,
-        *,
-        other_methods: Mapping[RuntimeExecutorKind, Mapping[RuntimeOperation, RuntimeMethod]] | None = None,
     ) -> None:
         kinds = frozenset(supported_kinds)
         if RuntimeExecutorKind.EVENT_UI not in kinds:
@@ -105,10 +98,7 @@ class CampaignEventUiExecutor(RuntimeExecutorInstance):
         if not isinstance(contributor, CampaignEventUiContributor):
             message = "campaign event UI executor requires a typed contributor"
             raise TypeError(message)
-        if other_methods is not None and RuntimeExecutorKind.EVENT_UI in other_methods:
-            message = "campaign event UI executor forbids string-dispatched event_ui methods"
-            raise ContentValidationError(message)
-        super().__init__(kinds, methods=other_methods)
+        super().__init__(kinds)
         self._event_ui_contributor = contributor
 
     @property

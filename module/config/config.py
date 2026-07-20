@@ -66,7 +66,6 @@ class AzurLaneConfig(ManualConfig, GeneratedConfig):
     # 旧装备切换任务在运行期注入的舰队和装备记录。
     FLEET_DAILY: int | list[int]
     FLEET_DAILY_EQUIPMENT: list[int] | None
-    FLEET_HARD_EQUIPMENT: list[int] | None
     EXERCISE_FLEET_EQUIPMENT: list[int] | None
     EventDaily_LastStage: int | str
 

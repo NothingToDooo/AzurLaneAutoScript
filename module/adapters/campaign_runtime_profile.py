@@ -37,23 +37,10 @@ class CampaignRuntimeProfileError(RuntimeError):
     """runtime profile 无法被固定生产适配器执行。"""
 
 
-class RuntimeOperation(StrEnum):
-    """旧地图引擎允许扩展的封闭调用面；值不是可反射的 Python 路径。"""
-
-    EXPECTED_END = "expected_end"
-    CLEAR_BOSS = "clear_boss"
-    EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
-    RUNTIME_CREATED = "runtime_created"
-
-
 class RuntimeSessionOutcome(StrEnum):
     COMPLETED = "completed"
     INTERRUPTED = "interrupted"
     FAILED = "failed"
-
-
-type RuntimeFallback = Callable[..., object]
-type RuntimeMethod = Callable[..., object]
 
 
 class RuntimeProfileHost(Protocol):
@@ -130,7 +117,6 @@ class RuntimeExecutorInstance:
     __slots__ = (
         "_camera_grid_class",
         "_map_grid_class",
-        "_methods",
         "_runtime",
         "_seed",
         "_shared_state",
@@ -142,7 +128,6 @@ class RuntimeExecutorInstance:
         self,
         supported_kinds: Iterable[RuntimeExecutorKind],
         *,
-        methods: Mapping[RuntimeExecutorKind, Mapping[RuntimeOperation, RuntimeMethod]] | None = None,
         state_seed: RuntimeStateSeed = _EMPTY_STATE_SEED,
         map_grid_class: type[GridInfo] | None = None,
         camera_grid_class: type[Grid] | None = None,
@@ -151,20 +136,6 @@ class RuntimeExecutorInstance:
         if not kinds or any(not isinstance(kind, RuntimeExecutorKind) for kind in kinds):
             message = "runtime executor instance requires typed supported kinds"
             raise TypeError(message)
-        values = {} if methods is None else dict(methods)
-        if set(values) - kinds:
-            message = "runtime executor instance contains methods for an unsupported kind"
-            raise ContentValidationError(message)
-        frozen_methods: dict[RuntimeExecutorKind, Mapping[RuntimeOperation, RuntimeMethod]] = {}
-        for kind, facet in values.items():
-            facet_methods = dict(facet)
-            if any(
-                not isinstance(operation, RuntimeOperation) or not callable(method)
-                for operation, method in facet_methods.items()
-            ):
-                message = "runtime executor methods must use typed operations and callables"
-                raise TypeError(message)
-            frozen_methods[kind] = MappingProxyType(facet_methods)
         if map_grid_class is not None and not issubclass(map_grid_class, GridInfo):
             message = "map grid executor must provide a GridInfo subclass"
             raise TypeError(message)
@@ -172,7 +143,6 @@ class RuntimeExecutorInstance:
             message = "camera grid executor must provide a Grid subclass"
             raise TypeError(message)
         self._supported_kinds = kinds
-        self._methods = MappingProxyType(frozen_methods)
         self._seed = state_seed
         self._map_grid_class = map_grid_class
         self._camera_grid_class = camera_grid_class
@@ -191,13 +161,6 @@ class RuntimeExecutorInstance:
     @property
     def camera_grid_class(self) -> type[Grid] | None:
         return self._camera_grid_class
-
-    def method(
-        self,
-        kind: RuntimeExecutorKind,
-        operation: RuntimeOperation,
-    ) -> RuntimeMethod | None:
-        return self._methods.get(kind, {}).get(operation)
 
     @property
     def state_seed(self) -> RuntimeStateSeed:
@@ -366,64 +329,6 @@ class _SessionFacet:
     instance: RuntimeExecutorInstance
 
 
-@dataclass(slots=True)
-class _InvocationFrame:
-    kind: RuntimeExecutorKind
-    operation: RuntimeOperation
-    runtime: object
-    chain: tuple[_SessionFacet, ...]
-    next_index: int
-    fallback: RuntimeFallback
-
-
-@dataclass(frozen=True, slots=True)
-class _RuntimeInvocationRequest:
-    kind: RuntimeExecutorKind
-    operation: RuntimeOperation
-    runtime: object
-    fallback: RuntimeFallback
-    args: tuple[object, ...]
-    kwargs: Mapping[str, object]
-
-
-class RuntimeFacetComposite:
-    """一个细粒度 executor kind 的 base→derived around 链入口。"""
-
-    __slots__ = ("_kind", "_manager")
-
-    def __init__(
-        self,
-        manager: CampaignRuntimeProfileManager,
-        kind: RuntimeExecutorKind,
-    ) -> None:
-        self._manager = manager
-        self._kind = kind
-
-    @property
-    def kind(self) -> RuntimeExecutorKind:
-        return self._kind
-
-    def invoke(
-        self,
-        operation: RuntimeOperation,
-        runtime: object,
-        fallback: RuntimeFallback,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        return self._manager.invoke_facet(
-            _RuntimeInvocationRequest(
-                self._kind,
-                operation,
-                runtime,
-                fallback,
-                args,
-                kwargs,
-            )
-        )
-
-
 def _resolve_support_fleet_state(
     instances: Iterable[RuntimeExecutorInstance],
 ) -> SupportFleetAttemptState | None:
@@ -441,12 +346,11 @@ def _resolve_support_fleet_state(
 
 
 class CampaignRuntimeProfileManager:
-    """把不可变 profile 编译为单 attempt 多 facet executor 链和 tuning 投影。"""
+    """把不可变 profile 编译为单 attempt typed executor 集合和 tuning 投影。"""
 
     __slots__ = (
         "_compiled_map",
         "_facets",
-        "_frames",
         "_instances",
         "_profile",
         "_registry",
@@ -474,7 +378,6 @@ class CampaignRuntimeProfileManager:
         for instance in self._instances:
             instance.attach_shared_state(self._shared_state)
         self._seed_attempt_state()
-        self._frames: list[_InvocationFrame] = []
         self._runtime: object | None = None
         self._compiled_map: CampaignMap | None = None
         self._session_active = False
@@ -519,24 +422,6 @@ class CampaignRuntimeProfileManager:
     @property
     def profile(self) -> CampaignRuntimeProfile:
         return self._profile
-
-    def facet(self, kind: RuntimeExecutorKind) -> RuntimeFacetComposite:
-        if not isinstance(kind, RuntimeExecutorKind):
-            message = "runtime facet requires a RuntimeExecutorKind"
-            raise TypeError(message)
-        return RuntimeFacetComposite(self, kind)
-
-    @property
-    def mechanic(self) -> RuntimeFacetComposite:
-        return self.facet(RuntimeExecutorKind.MAP_MECHANIC)
-
-    @property
-    def hard(self) -> RuntimeFacetComposite:
-        return self.facet(RuntimeExecutorKind.HARD_MODE)
-
-    @property
-    def engine(self) -> RuntimeFacetComposite:
-        return self.facet(RuntimeExecutorKind.ENGINE_EXTENSION)
 
     def executor_instance(self, kind: RuntimeExecutorKind) -> RuntimeExecutorInstance | None:
         """返回由 profile 编译出的唯一 typed executor。"""
@@ -617,7 +502,6 @@ class CampaignRuntimeProfileManager:
         self._compiled_map = compiled_map
         for instance in self._instances:
             instance.bind(runtime, compiled_map)
-        self.runtime_created(runtime)
 
     def begin_session(self) -> None:
         if self._runtime is None:
@@ -656,7 +540,6 @@ class CampaignRuntimeProfileManager:
         # ownership 状态先失效；executor reset 即使失败也不能让 manager 再次参与执行。
         self._runtime = None
         self._compiled_map = None
-        self._frames.clear()
         errors: list[BaseException] = []
         for instance in reversed(self._instances):
             try:
@@ -712,109 +595,3 @@ class CampaignRuntimeProfileManager:
             if seed.use_single_fleet_override is not None:
                 use_single_fleet_override = seed.use_single_fleet_override
         self._shared_state.use_single_fleet_override = use_single_fleet_override
-
-    def invoke_super(
-        self,
-        operation: RuntimeOperation,
-        runtime: object,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        if not self._frames:
-            message = "runtime super invocation requires an active executor frame"
-            raise CampaignRuntimeProfileError(message)
-        frame = self._frames[-1]
-        if frame.operation is not operation or frame.runtime is not runtime:
-            message = "runtime super invocation does not match the active executor frame"
-            raise CampaignRuntimeProfileError(message)
-        return self._invoke_at(
-            _InvocationFrame(
-                frame.kind,
-                frame.operation,
-                frame.runtime,
-                frame.chain,
-                frame.next_index,
-                frame.fallback,
-            ),
-            args,
-            kwargs,
-        )
-
-    def runtime_created(self, runtime: object) -> None:
-        for kind in (
-            RuntimeExecutorKind.MAP_MECHANIC,
-            RuntimeExecutorKind.HARD_MODE,
-            RuntimeExecutorKind.ENGINE_EXTENSION,
-        ):
-            result = self.invoke_facet(
-                _RuntimeInvocationRequest(
-                    kind,
-                    RuntimeOperation.RUNTIME_CREATED,
-                    runtime,
-                    lambda: None,
-                    (),
-                    {},
-                )
-            )
-            if result is not None:
-                message = "runtime_created executor chain must return None"
-                raise CampaignRuntimeProfileError(message)
-
-    def invoke_facet(self, request: _RuntimeInvocationRequest) -> object:
-        if not isinstance(request, _RuntimeInvocationRequest):
-            message = "runtime invocation requires a typed request"
-            raise TypeError(message)
-        if not isinstance(request.operation, RuntimeOperation):
-            message = "runtime invocation requires a RuntimeOperation"
-            raise TypeError(message)
-        if not callable(request.fallback):
-            message = "runtime invocation fallback must be callable"
-            raise TypeError(message)
-        chain = tuple(
-            facet
-            for facet in self._facets
-            if facet.binding.kind is request.kind and facet.instance.method(request.kind, request.operation) is not None
-        )
-        return self._invoke_at(
-            _InvocationFrame(
-                request.kind,
-                request.operation,
-                request.runtime,
-                chain,
-                len(chain) - 1,
-                request.fallback,
-            ),
-            request.args,
-            request.kwargs,
-        )
-
-    def _invoke_at(
-        self,
-        frame: _InvocationFrame,
-        args: tuple[object, ...],
-        kwargs: Mapping[str, object],
-    ) -> object:
-        if frame.next_index < 0:
-            return frame.fallback(*args, **dict(kwargs))
-        facet = frame.chain[frame.next_index]
-        method = facet.instance.method(frame.kind, frame.operation)
-        if method is None:
-            message = "runtime executor chain contains an operation gap"
-            raise AssertionError(message)
-        active = _InvocationFrame(
-            frame.kind,
-            frame.operation,
-            frame.runtime,
-            frame.chain,
-            frame.next_index - 1,
-            frame.fallback,
-        )
-        self._frames.append(active)
-        try:
-            return method(frame.runtime, *args, **dict(kwargs))
-        finally:
-            popped = self._frames.pop()
-            if popped is not active:
-                message = "runtime executor frame stack was corrupted"
-                raise AssertionError(message)
