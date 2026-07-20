@@ -223,6 +223,10 @@ class FleetOperator:
         if color_similar(color, (224, 154, 114), threshold=30):
             return True
 
+        # 新条茜皮肤的舰队卡片底部同样是低方差蓝色。
+        if color_similar(color, (124, 141, 171), threshold=30):
+            return True
+
         gray = rgb2gray(image)
         return bool(np.std(gray.flatten(), ddof=1) > self.FLEET_IN_USE_STD)
 

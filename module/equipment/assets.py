@@ -9,6 +9,12 @@ EMPTY_SHIP_R = Button(
     button=(192, 359, 268, 435),
     file="./assets/cn/equipment/EMPTY_SHIP_R.png",
 )
+EQUIPMENT_CLOSE = Button(
+    area=(1139, 87, 1231, 111),
+    color=(215, 149, 69),
+    button=(1139, 87, 1231, 111),
+    file="./assets/cn/equipment/EQUIPMENT_CLOSE.png",
+)
 EQUIPMENT_CODE_CLEAR = Button(
     area=(999, 477, 1121, 519),
     color=(142, 146, 151),
@@ -92,12 +98,6 @@ EQUIPMENT_CODE_TEXTBOX = Button(
     color=(45, 47, 60),
     button=(446, 668, 834, 706),
     file="./assets/cn/equipment/EQUIPMENT_CODE_TEXTBOX.png",
-)
-EQUIPMENT_CLOSE = Button(
-    area=(1139, 87, 1231, 111),
-    color=(215, 149, 69),
-    button=(1139, 87, 1231, 111),
-    file="./assets/cn/equipment/EQUIPMENT_CLOSE.png",
 )
 EQUIPMENT_OPEN = Button(
     area=(1166, 91, 1203, 110),

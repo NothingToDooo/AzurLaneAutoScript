@@ -149,3 +149,52 @@ git diff --check
 - `uv lock --check`、campaign runtime profile validator、`alas.py --help` 和 `gui.py --help` 通过。
 - 全仓 Ruff 仍有 152 个既有规则迁移问题（127 个 `RUF105`、25 个 `RUF201`）；全仓 `ty` 仍有
   `module/device/device.py:66` 和 `module/os_handler/os_status.py:40` 两个既有诊断。本次同步路径没有新增对应错误。
+
+## 7. 2026-07-18 增量同步与资源生成器修复
+
+本次从上一轮终点 `a97e76cab94598d5ef270372d6457b7faac073ad` 继续核对到
+`c535587c85b69e2c7834d22d2467318dade10a79`。仍只迁入国区、Windows + MuMu 12 单实例运行需要的行为，
+不恢复已经删除的平台和设备后端。
+
+| 功能 | 上游提交 | 本地处理 |
+|---|---|---|
+| Nier 战斗界面 | [`b053630e4`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/b053630e48b310b9b17bee2d52e75fdcade61523) | 语义适配：同步两张 CN 资源，将暂停、退出和演习新版血条布局接入当前表驱动识别链，并用真实资源执行 matcher 与点击回归测试 |
+| MuMu Pro macOS serial | [`372d94c82`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/372d94c821488e0f8c946f433930b0cd90b51dca)、[`513fbb3cc`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/513fbb3cc23a456c1f23b839f554da96defacf74) | 不迁入：只处理 macOS MuMu Pro 的 `emulator-*` serial；当前运行边界是 Windows MuMu 12，不存在多实例或 macOS 探测需求 |
+| 新条茜舰队卡片识别 | [`6df8bbb88`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/6df8bbb88bf394f3f679c7a03e2304f8563165ea) | 语义适配：在低方差空舰队 fallback 前识别该皮肤的蓝色底部区域，同时保留英仙座、高方差和真实空舰队回归样本 |
+| 上游合并节点 | [`c535587c8`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/c535587c85b69e2c7834d22d2467318dade10a79) | 只作为新的 `upstream/master` 核对终点，无独立功能改动 |
+
+`upstream/dev` 另有两个尚未进入上述 master 终点的提交，也已核对：
+
+- [`c0770475e`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/c0770475ef5b685fbef3e212067c58ec116cfd40)
+  只修改 vanguard 卸载日志；当前 `_hard_unmount(..., ship_name=...)` 已通过通用参数实现等价信息，不重复迁入。
+- [`c2b242650`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/c2b2426504a9ac3fb2fd83fb23d056db42635fed)
+  为高 Android 版本的 DroidCast 增加自动 fallback；当前设备边界不包含 DroidCast，不迁入。
+
+两张同步资源与上游 blob 完全一致：
+
+| 资源 | Git blob |
+|---|---|
+| `PAUSE_Nier.png` | `1c238b2bd2d9eb0cc132358a1408c6f07108db19` |
+| `QUIT_Nier.png` | `525b83a4865acba7c5c3b9d54fa5535e2a634c71` |
+
+### 7.1 国区资源生成契约
+
+同步 Nier 资源时发现 [`dev_tools/button_extract.py`](../dev_tools/button_extract.py) 仍会输出
+`{"cn": ...}`：运行时和全部生成文件早已裁剪为国区标量，`Resource.parse_property()` 也只原样返回输入；因此旧输出会在
+`Button` 构造时把字典路径用作资源表 key，并直接抛出 `TypeError`。这不是需要保留的兼容行为。
+
+本次将生成器内部的 area、color、button 和 file 一并改为标量，并稳定输出 `./assets/...` 相对路径；生成文件引用校验
+拒绝非字符串 `file`，端到端测试会实际生成并加载 `Button` / `Template`。同时删除两处仍宣称支持 server mapping 的
+失真 docstring。全量重建 40 个资源模块后，仅将 `module/equipment/assets.py` 中原本未按字母排序的
+`EQUIPMENT_CLOSE` 移回规范位置，资源数值没有变化。
+
+### 7.2 验证结果
+
+- Nier、舰队卡片和资源生成器定向测试：`26 passed`。
+- 全量测试：`2896 passed`。
+- 全仓 Ruff 通过；格式检查通过（690 files）。
+- `uv lock --check`、完整 40 模块资源生成与引用校验、campaign runtime profile validator 和
+  `git diff --check` 通过。
+- 本次修改文件的 ty 检查通过。全仓 ty 仍有 17 条既有诊断，均位于
+  `module/device/minitouch_service.py`、`module/device/nemu_ipc_service.py`、
+  `tests/test_device_minitouch_retry.py` 和 `tests/test_device_nemu_ipc_retry.py`；本次没有修改这些文件。

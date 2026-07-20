@@ -55,7 +55,7 @@ class Button(Resource):
         file: FilePath | None = None,
         name: str | None = None,
     ) -> None:
-        """area 和 button 均为左上、右下坐标，color 为 RGB；三者也可按服务器提供映射。
+        """area 和 button 均为左上、右下坐标，color 为 RGB。
 
         button 为空元组时实例仅用于检测，不用于点击。
         """

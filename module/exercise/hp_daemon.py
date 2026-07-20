@@ -31,6 +31,7 @@ NEW_HP_BAR_PAUSES = (
     combat_ui_assets.PAUSE_ElvenVine,
     combat_ui_assets.PAUSE_GildedReverie,
     combat_ui_assets.PAUSE_AzureCore,
+    combat_ui_assets.PAUSE_Nier,
 )
 
 
