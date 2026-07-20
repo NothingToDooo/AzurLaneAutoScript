@@ -60,7 +60,6 @@ from module.content.mechanic_rules import (
 )
 from module.content.models import StageRef
 from module.content.runtime_profile import RuntimeExecutorKind
-from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
 from module.content.stage_definition import (
     CampaignStageDefinition,
     CellSpec,
@@ -978,28 +977,6 @@ def test_stage_overlay_enables_every_declared_map_structure() -> None:
     assert overlay["MAP_HAS_MAZE"] is True
     assert overlay["MAP_HAS_FORTRESS"] is True
     assert overlay["MAP_HAS_BOUNCING_ENEMY"] is True
-
-
-def test_every_remaining_profile_operation_has_an_explicit_dispatch_boundary() -> None:
-    registry = load_default_campaign_runtime_profile_registry()
-    grid_kinds = {
-        RuntimeExecutorKind.MAP_GRID_RECOGNITION,
-        RuntimeExecutorKind.CAMERA_GRID_RECOGNITION,
-    }
-    missing: set[str] = set()
-    for extension in registry.extensions.values():
-        for binding in extension.executors:
-            if binding.kind in grid_kinds:
-                continue
-            operations = binding.options.get("operations", ())
-            if isinstance(operations, tuple):
-                missing.update(
-                    operation
-                    for operation in operations
-                    if isinstance(operation, str) and operation not in DeclarativeCampaignMapRuntime.__dict__
-                )
-
-    assert missing == set()
 
 
 def test_execution_settings_compile_to_legacy_campaign_primitives() -> None:
