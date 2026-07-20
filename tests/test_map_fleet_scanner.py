@@ -39,6 +39,7 @@ class _ScannerFleet(Fleet):
         self._map_observer = CampaignMapObserver(
             combat=STANDARD_CAMPAIGN_MAP_OBSERVER.combat,
             scanner=scanner,
+            enemy_searching=STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching,
         )
 
 

@@ -1,11 +1,12 @@
 from module.base.decorator import del_cached_property
 from module.base.timer import Timer
 from module.exception import CampaignEnd
-from module.handler.assets import IN_MAP, MAP_ENEMY_SEARCHING
+from module.handler.assets import IN_MAP
 from module.handler.info_handler import InfoHandler
 from module.handler.map_transition_ui import STANDARD_MAP_TRANSITION_UI, MapTransitionUi
 from module.logger import logger
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION, MAP_PREPARATION_CANCEL
+from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
 from module.ui.assets import CAMPAIGN_CHECK, EVENT_CHECK, SP_CHECK
 
 IN_STAGE_MESSAGE = "In stage."
@@ -13,6 +14,7 @@ IN_STAGE_MESSAGE = "In stage."
 
 class EnemySearchingHandler(InfoHandler):
     _map_transition_ui: MapTransitionUi = STANDARD_MAP_TRANSITION_UI
+    _map_observer: CampaignMapObserver = STANDARD_CAMPAIGN_MAP_OBSERVER
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.5  # 实测通常为 0.70～0.80。
     MAP_ENEMY_SEARCHING_TIMEOUT_SECOND = 5
     in_stage_timer = Timer(0.5, count=2)
@@ -28,7 +30,10 @@ class EnemySearchingHandler(InfoHandler):
         if not self.is_in_map():
             return False
 
-        return MAP_ENEMY_SEARCHING.match_luma(self.device.image, offset=(5, 5))
+        return self._map_observer.enemy_searching.appears(
+            self.device.image,
+            overlay_transparency_threshold=self.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD,
+        )
 
     def handle_enemy_flashing(self) -> None:
         self.device.sleep(1.2)

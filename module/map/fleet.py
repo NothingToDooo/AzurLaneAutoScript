@@ -12,7 +12,6 @@ from module.handler.ambush import AmbushHandler
 from module.logger import logger
 from module.map.camera import Camera, FullScanOptions
 from module.map.map_grids import SelectedGrids
-from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
 from module.map.utils import location_ensure, match_movable
 
 if TYPE_CHECKING:
@@ -47,7 +46,6 @@ class _GotoState:
 
 
 class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - 待拆分轮次状态与舰队定位。
-    _map_observer: CampaignMapObserver = STANDARD_CAMPAIGN_MAP_OBSERVER
     fleet_1_location: FleetLocation = ()
     fleet_2_location: FleetLocation = ()
     fleet_submarine_location: FleetLocation = ()

@@ -845,11 +845,7 @@
         {
           "implementation": "observation/red_overlay_enemy_search",
           "kind": "map_observation",
-          "options": {
-            "operations": [
-              "enemy_searching_appear"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "event_20220915_cn/campaign_base/campaign_base"
@@ -2369,11 +2365,7 @@
         {
           "implementation": "observation/red_overlay_enemy_search",
           "kind": "map_observation",
-          "options": {
-            "operations": [
-              "enemy_searching_appear"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "war_archives_20220915_cn/campaign_base/campaign_base"

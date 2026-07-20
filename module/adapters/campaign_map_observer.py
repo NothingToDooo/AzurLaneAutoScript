@@ -7,6 +7,7 @@ from module.map.map_observer import (
     CampaignMapObserver,
     CampaignMapScanner,
     CombatMapObserver,
+    EnemySearchingObserver,
     MapObserverRuntime,
     MapScannerRuntime,
 )
@@ -16,6 +17,7 @@ from .campaign_runtime_profile import RuntimeExecutorInstance
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    from module.base.type_alias import ImageArray
     from module.map.camera import FullScanOptions
     from module.map.map_grids import SelectedGrids
     from module.map.type_alias import GridMode
@@ -59,11 +61,33 @@ class FullScanMovableHandler(Protocol):
     ) -> None: ...
 
 
+class EnemySearchingNext(Protocol):
+    def __call__(
+        self,
+        image: ImageArray,
+        /,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool: ...
+
+
+class EnemySearchingHandler(Protocol):
+    def __call__(
+        self,
+        image: ImageArray,
+        next_handler: EnemySearchingNext,
+        /,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool: ...
+
+
 @dataclass(frozen=True, slots=True)
 class CampaignMapObserverContributor:
     camera_repositioning: CameraRepositioningHandler | None = None
     full_scan: FullScanHandler | None = None
     full_scan_movable: FullScanMovableHandler | None = None
+    enemy_searching: EnemySearchingHandler | None = None
 
 
 @runtime_checkable
@@ -136,6 +160,23 @@ class _ComposedCampaignMapScanner(CampaignMapScanner):
         self.full_scan_movable_handler(runtime, enemy_cleared=enemy_cleared)
 
 
+@dataclass(frozen=True, slots=True)
+class _ComposedEnemySearchingObserver(EnemySearchingObserver):
+    handler: EnemySearchingNext
+
+    @override
+    def appears(
+        self,
+        image: ImageArray,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool:
+        return self.handler(
+            image,
+            overlay_transparency_threshold=overlay_transparency_threshold,
+        )
+
+
 def _overlay_camera_repositioning(
     handler: CameraRepositioningHandler,
     next_handler: CameraRepositioningNext,
@@ -170,6 +211,24 @@ def _overlay_full_scan_movable(
     return execute
 
 
+def _overlay_enemy_searching(
+    handler: EnemySearchingHandler,
+    next_handler: EnemySearchingNext,
+) -> EnemySearchingNext:
+    def execute(
+        image: ImageArray,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool:
+        return handler(
+            image,
+            next_handler,
+            overlay_transparency_threshold=overlay_transparency_threshold,
+        )
+
+    return execute
+
+
 def _standard_full_scan(runtime: MapScannerRuntime, request: FullScanRequest) -> None:
     STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan(
         runtime,
@@ -186,6 +245,7 @@ def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObser
     camera_repositioning = STANDARD_CAMPAIGN_MAP_OBSERVER.combat.camera_repositioned_after_combat
     full_scan = _standard_full_scan
     full_scan_movable = STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan_movable
+    enemy_searching = STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching.appears
     for instance in instances:
         if not isinstance(instance, CampaignMapObserverContributorSource):
             continue
@@ -202,7 +262,13 @@ def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObser
                 contributor.full_scan_movable,
                 full_scan_movable,
             )
+        if contributor.enemy_searching is not None:
+            enemy_searching = _overlay_enemy_searching(
+                contributor.enemy_searching,
+                enemy_searching,
+            )
     return CampaignMapObserver(
         combat=_ComposedCombatMapObserver(camera_repositioning),
         scanner=_ComposedCampaignMapScanner(full_scan, full_scan_movable),
+        enemy_searching=_ComposedEnemySearchingObserver(enemy_searching),
     )

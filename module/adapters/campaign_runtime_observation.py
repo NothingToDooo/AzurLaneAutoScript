@@ -12,6 +12,7 @@ from module.map.utils import location_ensure
 from .campaign_map_observer import (
     CampaignMapObserverContributor,
     CampaignMapObserverExecutor,
+    EnemySearchingNext,
     FullScanMovableNext,
     FullScanNext,
     FullScanRequest,
@@ -26,10 +27,9 @@ from .campaign_runtime_profile import (
 )
 
 if TYPE_CHECKING:
-    from module.base.type_alias import Point
+    from module.base.type_alias import ImageArray, Point
     from module.campaign.campaign_engine import CampaignEngine
     from module.config.config import AzurLaneConfig
-    from module.device.device import Device
     from module.map.map_grids import SelectedGrids
     from module.map.map_observer import MapScannerRuntime
     from module.map.utils import HasLocation
@@ -37,9 +37,7 @@ if TYPE_CHECKING:
 
 
 class _ObservationRuntimeHost(Protocol):
-    MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD: float
     config: AzurLaneConfig
-    device: Device
     map: object
     fleet_1: object
     fleet_2: object
@@ -56,8 +54,6 @@ class _ObservationRuntimeHost(Protocol):
         *args: object,
         **kwargs: object,
     ) -> object: ...
-
-    def is_in_map(self) -> bool: ...
 
     def focus_to(self, location: object) -> object: ...
 
@@ -154,27 +150,22 @@ def _build_preserve_enemy_genre(context: RuntimeExecutorBuildContext) -> Runtime
 
 
 def _build_red_overlay_enemy_search(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-    _require_operations(options, frozenset({"enemy_searching_appear"}))
+    del context
 
-    def enemy_searching_appear(runtime: object) -> object:
-        host = _host(runtime)
-        if not host.is_in_map():
-            return False
+    def enemy_searching_appear(
+        image: ImageArray,
+        next_handler: EnemySearchingNext,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool:
+        del next_handler
         transparency = red_overlay_transparency(
             MAP_ENEMY_SEARCHING.color,
-            get_color(host.device.image, MAP_ENEMY_SEARCHING.area),
+            get_color(image, MAP_ENEMY_SEARCHING.area),
         )
-        return bool(transparency > host.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD)
+        return bool(transparency > overlay_transparency_threshold)
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={
-            RuntimeExecutorKind.MAP_OBSERVATION: {
-                RuntimeOperation.ENEMY_SEARCHING_APPEAR: enemy_searching_appear,
-            }
-        },
-    )
+    return CampaignMapObserverExecutor(CampaignMapObserverContributor(enemy_searching=enemy_searching_appear))
 
 
 def _build_fixed_fleet_locations(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
@@ -390,7 +381,7 @@ def observation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDe
         ),
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("observation/red_overlay_enemy_search"),
-            {observation: RuntimeExecutorOptionsSchema(required=frozenset({"operations"}))},
+            {observation: RuntimeExecutorOptionsSchema()},
             _build_red_overlay_enemy_search,
         ),
         RuntimeExecutorFactoryDescriptor(

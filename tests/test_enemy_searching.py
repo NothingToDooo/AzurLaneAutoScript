@@ -1,13 +1,16 @@
 from typing import TYPE_CHECKING, override
 
+import numpy as np
+import pytest
+
 from module.handler import enemy_searching as enemy_searching_module
 from module.handler.enemy_searching import EnemySearchingHandler
+from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import pytest
-
+    from module.base.type_alias import ImageArray
     from module.handler.map_transition_ui import (
         MapTransitionCombatRuntime,
         MapTransitionRuntime,
@@ -37,7 +40,7 @@ class _Timer:
 
 class _Device:
     def __init__(self) -> None:
-        self.image = "screen"
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
         self.screenshot_count = 0
         self.sleep_calls = []
 
@@ -125,6 +128,39 @@ class _EnemySearching(EnemySearchingHandler):
         self.flashing_count += 1
 
 
+class _RecordingEnemySearchingObserver:
+    def __init__(self, *, result: bool) -> None:
+        self.result = result
+        self.calls: list[tuple[ImageArray, float]] = []
+
+    def appears(
+        self,
+        image: ImageArray,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool:
+        self.calls.append((image, overlay_transparency_threshold))
+        return self.result
+
+
+class _CanonicalEnemySearching(EnemySearchingHandler):
+    device: _Device
+
+    def __init__(self, observer: _RecordingEnemySearchingObserver) -> None:
+        self.device = _Device()
+        self.in_map_results: list[bool] = []
+        self._map_observer = CampaignMapObserver(
+            combat=STANDARD_CAMPAIGN_MAP_OBSERVER.combat,
+            scanner=STANDARD_CAMPAIGN_MAP_OBSERVER.scanner,
+            enemy_searching=observer,
+        )
+
+    def is_in_map(self) -> bool:
+        if self.in_map_results:
+            return self.in_map_results.pop(0)
+        return False
+
+
 class _MapTransitionProbe:
     def __init__(
         self,
@@ -156,6 +192,23 @@ class _MapTransitionProbe:
     def combat_end_override(runtime: MapTransitionCombatRuntime) -> Callable[[], bool] | None:
         del runtime
         raise AssertionError
+
+
+def test_enemy_searching_public_path_gates_before_forwarding_the_same_image_and_threshold() -> None:
+    observer = _RecordingEnemySearchingObserver(result=True)
+    handler = _CanonicalEnemySearching(observer)
+    handler.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.65
+
+    handler.in_map_results = [False]
+    assert not handler.enemy_searching_appear()
+    assert observer.calls == []
+
+    handler.in_map_results = [True]
+    assert handler.enemy_searching_appear()
+    assert len(observer.calls) == 1
+    image, threshold = observer.calls[0]
+    assert image is handler.device.image
+    assert threshold == pytest.approx(0.65)
 
 
 def test_enemy_searching_returns_false_outside_map() -> None:

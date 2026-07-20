@@ -670,14 +670,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             sub_hunt=sub_hunt,
         )
 
-    def enemy_searching_appear(self) -> bool:
-        result = self._runtime_profile.observation.invoke(
-            RuntimeOperation.ENEMY_SEARCHING_APPEAR,
-            self,
-            lambda: CampaignEngine.enemy_searching_appear(self),
-        )
-        return bool(result)
-
     def find_current_fleet(self) -> FleetLocation:
         result = self._runtime_profile.observation.invoke(
             RuntimeOperation.FIND_CURRENT_FLEET,

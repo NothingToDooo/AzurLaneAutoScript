@@ -1,5 +1,5 @@
 from dataclasses import FrozenInstanceError
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -9,6 +9,7 @@ from module.adapters.campaign_map_observer import (
     FullScanRequest,
     build_campaign_map_observer,
 )
+from module.handler.assets import MAP_ENEMY_SEARCHING
 from module.map.camera import FullScanOptions
 from module.map.map_base import CampaignMap
 from module.map.map_grids import SelectedGrids
@@ -19,11 +20,14 @@ if TYPE_CHECKING:
     from module.adapters.campaign_map_observer import (
         CameraRepositioningHandler,
         CameraRepositioningNext,
+        EnemySearchingHandler,
+        EnemySearchingNext,
         FullScanHandler,
         FullScanMovableHandler,
         FullScanMovableNext,
         FullScanNext,
     )
+    from module.base.type_alias import ImageArray
     from module.map.map_observer import MapObserverRuntime, MapScannerRuntime
     from module.map.type_alias import GridMode
 
@@ -171,3 +175,97 @@ def test_map_observer_is_frozen_and_composes_scanners_later_first() -> None:
     with pytest.raises(FrozenInstanceError):
         setattr(observer, field_name, STANDARD_CAMPAIGN_MAP_OBSERVER.combat)
     assert isinstance(observer, CampaignMapObserver)
+
+
+def test_standard_enemy_searching_observer_uses_the_exact_image_and_luma_offset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    image = cast("ImageArray", object())
+    calls: list[tuple[object, object]] = []
+
+    def match_luma(_button: object, observed_image: object, *, offset: object) -> bool:
+        calls.append((observed_image, offset))
+        return True
+
+    monkeypatch.setattr(type(MAP_ENEMY_SEARCHING), "match_luma", match_luma)
+
+    assert STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching.appears(
+        image,
+        overlay_transparency_threshold=0.65,
+    )
+    assert calls == [(image, (5, 5))]
+
+
+def test_enemy_searching_observer_composes_later_first_with_the_same_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    image = cast("ImageArray", object())
+    calls: list[tuple[str, object, float | None]] = []
+
+    def match_luma(_button: object, observed_image: object, *, offset: object) -> bool:
+        calls.append(("standard", observed_image, None))
+        assert offset == (5, 5)
+        return True
+
+    def handler(label: str) -> EnemySearchingHandler:
+        def execute(
+            observed_image: ImageArray,
+            next_handler: EnemySearchingNext,
+            *,
+            overlay_transparency_threshold: float,
+        ) -> bool:
+            calls.append((label, observed_image, overlay_transparency_threshold))
+            return next_handler(
+                observed_image,
+                overlay_transparency_threshold=overlay_transparency_threshold,
+            )
+
+        return execute
+
+    monkeypatch.setattr(type(MAP_ENEMY_SEARCHING), "match_luma", match_luma)
+    observer = build_campaign_map_observer(
+        (
+            CampaignMapObserverExecutor(CampaignMapObserverContributor(enemy_searching=handler("first"))),
+            CampaignMapObserverExecutor(CampaignMapObserverContributor(enemy_searching=handler("second"))),
+        )
+    )
+
+    assert observer.enemy_searching.appears(
+        image,
+        overlay_transparency_threshold=0.65,
+    )
+    assert calls == [
+        ("second", image, 0.65),
+        ("first", image, 0.65),
+        ("standard", image, None),
+    ]
+
+
+def test_enemy_searching_replacement_does_not_call_next(monkeypatch: pytest.MonkeyPatch) -> None:
+    image = cast("ImageArray", object())
+    calls: list[tuple[object, float]] = []
+
+    def unexpected_standard(_button: object, _image: object, *, offset: object) -> bool:
+        del offset
+        raise AssertionError
+
+    def replacement(
+        observed_image: ImageArray,
+        next_handler: EnemySearchingNext,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool:
+        del next_handler
+        calls.append((observed_image, overlay_transparency_threshold))
+        return False
+
+    monkeypatch.setattr(type(MAP_ENEMY_SEARCHING), "match_luma", unexpected_standard)
+    observer = build_campaign_map_observer(
+        (CampaignMapObserverExecutor(CampaignMapObserverContributor(enemy_searching=replacement)),)
+    )
+
+    assert not observer.enemy_searching.appears(
+        image,
+        overlay_transparency_threshold=0.5,
+    )
+    assert calls == [(image, 0.5)]

@@ -36,7 +36,6 @@ class RuntimeOperation(StrEnum):
     EXPECTED_END = "expected_end"
     MAP_SWIPE = "map_swipe"
     CLEAR_BOSS = "clear_boss"
-    ENEMY_SEARCHING_APPEAR = "enemy_searching_appear"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
     FIND_CURRENT_FLEET = "find_current_fleet"
     FLEET_PREPARATION = "fleet_preparation"

@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, override
 
+from module.handler.assets import MAP_ENEMY_SEARCHING
 from module.logger import logger
 
 if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
     from module.map.camera import FullScanOptions
     from module.map.map_base import CampaignMap
     from module.map.map_grids import SelectedGrids
@@ -58,10 +60,22 @@ class CampaignMapScanner(Protocol):
     ) -> None: ...
 
 
+class EnemySearchingObserver(Protocol):
+    """识别当前截图中的寻敌动画；地图页判定由调用者统一负责。"""
+
+    def appears(
+        self,
+        image: ImageArray,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool: ...
+
+
 @dataclass(frozen=True, slots=True)
 class CampaignMapObserver:
     combat: CombatMapObserver
     scanner: CampaignMapScanner
+    enemy_searching: EnemySearchingObserver
 
 
 class _StandardCombatMapObserver(CombatMapObserver):
@@ -108,7 +122,20 @@ class _StandardCampaignMapScanner(CampaignMapScanner):
         )
 
 
+class _StandardEnemySearchingObserver(EnemySearchingObserver):
+    @override
+    def appears(
+        self,
+        image: ImageArray,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool:
+        del overlay_transparency_threshold
+        return MAP_ENEMY_SEARCHING.match_luma(image, offset=(5, 5))
+
+
 STANDARD_CAMPAIGN_MAP_OBSERVER = CampaignMapObserver(
     combat=_StandardCombatMapObserver(),
     scanner=_StandardCampaignMapScanner(),
+    enemy_searching=_StandardEnemySearchingObserver(),
 )
