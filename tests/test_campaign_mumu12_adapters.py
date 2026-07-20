@@ -213,6 +213,26 @@ def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
     assert combat_result.handle_experience_result(runtime) is False
 
 
+def test_declarative_runtime_wires_t4_map_observer_to_the_real_fortress_grid() -> None:
+    config = in_memory_config("campaign-map-observer-wiring", {})
+    definition = load_default_stage(StageRef("event_20211125_cn", "t4"))
+    runtime = DeclarativeCampaignMapRuntime(config, object.__new__(Device), definition)
+    runtime.MAP.load_mechanism(fortress=True)
+    destination = runtime.MAP[(2, 1)]
+    sleeps: list[float] = []
+    runtime.device = cast("Device", SimpleNamespace(sleep=sleeps.append))
+    runtime.map = runtime.MAP
+    runtime.battle_count = 1
+    runtime.map_is_clear_mode = False
+
+    assert destination.is_fortress
+    assert runtime._map_observer.camera_repositioned_after_combat(  # ruff:ignore[private-member-access] - 删除 profile wiring 时必须失败。
+        runtime,
+        destination,
+    )
+    assert sleeps == [3]
+
+
 class _ExpectedEndTransitionProbe:
     def __init__(self, override: object | None) -> None:
         self.override = override

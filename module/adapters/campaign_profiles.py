@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from module.adapters.campaign_event_ui import build_campaign_event_ui_services
+from module.adapters.campaign_map_observer import build_campaign_map_observer
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
@@ -51,6 +52,7 @@ def _validate_executor_contracts(
         try:
             manager = CampaignRuntimeProfileManager(profile, executors)
             build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
+            build_campaign_map_observer(manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION))
         except CampaignRuntimeProfileError as error:
             message = f"runtime profile {profile.profile_id.value} is not executable: {error}"
             raise ContentValidationError(message) from error

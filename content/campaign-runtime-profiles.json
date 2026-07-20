@@ -698,11 +698,7 @@
         {
           "implementation": "event_20211125_cn/t4/campaign",
           "kind": "map_observation",
-          "options": {
-            "operations": [
-              "catch_camera_repositioning"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "event_20211125_cn/t4/campaign"

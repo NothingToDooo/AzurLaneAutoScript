@@ -12,6 +12,7 @@ from module.handler.ambush import AmbushHandler
 from module.logger import logger
 from module.map.camera import Camera, FullScanOptions
 from module.map.map_grids import SelectedGrids
+from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
 from module.map.utils import location_ensure, match_movable
 
 if TYPE_CHECKING:
@@ -46,6 +47,7 @@ class _GotoState:
 
 
 class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - 待拆分轮次状态与舰队定位。
+    _map_observer: CampaignMapObserver = STANDARD_CAMPAIGN_MAP_OBSERVER
     fleet_1_location: FleetLocation = ()
     fleet_2_location: FleetLocation = ()
     fleet_submarine_location: FleetLocation = ()
@@ -326,12 +328,13 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         state.result = "combat"
         self.battle_count += 1
         self.fleet_ammo -= 1
+        destination = self.map[state.location]
         if "siren" in state.expected or (self.config.MAP_HAS_MOVABLE_ENEMY and not state.expected):
             self.siren_count += 1
-        elif self.map[state.location].may_enemy:
-            self.map[state.location].is_cleared = True
+        elif destination.may_enemy:
+            destination.is_cleared = True
 
-        if self.catch_camera_repositioning():
+        if self._map_observer.camera_repositioned_after_combat(self, destination):
             self.handle_boss_appear_refocus()
             if sum(self.hp) < 0.01:
                 logger.warning("Empty HP on all slots, trying hp_get again")
@@ -1139,16 +1142,6 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         for block in roadblocks:
             block.is_enemy = True
         self.find_path_initial()
-
-    def catch_camera_repositioning(self) -> bool:
-        """检测 Boss 出现后是否触发了地图镜头重定位。"""
-        appear = False
-        for data in self.map.spawn_data:
-            if data.get("battle") == self.battle_count and data.get("boss", 0):
-                logger.info("Catch camera re-positioning after boss appear")
-                appear = True
-
-        return appear
 
     def handle_boss_appear_refocus(self, preset: GridLocation | None = None) -> None:
         """Boss 出现并触发镜头移动后，按 (x, y) 滑动预设恢复原相机位置。"""

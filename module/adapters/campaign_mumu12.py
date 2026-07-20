@@ -14,6 +14,7 @@ from module.adapters.campaign_live import (
     CommittedCampaignUnit,
     build_existing_campaign_map_workflow,
 )
+from module.adapters.campaign_map_observer import build_campaign_map_observer
 from module.adapters.campaign_map_session_mumu12 import (
     Mumu12CampaignMapSessionOwner,
     apply_campaign_map_mutations,
@@ -455,7 +456,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
 
     definition: CampaignStageDefinition
     session_variant: CampaignRunVariant
-    fleet_destination: object | None
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
     _event_ui_services: CampaignEventUiServices
     _runtime_profile: CampaignRuntimeProfileManager
@@ -489,12 +489,14 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         self._runtime_profile.apply_config(config)
         self.ENEMY_FILTER = definition.enemy_filter
         self.session_variant = CampaignRunVariant.NORMAL
-        self.fleet_destination = None
         self._gems_behavior = None
         super().__init__(config=config, device=device)
         self._runtime_profile.apply_runtime_tunings(self)
         self._runtime_profile.bind(self, self.MAP)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
+        self._map_observer = build_campaign_map_observer(
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION)
+        )
         self._event_ui_services = build_campaign_event_ui_services(
             self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
         )
@@ -669,14 +671,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             sub_view=sub_view,
             sub_hunt=sub_hunt,
         )
-
-    def catch_camera_repositioning(self) -> bool:
-        result = self._runtime_profile.observation.invoke(
-            RuntimeOperation.CATCH_CAMERA_REPOSITIONING,
-            self,
-            lambda: CampaignEngine.catch_camera_repositioning(self),
-        )
-        return bool(result)
 
     def enemy_searching_appear(self) -> bool:
         result = self._runtime_profile.observation.invoke(

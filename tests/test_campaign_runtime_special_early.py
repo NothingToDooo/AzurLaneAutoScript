@@ -1,9 +1,13 @@
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
 
 from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
+from module.adapters.campaign_map_observer import (
+    CampaignMapObserverContributor,
+    CampaignMapObserverExecutor,
+    build_campaign_map_observer,
+)
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
@@ -23,10 +27,14 @@ from module.content.runtime_profile import (
     RuntimeImplementationId,
 )
 from module.handler.assets import MYSTERY_ITEM
+from module.map.map_base import CampaignMap
+from module.map_detection.grid_info import GridInfo
 from module.ui.page import page_campaign_menu, page_event, page_main
 
 if TYPE_CHECKING:
+    from module.adapters.campaign_map_observer import CameraRepositioningNext
     from module.base.button import Button, MatchOffset
+    from module.map.map_observer import MapObserverRuntime
     from module.ui.page import Page
 
 _T4_IMPLEMENTATION = "event_20211125_cn/t4/campaign"
@@ -49,16 +57,13 @@ class _Device:
         self.screenshot_count += 1
 
 
-@dataclass(slots=True)
-class _Destination:
-    is_fortress: bool
-
-
 class _Runtime:
     def __init__(self, manager: CampaignRuntimeProfileManager) -> None:
         self.manager = manager
         self.device = _Device()
-        self.fleet_destination: _Destination | None = None
+        self.map = CampaignMap("special-early-test")
+        self.map.spawn_data = []
+        self.battle_count = 0
         self.map_is_clear_mode = False
         self.visible_asset: object | None = None
         self.visible_page: object | None = None
@@ -163,7 +168,7 @@ def _t4_manager(**extra_options: object) -> CampaignRuntimeProfileManager:
         _binding(
             _T4_IMPLEMENTATION,
             RuntimeExecutorKind.MAP_OBSERVATION,
-            ["catch_camera_repositioning"],
+            None,
             **extra_options,
         )
     )
@@ -188,46 +193,55 @@ def _event_ui_services(manager: CampaignRuntimeProfileManager) -> CampaignEventU
     return build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
 
 
-def test_t4_observation_preserves_base_camera_repositioning_result() -> None:
+def test_t4_observation_preserves_base_result_and_destination_identity() -> None:
     manager = _t4_manager()
     runtime = _Runtime(manager)
+    destination = GridInfo()
+    observed: list[tuple[MapObserverRuntime, GridInfo]] = []
 
-    result = manager.observation.invoke(
-        RuntimeOperation.CATCH_CAMERA_REPOSITIONING,
-        runtime,
-        lambda: True,
+    def base_result(
+        observed_runtime: MapObserverRuntime,
+        observed_destination: GridInfo,
+        next_handler: CameraRepositioningNext,
+    ) -> bool:
+        del next_handler
+        observed.append((observed_runtime, observed_destination))
+        return True
+
+    observer = build_campaign_map_observer(
+        (
+            CampaignMapObserverExecutor(CampaignMapObserverContributor(camera_repositioning=base_result)),
+            *manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
+        )
     )
+    result = observer.camera_repositioned_after_combat(runtime, destination)
 
     assert result is True
+    assert observed == [(runtime, destination)]
     assert runtime.device.sleeps == []
 
 
 @pytest.mark.parametrize(
-    ("destination", "is_clear_mode", "expected", "expected_sleeps"),
+    "scenario",
     [
-        (None, False, False, []),
-        (_Destination(is_fortress=False), False, False, []),
-        (_Destination(is_fortress=True), True, False, []),
-        (_Destination(is_fortress=True), False, True, [3]),
+        (False, False, False, []),
+        (False, True, False, []),
+        (True, True, False, []),
+        (True, False, True, [3]),
     ],
 )
 def test_t4_observation_only_waits_for_a_fortress_camera_move(
-    destination: _Destination | None,
-    *,
-    is_clear_mode: bool,
-    expected: bool,
-    expected_sleeps: list[float],
+    scenario: tuple[bool, bool, bool, list[float]],
 ) -> None:
+    is_fortress, is_clear_mode, expected, expected_sleeps = scenario
     manager = _t4_manager()
     runtime = _Runtime(manager)
-    runtime.fleet_destination = destination
     runtime.map_is_clear_mode = is_clear_mode
+    destination = GridInfo()
+    destination.is_fortress = is_fortress
 
-    result = manager.observation.invoke(
-        RuntimeOperation.CATCH_CAMERA_REPOSITIONING,
-        runtime,
-        lambda: False,
-    )
+    observer = build_campaign_map_observer(manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION))
+    result = observer.camera_repositioned_after_combat(runtime, destination)
 
     assert result is expected
     assert runtime.device.sleeps == expected_sleeps
@@ -330,13 +344,13 @@ def test_special_early_descriptors_reject_unknown_options() -> None:
         _t4_manager(unexpected=True)
 
 
-def test_special_early_descriptors_reject_operation_drift() -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match="event_20211125 T4 observation operations mismatch"):
+def test_t4_observer_rejects_obsolete_operations_field() -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match="unknown option: operations"):
         _manager(
             _binding(
                 _T4_IMPLEMENTATION,
                 RuntimeExecutorKind.MAP_OBSERVATION,
-                ["full_scan"],
+                ["catch_camera_repositioning"],
             )
         )
 

@@ -9,6 +9,11 @@ from module.logger import logger
 from module.ui.page import page_campaign_menu, page_event
 
 from .campaign_event_ui import CampaignEventUiContributor, CampaignEventUiExecutor
+from .campaign_map_observer import (
+    CameraRepositioningNext,
+    CampaignMapObserverContributor,
+    CampaignMapObserverExecutor,
+)
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
@@ -20,6 +25,9 @@ from .campaign_runtime_profile import (
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from module.map.map_observer import MapObserverRuntime
+    from module.map_detection.grid_info import GridInfo
 
 type _Offset = tuple[int, int] | tuple[int, int, int, int]
 
@@ -35,22 +43,9 @@ class _Device(Protocol):
     def screenshot(self) -> object: ...
 
 
-class _FortressDestination(Protocol):
-    is_fortress: bool
-
-
 class _T4ObservationHost(Protocol):
     device: _Device
-    fleet_destination: _FortressDestination | None
     map_is_clear_mode: bool
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
 
 
 class _RyzaRuntimeHost(Protocol):
@@ -107,34 +102,23 @@ def _require_operations(
 
 
 def _build_t4_observation(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-    _require_operations(
-        options,
-        frozenset({"catch_camera_repositioning"}),
-        label="event_20211125 T4 observation",
-    )
+    del context
 
-    def catch_camera_repositioning(runtime: object) -> bool:
+    def camera_repositioning(
+        runtime: MapObserverRuntime,
+        destination: GridInfo,
+        next_handler: CameraRepositioningNext,
+    ) -> bool:
         host = cast("_T4ObservationHost", runtime)
-        if host.runtime_super(RuntimeOperation.CATCH_CAMERA_REPOSITIONING):
+        if next_handler(runtime, destination):
             return True
-        destination = host.fleet_destination
-        if destination is None:
-            return False
         if not host.map_is_clear_mode and destination.is_fortress:
             logger.info("Catch camera re-positioning after fortress cleared")
             host.device.sleep(3)
             return True
         return False
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={
-            RuntimeExecutorKind.MAP_OBSERVATION: {
-                RuntimeOperation.CATCH_CAMERA_REPOSITIONING: catch_camera_repositioning,
-            }
-        },
-    )
+    return CampaignMapObserverExecutor(CampaignMapObserverContributor(camera_repositioning=camera_repositioning))
 
 
 class _RyzaEventDestination(EventDestination):
@@ -192,7 +176,7 @@ def special_early_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactory
     return (
         RuntimeExecutorFactoryDescriptor(
             _T4_IMPLEMENTATION,
-            {RuntimeExecutorKind.MAP_OBSERVATION: operations_only},
+            {RuntimeExecutorKind.MAP_OBSERVATION: empty_options},
             _build_t4_observation,
         ),
         RuntimeExecutorFactoryDescriptor(
