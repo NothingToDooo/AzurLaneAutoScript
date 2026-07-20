@@ -18,6 +18,7 @@ from module.logger import logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Concatenate
 
     from adbutils import AdbConnection
     from numpy.typing import NDArray
@@ -39,8 +40,15 @@ class _CommandTarget(Protocol):
     def minitouch_send(self, builder: CommandBuilder) -> str | None: ...
 
 
+class _MinitouchRecoverySession(Protocol):
+    def adb_reconnect(self) -> None: ...
+
+    def adb_start_server(self) -> int: ...
+
+
 class _MinitouchRecoveryTarget(Protocol):
-    session: MinitouchSession
+    @property
+    def session(self) -> _MinitouchRecoverySession: ...
 
     def _reset_minitouch_connection(self, *, remove_forward: bool = True) -> None: ...
 
@@ -307,8 +315,8 @@ def _minitouch_error_recovery(
 
 
 def retry[TargetT: _MinitouchRecoveryTarget, **P, ResultT](
-    func: Callable[[TargetT, *P.args], ResultT],
-) -> Callable[[TargetT, *P.args], ResultT]:
+    func: Callable[Concatenate[TargetT, P], ResultT],
+) -> Callable[Concatenate[TargetT, P], ResultT]:
     @wraps(func)
     def retry_wrapper(self: TargetT, *args: P.args, **kwargs: P.kwargs) -> ResultT:
         recovery: Recovery | None = None

@@ -2,7 +2,6 @@ import ctypes
 import os
 import sys
 import time
-from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Protocol
 
@@ -208,17 +207,6 @@ def _run_with_retry[TargetT: _NemuRetryTarget, ResultT](
     message = NEMU_IPC_TIMEOUT_MESSAGE if isinstance(terminal_error, JobTimeout) else f"Retry {func_name}() failed"
     logger.critical(message)
     raise RequestHumanTakeover(message) from terminal_error
-
-
-def retry[TargetT: _NemuRetryTarget, **P, ResultT](
-    func: Callable[[TargetT, *P.args], ResultT],
-) -> Callable[[TargetT, *P.args], ResultT]:
-    @wraps(func)
-    def retry_wrapper(self: TargetT, *args: P.args, **kwargs: P.kwargs) -> ResultT:
-        func_name = getattr(func, "__name__", type(func).__name__)
-        return _run_with_retry(self, func_name, lambda _trial: func(self, *args, **kwargs))
-
-    return retry_wrapper
 
 
 class NemuIpcImpl:

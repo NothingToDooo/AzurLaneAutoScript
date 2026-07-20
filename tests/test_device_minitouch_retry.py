@@ -130,8 +130,9 @@ class _Session:
     def adb_reconnect(self) -> None:
         self.calls.append("adb_reconnect")
 
-    def adb_start_server(self) -> None:
+    def adb_start_server(self) -> int:
         self.calls.append("adb_start_server")
+        return 0
 
 
 class _Minitouch:
