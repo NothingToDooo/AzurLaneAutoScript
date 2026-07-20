@@ -5,6 +5,11 @@ from module.combat.assets import ALCHEMIST_MATERIAL_CONFIRM
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
 from module.ui.page import page_campaign, page_event
 
+from .campaign_event_ui import (
+    CampaignEventCombatResultContributor,
+    CampaignEventUiContributor,
+    CampaignEventUiExecutor,
+)
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
@@ -15,8 +20,11 @@ from .campaign_runtime_profile import (
 )
 
 if TYPE_CHECKING:
+    from module.combat.combat_result_ui import CombatResultRuntime
     from module.config.config import AzurLaneConfig
     from module.config.config_generated import ConfigOverrides
+
+    from .campaign_event_ui import EventCombatResultNext
 
 
 class _SemanticRuntimeHost(Protocol):
@@ -114,7 +122,6 @@ def _require_operations(
 
 def _build_exp_info_page_guard(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = _required_options(context, RuntimeExecutorKind.EVENT_UI)
-    _require_operations(options, frozenset({"handle_exp_info"}))
     blocked_page = _string_option(options, "blocked_page")
     if blocked_page == "campaign":
         page = page_campaign
@@ -124,25 +131,27 @@ def _build_exp_info_page_guard(context: RuntimeExecutorBuildContext) -> RuntimeE
         message = f"unsupported EXP-info blocked page: {blocked_page}"
         raise CampaignRuntimeProfileError(message)
 
-    def handle_exp_info(runtime: object) -> object:
+    def handle_experience_result(
+        runtime: CombatResultRuntime,
+        next_handler: EventCombatResultNext,
+    ) -> bool:
         host = _host(runtime)
         if host.ui_page_appear(page):
             return False
-        return host.runtime_super(RuntimeOperation.HANDLE_EXP_INFO)
+        return next_handler(runtime)
 
-    return RuntimeExecutorInstance(
+    return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
-        methods={
-            RuntimeExecutorKind.EVENT_UI: {
-                RuntimeOperation.HANDLE_EXP_INFO: handle_exp_info,
-            }
-        },
+        CampaignEventUiContributor(
+            combat_result=CampaignEventCombatResultContributor(
+                handle_experience_result=handle_experience_result,
+            )
+        ),
     )
 
 
 def _build_exp_info_click_guard(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = _required_options(context, RuntimeExecutorKind.EVENT_UI)
-    _require_operations(options, frozenset({"handle_exp_info"}))
     asset = _string_option(options, "asset")
     if asset != "ALCHEMIST_MATERIAL_CONFIRM":
         message = f"unsupported EXP-info confirmation asset: {asset}"
@@ -150,7 +159,10 @@ def _build_exp_info_click_guard(context: RuntimeExecutorBuildContext) -> Runtime
     offset = _offset_option(options, "offset")
     interval = _number_option(options, "interval")
 
-    def handle_exp_info(runtime: object) -> object:
+    def handle_experience_result(
+        runtime: CombatResultRuntime,
+        next_handler: EventCombatResultNext,
+    ) -> bool:
         host = _host(runtime)
         if host.appear_then_click(
             ALCHEMIST_MATERIAL_CONFIRM,
@@ -158,15 +170,15 @@ def _build_exp_info_click_guard(context: RuntimeExecutorBuildContext) -> Runtime
             interval=interval,
         ):
             return False
-        return host.runtime_super(RuntimeOperation.HANDLE_EXP_INFO)
+        return next_handler(runtime)
 
-    return RuntimeExecutorInstance(
+    return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
-        methods={
-            RuntimeExecutorKind.EVENT_UI: {
-                RuntimeOperation.HANDLE_EXP_INFO: handle_exp_info,
-            }
-        },
+        CampaignEventUiContributor(
+            combat_result=CampaignEventCombatResultContributor(
+                handle_experience_result=handle_experience_result,
+            )
+        ),
     )
 
 
@@ -267,7 +279,7 @@ def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("event_ui/exp_info_page_guard"),
             {
                 RuntimeExecutorKind.EVENT_UI: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "blocked_page"}),
+                    required=frozenset({"blocked_page"}),
                 )
             },
             _build_exp_info_page_guard,
@@ -276,7 +288,7 @@ def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("event_ui/exp_info_click_guard"),
             {
                 RuntimeExecutorKind.EVENT_UI: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "asset", "interval", "offset"}),
+                    required=frozenset({"asset", "interval", "offset"}),
                 )
             },
             _build_exp_info_click_guard,

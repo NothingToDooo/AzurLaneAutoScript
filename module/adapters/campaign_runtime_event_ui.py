@@ -21,7 +21,11 @@ from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplement
 from module.logger import logger
 from module.ui.page import page_campaign_menu, page_event, page_main_white
 
-from .campaign_event_ui import CampaignEventUiContributor, CampaignEventUiExecutor
+from .campaign_event_ui import (
+    CampaignEventCombatResultContributor,
+    CampaignEventUiContributor,
+    CampaignEventUiExecutor,
+)
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
@@ -35,6 +39,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from module.campaign.event_destination import EventDestinationHost
+    from module.combat.combat_result_ui import CombatResultRuntime
+
+    from .campaign_event_ui import EventCombatResultNext
 
 
 _ANIMATION_PINK = Button(
@@ -88,14 +95,6 @@ _PAGES: Mapping[str, object] = {
 
 
 class _EventUiRuntimeHost(Protocol):
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
-
     def appear(
         self,
         button: object,
@@ -428,7 +427,6 @@ class _PageEventDestination:
 
 def _build_page_event_entry(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = context.options(RuntimeExecutorKind.EVENT_UI)
-    operations = _operations(options)
     destination = _PageEventDestination(
         already=_AlreadyAtEvent.from_options(options["already"]),
         menu_page=_page(_string(options, "menu_page")),
@@ -436,28 +434,28 @@ def _build_page_event_entry(context: RuntimeExecutorBuildContext) -> RuntimeExec
     )
     blocked_page_value = options.get("exp_info_blocked_page")
     blocked_page = None if blocked_page_value is None else _page(cast("str", blocked_page_value))
-    expected: set[str] = set()
-    if blocked_page is not None:
-        expected.add("handle_exp_info")
-    if operations != expected:
-        message = f"page event entry operations mismatch: expected={sorted(expected)}, actual={sorted(operations)}"
-        raise CampaignRuntimeProfileError(message)
-
-    methods = {}
+    combat_result = None
     if blocked_page is not None:
 
-        def handle_exp_info(runtime: object) -> object:
+        def handle_experience_result(
+            runtime: CombatResultRuntime,
+            next_handler: EventCombatResultNext,
+        ) -> bool:
             host = _host(runtime)
             if host.ui_page_appear(blocked_page):
                 return False
-            return host.runtime_super(RuntimeOperation.HANDLE_EXP_INFO)
+            return next_handler(runtime)
 
-        methods[RuntimeOperation.HANDLE_EXP_INFO] = handle_exp_info
+        combat_result = CampaignEventCombatResultContributor(
+            handle_experience_result=handle_experience_result,
+        )
 
     return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
-        CampaignEventUiContributor(destination=destination),
-        methods={RuntimeExecutorKind.EVENT_UI: methods},
+        CampaignEventUiContributor(
+            destination=destination,
+            combat_result=combat_result,
+        ),
     )
 
 
@@ -496,7 +494,7 @@ def event_ui_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("event_ui/page_event_entry"),
             {
                 event_ui: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "already", "menu_page", "destination"}),
+                    required=frozenset({"already", "menu_page", "destination"}),
                     optional=frozenset({"exp_info_blocked_page"}),
                 )
             },

@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from module.adapters.campaign_event_ui import (
+    CampaignEventCombatResultContributor,
     CampaignEventStageRecoveryContributor,
     CampaignEventUiContributor,
+    EventCombatResultNext,
     EventStageRecoveryNext,
     build_campaign_event_ui_services,
 )
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
     from module.campaign.campaign_engine import CampaignEngine
     from module.campaign.event_destination import EventDestinationHost
+    from module.combat.combat_result_ui import CombatResultRuntime
     from module.ui.page import Page
 
 
@@ -134,6 +137,32 @@ class _RecoveryLayer:
     def handle(self, runtime: CampaignEngine, next_handler: EventStageRecoveryNext) -> bool:
         self.calls.append(self.name)
         return next_handler(runtime)
+
+
+@dataclass(slots=True)
+class _CombatResultLayer:
+    name: str
+    calls: list[str]
+    blocked: bool = False
+
+    def handle(
+        self,
+        runtime: CombatResultRuntime,
+        next_handler: EventCombatResultNext,
+    ) -> bool:
+        self.calls.append(self.name)
+        if self.blocked:
+            return False
+        return next_handler(runtime)
+
+
+class _VirtualCombatResultHost:
+    def __init__(self, calls: list[str]) -> None:
+        self.calls = calls
+
+    def handle_exp_info(self) -> bool:
+        self.calls.append("standard")
+        return True
 
 
 def test_standard_destination_short_circuits_on_the_open_event_page() -> None:
@@ -259,3 +288,44 @@ def test_stage_recovery_composes_partial_contributors_per_hook() -> None:
     assert not services.stage_recovery.recover_stage_page(runtime)
 
     assert calls == ["base", "derived", "base", "derived"]
+
+
+def test_standard_combat_result_preserves_virtual_dispatch() -> None:
+    calls: list[str] = []
+    services = build_campaign_event_ui_services(())
+
+    assert services.combat_result.handle_experience_result(_VirtualCombatResultHost(calls))
+    assert calls == ["standard"]
+
+
+def test_combat_result_composes_later_contributors_and_short_circuits() -> None:
+    calls: list[str] = []
+    base = _CombatResultLayer("base", calls)
+    derived = _CombatResultLayer("derived", calls)
+    services = build_campaign_event_ui_services(
+        (
+            _ContributorSource(
+                CampaignEventUiContributor(
+                    combat_result=CampaignEventCombatResultContributor(
+                        handle_experience_result=base.handle,
+                    )
+                )
+            ),
+            _ContributorSource(
+                CampaignEventUiContributor(
+                    combat_result=CampaignEventCombatResultContributor(
+                        handle_experience_result=derived.handle,
+                    )
+                )
+            ),
+        )
+    )
+    runtime = _VirtualCombatResultHost(calls)
+
+    assert services.combat_result.handle_experience_result(runtime)
+    assert calls == ["derived", "base", "standard"]
+
+    calls.clear()
+    derived.blocked = True
+    assert not services.combat_result.handle_experience_result(runtime)
+    assert calls == ["derived"]

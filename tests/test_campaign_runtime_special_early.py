@@ -131,13 +131,16 @@ class _Runtime:
 def _binding(
     implementation: str,
     kind: RuntimeExecutorKind,
-    operations: list[str],
+    operations: list[str] | None,
     **extra_options: object,
 ) -> RuntimeExecutorBinding:
+    options = dict(extra_options)
+    if operations is not None:
+        options["operations"] = operations
     return RuntimeExecutorBinding(
         kind,
         RuntimeImplementationId(implementation),
-        {"operations": operations, **extra_options},
+        options,
     )
 
 
@@ -171,7 +174,7 @@ def _ryza_manager() -> CampaignRuntimeProfileManager:
         _binding(
             _RYZA_IMPLEMENTATION,
             RuntimeExecutorKind.EVENT_UI,
-            [],
+            None,
         ),
         _binding(
             _RYZA_IMPLEMENTATION,
@@ -344,6 +347,22 @@ def test_ryza_executor_requires_both_facets() -> None:
             _binding(
                 _RYZA_IMPLEMENTATION,
                 RuntimeExecutorKind.EVENT_UI,
-                [],
+                None,
             )
+        )
+
+
+def test_ryza_event_ui_rejects_obsolete_operations_field() -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match="unknown option: operations"):
+        _manager(
+            _binding(
+                _RYZA_IMPLEMENTATION,
+                RuntimeExecutorKind.EVENT_UI,
+                [],
+            ),
+            _binding(
+                _RYZA_IMPLEMENTATION,
+                RuntimeExecutorKind.MAP_MECHANIC,
+                ["handle_mystery_items"],
+            ),
         )

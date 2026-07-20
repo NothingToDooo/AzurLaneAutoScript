@@ -26,6 +26,7 @@ from module.base.button import Button
 from module.campaign.campaign_engine import CampaignEngine
 from module.campaign.campaign_ocr import CampaignStagePage
 from module.campaign.event_destination import STANDARD_EVENT_DESTINATION
+from module.combat.combat_result_ui import STANDARD_COMBAT_RESULT_UI
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -209,6 +210,7 @@ def test_stage_navigator_calls_typed_recovery_services_directly(
     services = CampaignEventUiServices(
         destination=STANDARD_EVENT_DESTINATION,
         stage_recovery=recovery,
+        combat_result=STANDARD_COMBAT_RESULT_UI,
     )
     runtime = cast("CampaignEngine", _Runtime())
     navigator = _DirectRecoveryNavigator(runtime, services, None, None)

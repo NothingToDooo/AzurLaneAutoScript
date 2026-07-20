@@ -8,6 +8,7 @@ from module.base.timer import Timer
 from module.combat import assets as combat_assets
 from module.combat.combat_auto import CombatAuto
 from module.combat.combat_manual import CombatManual
+from module.combat.combat_result_ui import STANDARD_COMBAT_RESULT_UI, CombatResultUi
 from module.combat.hp_balancer import HPBalancer
 from module.combat.level import Level
 from module.combat.submarine import SubmarineCall
@@ -100,6 +101,7 @@ def _match_first_combat_ui_button(
 
 class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatManual, AutoSearchHandler):
     _automation_set_timer = Timer(1)
+    _combat_result_ui: CombatResultUi = STANDARD_COMBAT_RESULT_UI
     battle_status_click_interval = 0
 
     def combat_appear(self) -> bool:
@@ -434,7 +436,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
     def _handle_combat_status_progress(self, *, battle_status: bool, exp_info: bool) -> tuple[bool, bool, bool]:
         if battle_status:
-            if self.handle_exp_info():
+            if self._combat_result_ui.handle_experience_result(self):
                 return True, battle_status, True
             if not exp_info and self.handle_battle_status():
                 return True, True, exp_info
@@ -442,7 +444,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         if not exp_info and self.handle_battle_status():
             return True, True, exp_info
-        if self.handle_exp_info():
+        if self._combat_result_ui.handle_experience_result(self):
             return True, battle_status, True
         return False, battle_status, exp_info
 

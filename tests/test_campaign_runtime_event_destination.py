@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from module.adapters.campaign_event_ui import build_campaign_event_ui_services
+from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
 from module.adapters.campaign_runtime_implementations import load_default_campaign_runtime_executor_registry
 from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager, RuntimeOperation
 from module.campaign.assets import (
@@ -14,6 +14,7 @@ from module.campaign.assets import (
     EVENT_20250424_PT_ICON,
     EVENT_20250724_PT_ICON,
 )
+from module.combat.assets import ALCHEMIST_MATERIAL_CONFIRM
 from module.content.runtime_profile import (
     CampaignRuntimeExtensionId,
     CampaignRuntimeProfile,
@@ -34,7 +35,8 @@ class _Host:
         self.visible_buttons: list[object] = []
         self.visible_page: object | None = None
         self.entrance_available = True
-        self.super_result = True
+        self.exp_info_result = True
+        self.exp_info_calls = 0
         self.calls: list[tuple[object, ...]] = []
 
     def ui_get_current_page(self, *, skip_first_screenshot: bool = True) -> Page:
@@ -92,10 +94,19 @@ class _Host:
         self.calls.append(("available",))
         return self.entrance_available
 
-    def runtime_super(self, operation: RuntimeOperation, /, *args: object, **kwargs: object) -> object:
-        del args, kwargs
-        self.calls.append(("super", operation))
-        return self.super_result
+    def appear_then_click(
+        self,
+        button: object,
+        *,
+        offset: tuple[int, int],
+        interval: float,
+    ) -> bool:
+        self.calls.append(("appear-then-click", button, offset, interval))
+        return any(button is visible for visible in self.visible_buttons)
+
+    def handle_exp_info(self) -> bool:
+        self.exp_info_calls += 1
+        return self.exp_info_result
 
 
 def _manager(*extension_ids: str) -> CampaignRuntimeProfileManager:
@@ -107,9 +118,12 @@ def _manager(*extension_ids: str) -> CampaignRuntimeProfileManager:
     )
 
 
+def _services(manager: CampaignRuntimeProfileManager) -> CampaignEventUiServices:
+    return build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
+
+
 def _destination(manager: CampaignRuntimeProfileManager) -> EventDestination:
-    services = build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
-    return services.destination
+    return _services(manager).destination
 
 
 @pytest.mark.parametrize(
@@ -165,17 +179,22 @@ def test_detail_destination_stops_before_detail_navigation_when_unavailable() ->
 
 def test_20250424_page_destination_keeps_its_exp_info_guard() -> None:
     manager = _manager("event_20250424_cn/campaign_base/campaign_base")
-    instance = manager.executor_instances(RuntimeExecutorKind.EVENT_UI)[0]
+    services = _services(manager)
     host = _Host()
 
-    assert _destination(manager).open(host)
+    assert services.destination.open(host)
     assert host.calls == [
         ("appear", EVENT_20250424_PT_ICON, (20, 20)),
         ("ensure", page_campaign_menu),
         ("available",),
         ("goto", page_event),
     ]
-    assert instance.method(RuntimeExecutorKind.EVENT_UI, RuntimeOperation.HANDLE_EXP_INFO) is not None
+    host.visible_page = page_event
+    assert not services.combat_result.handle_experience_result(host)
+    assert host.exp_info_calls == 0
+    host.visible_page = None
+    assert services.combat_result.handle_experience_result(host)
+    assert host.exp_info_calls == 1
 
 
 def test_20250724_t_destination_and_ts_guard_remain_independent() -> None:
@@ -184,10 +203,18 @@ def test_20250724_t_destination_and_ts_guard_remain_independent() -> None:
         "event_20250724_cn/campaign_base/campaign_base_ts",
     )
     instances = manager.executor_instances(RuntimeExecutorKind.EVENT_UI)
+    services = build_campaign_event_ui_services(instances)
     host = _Host()
 
     assert len(instances) == 2
-    assert _destination(manager).open(host)
+    assert services.destination.open(host)
     assert host.calls[0] == ("appear", EVENT_20250724_PT_ICON, (20, 20))
-    assert instances[0].method(RuntimeExecutorKind.EVENT_UI, RuntimeOperation.HANDLE_EXP_INFO) is None
-    assert instances[1].method(RuntimeExecutorKind.EVENT_UI, RuntimeOperation.HANDLE_EXP_INFO) is not None
+    host.visible_buttons = [ALCHEMIST_MATERIAL_CONFIRM]
+    assert not services.combat_result.handle_experience_result(host)
+    assert host.calls[-1] == (
+        "appear-then-click",
+        ALCHEMIST_MATERIAL_CONFIRM,
+        (20, 20),
+        1.0,
+    )
+    assert host.exp_info_calls == 0

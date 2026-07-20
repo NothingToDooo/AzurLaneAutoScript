@@ -53,14 +53,7 @@ def _validate_executor_contracts(
             message = f"runtime profile {profile.profile_id.value} is not executable: {error}"
             raise ContentValidationError(message) from error
         for extension in profile.extensions:
-            for binding in extension.executors:
-                if not binding.options:
-                    message = (
-                        "runtime executor binding has no explicit options contract: "
-                        f"{binding.implementation_id.value}/{binding.kind.value}"
-                    )
-                    raise ContentValidationError(message)
-                bound_contracts.add((binding.implementation_id, binding.kind))
+            bound_contracts.update((binding.implementation_id, binding.kind) for binding in extension.executors)
 
     declared_contracts = {
         (implementation_id, kind)

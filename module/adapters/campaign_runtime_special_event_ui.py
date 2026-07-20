@@ -14,6 +14,7 @@ from module.logger import logger
 from module.ui.page import page_event
 
 from .campaign_event_ui import (
+    CampaignEventCombatResultContributor,
     CampaignEventStageRecoveryContributor,
     CampaignEventUiContributor,
     CampaignEventUiExecutor,
@@ -33,8 +34,9 @@ if TYPE_CHECKING:
     from module.base.button import Button
     from module.base.type_alias import ImageArray
     from module.campaign.campaign_engine import CampaignEngine
+    from module.combat.combat_result_ui import CombatResultRuntime
 
-    from .campaign_event_ui import EventStageRecoveryNext
+    from .campaign_event_ui import EventCombatResultNext, EventStageRecoveryNext
 
 
 class _DevicePort(Protocol):
@@ -183,7 +185,7 @@ class Event20240815UiExecutor(CampaignEventUiExecutor):
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.EVENT_UI)
-        expected = {"handle_exp_info", "handle_in_stage"}
+        expected = {"handle_in_stage"}
         if _operations(options) != expected:
             message = "event 20240815 UI operations mismatch"
             raise CampaignRuntimeProfileError(message)
@@ -201,11 +203,13 @@ class Event20240815UiExecutor(CampaignEventUiExecutor):
                 stage_recovery=CampaignEventStageRecoveryContributor(
                     recover_campaign_selection=self._recover_campaign_selection,
                     recover_stage_page=self._recover_stage_page,
-                )
+                ),
+                combat_result=CampaignEventCombatResultContributor(
+                    handle_experience_result=self._handle_experience_result,
+                ),
             ),
             methods={
                 RuntimeExecutorKind.EVENT_UI: {
-                    RuntimeOperation.HANDLE_EXP_INFO: self._handle_exp_info,
                     RuntimeOperation.HANDLE_IN_STAGE: self._handle_in_stage,
                 }
             },
@@ -283,11 +287,14 @@ class Event20240815UiExecutor(CampaignEventUiExecutor):
         return next_handler(runtime)
 
     @staticmethod
-    def _handle_exp_info(runtime: object) -> object:
+    def _handle_experience_result(
+        runtime: CombatResultRuntime,
+        next_handler: EventCombatResultNext,
+    ) -> bool:
         host = _host(runtime)
         if host.ui_page_appear(page_event):
             return False
-        return host.runtime_super(RuntimeOperation.HANDLE_EXP_INFO)
+        return next_handler(runtime)
 
     @override
     def reset(self) -> None:

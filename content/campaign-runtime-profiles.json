@@ -148,10 +148,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "campaign",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "campaign"
           }
         }
       ],
@@ -163,10 +160,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "campaign",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "campaign"
           }
         }
       ],
@@ -729,10 +723,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
@@ -807,10 +798,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -872,10 +860,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
@@ -954,9 +939,7 @@
         {
           "implementation": "event_20221124_cn/campaign_base/campaign_base",
           "kind": "event_ui",
-          "options": {
-            "operations": []
-          }
+          "options": {}
         },
         {
           "implementation": "observation/auto_search_clear_status",
@@ -990,10 +973,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
@@ -1100,10 +1080,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -1550,7 +1527,6 @@
           "options": {
             "exp_info_blocked_page": "event",
             "operations": [
-              "handle_exp_info",
               "handle_in_stage"
             ],
             "state": [
@@ -1607,10 +1583,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -1767,10 +1740,7 @@
             },
             "destination": "event",
             "exp_info_blocked_page": "event",
-            "menu_page": "campaign_menu",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "menu_page": "campaign_menu"
           }
         }
       ],
@@ -1791,8 +1761,7 @@
               "page": "event"
             },
             "destination": "event",
-            "menu_page": "campaign_menu",
-            "operations": []
+            "menu_page": "campaign_menu"
           }
         }
       ],
@@ -1834,9 +1803,6 @@
             "offset": [
               20,
               20
-            ],
-            "operations": [
-              "handle_exp_info"
             ]
           }
         },
@@ -1923,10 +1889,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -2362,10 +2325,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
@@ -2393,10 +2353,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -2458,10 +2415,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
@@ -2482,10 +2436,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {

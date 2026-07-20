@@ -498,6 +498,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         self._event_ui_services = build_campaign_event_ui_services(
             self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
         )
+        self._combat_result_ui = self._event_ui_services.combat_result
         self.stage_navigator = build_campaign_stage_navigator(
             self,
             self._runtime_profile,
@@ -773,14 +774,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
             RuntimeOperation.EVENT_ANIMATION_END,
             self,
             partial(self._missing_runtime_base, RuntimeOperation.EVENT_ANIMATION_END),
-        )
-        return bool(result)
-
-    def handle_exp_info(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_EXP_INFO,
-            self,
-            lambda: CampaignEngine.handle_exp_info(self),
         )
         return bool(result)
 

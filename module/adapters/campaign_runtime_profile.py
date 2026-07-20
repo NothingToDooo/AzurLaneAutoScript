@@ -46,7 +46,6 @@ class RuntimeOperation(StrEnum):
     FULL_SCAN_MOVABLE = "full_scan_movable"
     GET_MAP_CLEAR_PERCENTAGE = "get_map_clear_percentage"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
-    HANDLE_EXP_INFO = "handle_exp_info"
     HANDLE_IN_STAGE = "handle_in_stage"
     HANDLE_MYSTERY_ITEMS = "handle_mystery_items"
     HANDLE_SUBMARINE_SUPPORT_POPUP = "handle_submarine_support_popup"

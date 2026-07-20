@@ -31,6 +31,7 @@ from module.adapters.campaign_runtime_profile import (
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
+from module.adapters.campaign_stage_navigator import ProfileCampaignStageNavigator
 from module.adapters.gems_mumu12 import GemsHardPreparationError, Mumu12GemsRuntimeBehavior
 from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, SafeUnitCancellation, TaskId
 from module.base.button import Button
@@ -126,6 +127,7 @@ from module.gameplay.emotion import (
     FleetEmotionSettings,
 )
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
+from module.ui.page import page_event
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -176,6 +178,34 @@ def test_combat_stuck_detection_pause_is_scoped(monkeypatch: pytest.MonkeyPatch)
     DeclarativeCampaignMapRuntime.combat_status(runtime)
 
     assert events == ["disable", "combat", "enable"]
+
+
+def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = in_memory_config("campaign-event-ui-wiring", {})
+    definition = load_default_stage(StageRef("event_20250424_cn", "t1"))
+    runtime = DeclarativeCampaignMapRuntime(config, object.__new__(Device), definition)
+
+    services = runtime._event_ui_services  # ruff:ignore[private-member-access] - 验证 runtime 构造期的能力 wiring。
+    combat_result = runtime._combat_result_ui  # ruff:ignore[private-member-access] - 删除生产 wiring 时本测试必须失败。
+    assert combat_result is services.combat_result
+    assert isinstance(runtime.stage_navigator, ProfileCampaignStageNavigator)
+    assert runtime.stage_navigator._event_ui is services  # ruff:ignore[private-member-access] - navigator 必须复用同一次组合结果。
+
+    def event_page_visible(
+        button: Button,
+        offset: object = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del offset, interval, similarity, threshold
+        return button is page_event.check_button
+
+    monkeypatch.setattr(runtime, "appear", event_page_visible)
+
+    assert combat_result.handle_experience_result(runtime) is False
 
 
 def _definition() -> CampaignStageDefinition:

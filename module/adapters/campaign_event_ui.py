@@ -3,6 +3,11 @@ from typing import TYPE_CHECKING, Protocol, override, runtime_checkable
 
 from module.campaign.campaign_engine import CampaignEngine
 from module.campaign.event_destination import STANDARD_EVENT_DESTINATION, EventDestination
+from module.combat.combat_result_ui import (
+    STANDARD_COMBAT_RESULT_UI,
+    CombatResultRuntime,
+    CombatResultUi,
+)
 from module.content.errors import ContentValidationError
 from module.content.runtime_profile import RuntimeExecutorKind
 
@@ -24,6 +29,8 @@ class EventStageRecovery(Protocol):
 
 type EventStageRecoveryNext = Callable[[CampaignEngine], bool]
 type EventStageRecoveryHandler = Callable[[CampaignEngine, EventStageRecoveryNext], bool]
+type EventCombatResultNext = Callable[[CombatResultRuntime], bool]
+type EventCombatResultHandler = Callable[[CombatResultRuntime, EventCombatResultNext], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,11 +41,17 @@ class CampaignEventStageRecoveryContributor:
 
 
 @dataclass(frozen=True, slots=True)
+class CampaignEventCombatResultContributor:
+    handle_experience_result: EventCombatResultHandler | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class CampaignEventUiContributor:
     """一个 runtime executor 对活动 UI typed services 的贡献。"""
 
     destination: EventDestination | None = None
     stage_recovery: CampaignEventStageRecoveryContributor | None = None
+    combat_result: CampaignEventCombatResultContributor | None = None
 
 
 @runtime_checkable
@@ -80,6 +93,7 @@ class CampaignEventUiServices:
 
     destination: EventDestination
     stage_recovery: EventStageRecovery
+    combat_result: CombatResultUi
 
 
 class _StandardEventStageRecovery(EventStageRecovery):
@@ -116,6 +130,15 @@ class _ComposedEventStageRecovery(EventStageRecovery):
         return self.recover_stage_page_handler(runtime)
 
 
+@dataclass(frozen=True, slots=True)
+class _ComposedCombatResultUi(CombatResultUi):
+    handle_experience_result_handler: EventCombatResultNext
+
+    @override
+    def handle_experience_result(self, runtime: CombatResultRuntime) -> bool:
+        return self.handle_experience_result_handler(runtime)
+
+
 def _overlay_recovery(
     handler: EventStageRecoveryHandler,
     next_handler: EventStageRecoveryNext,
@@ -126,22 +149,39 @@ def _overlay_recovery(
     return execute
 
 
+def _overlay_combat_result(
+    handler: EventCombatResultHandler,
+    next_handler: EventCombatResultNext,
+) -> EventCombatResultNext:
+    def execute(runtime: CombatResultRuntime) -> bool:
+        return handler(runtime, next_handler)
+
+    return execute
+
+
 def build_campaign_event_ui_services(
     instances: Iterable[object],
 ) -> CampaignEventUiServices:
-    """按 profile 顺序组合能力；destination 后者覆盖，recovery 后者先处理并可续传。"""
+    """按 profile 顺序组合能力；destination 后者覆盖，其余能力后者先处理并可续传。"""
 
     destination = STANDARD_EVENT_DESTINATION
     standard_recovery = _StandardEventStageRecovery()
     recover_campaign_selection = standard_recovery.recover_campaign_selection
     recover_chapter_selection = standard_recovery.recover_chapter_selection
     recover_stage_page = standard_recovery.recover_stage_page
+    handle_experience_result = STANDARD_COMBAT_RESULT_UI.handle_experience_result
     for instance in instances:
         if not isinstance(instance, CampaignEventUiContributorSource):
             continue
         contributor = instance.event_ui_contributor
         if contributor.destination is not None:
             destination = contributor.destination
+        combat_result = contributor.combat_result
+        if combat_result is not None and combat_result.handle_experience_result is not None:
+            handle_experience_result = _overlay_combat_result(
+                combat_result.handle_experience_result,
+                handle_experience_result,
+            )
         recovery = contributor.stage_recovery
         if recovery is None:
             continue
@@ -166,5 +206,8 @@ def build_campaign_event_ui_services(
             recover_campaign_selection_handler=recover_campaign_selection,
             recover_chapter_selection_handler=recover_chapter_selection,
             recover_stage_page_handler=recover_stage_page,
+        ),
+        combat_result=_ComposedCombatResultUi(
+            handle_experience_result_handler=handle_experience_result,
         ),
     )

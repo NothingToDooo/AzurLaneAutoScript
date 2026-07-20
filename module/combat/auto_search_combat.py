@@ -341,7 +341,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         ):
             if handler():
                 return True, exp_info
-        if self.handle_exp_info():
+        if self._combat_result_ui.handle_experience_result(self):
             return True, True
         return False, exp_info
 

@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, override
 
 import pytest
 
+from module.adapters.campaign_event_ui import build_campaign_event_ui_services
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
@@ -23,6 +24,7 @@ from module.content.runtime_profile import (
 if TYPE_CHECKING:
     from typing import Unpack
 
+    from module.combat.combat_result_ui import CombatResultUi
     from module.config.config_generated import ConfigOverrides
 
 
@@ -44,6 +46,8 @@ class _Runtime:
         self.page_visible = False
         self.confirm_visible = False
         self.confirm_calls: list[tuple[object, tuple[int, int], float]] = []
+        self.exp_info_calls = 0
+        self.exp_info_result = True
 
     def runtime_super(
         self,
@@ -67,6 +71,10 @@ class _Runtime:
     ) -> bool:
         self.confirm_calls.append((button, offset, interval))
         return self.confirm_visible
+
+    def handle_exp_info(self) -> bool:
+        self.exp_info_calls += 1
+        return self.exp_info_result
 
 
 def _manager(
@@ -94,31 +102,28 @@ def _manager(
     )
 
 
+def _combat_result(manager: CampaignRuntimeProfileManager) -> CombatResultUi:
+    instances = manager.executor_instances(RuntimeExecutorKind.EVENT_UI)
+    return build_campaign_event_ui_services(instances).combat_result
+
+
 def test_exp_info_page_guard_short_circuits_only_on_blocked_page() -> None:
     manager = _manager(
         "event_ui/exp_info_page_guard",
         RuntimeExecutorKind.EVENT_UI,
-        {"operations": ["handle_exp_info"], "blocked_page": "event"},
+        {"blocked_page": "event"},
     )
     runtime = _Runtime(manager)
-    fallbacks: list[str] = []
+    combat_result = _combat_result(manager)
     runtime.page_visible = True
 
-    blocked = manager.event_ui.invoke(
-        RuntimeOperation.HANDLE_EXP_INFO,
-        runtime,
-        lambda: fallbacks.append("fallback") or True,
-    )
+    blocked = combat_result.handle_experience_result(runtime)
     runtime.page_visible = False
-    delegated = manager.event_ui.invoke(
-        RuntimeOperation.HANDLE_EXP_INFO,
-        runtime,
-        lambda: fallbacks.append("fallback") or True,
-    )
+    delegated = combat_result.handle_experience_result(runtime)
 
     assert blocked is False
     assert delegated is True
-    assert fallbacks == ["fallback"]
+    assert runtime.exp_info_calls == 1
 
 
 def test_exp_info_click_guard_uses_closed_asset_mapping() -> None:
@@ -126,7 +131,6 @@ def test_exp_info_click_guard_uses_closed_asset_mapping() -> None:
         "event_ui/exp_info_click_guard",
         RuntimeExecutorKind.EVENT_UI,
         {
-            "operations": ["handle_exp_info"],
             "asset": "ALCHEMIST_MATERIAL_CONFIRM",
             "offset": [20, 20],
             "interval": 1,
@@ -134,16 +138,18 @@ def test_exp_info_click_guard_uses_closed_asset_mapping() -> None:
     )
     runtime = _Runtime(manager)
     runtime.confirm_visible = True
+    combat_result = _combat_result(manager)
 
-    result = manager.event_ui.invoke(
-        RuntimeOperation.HANDLE_EXP_INFO,
-        runtime,
-        lambda: True,
-    )
+    result = combat_result.handle_experience_result(runtime)
 
     assert result is False
+    assert runtime.exp_info_calls == 0
     assert len(runtime.confirm_calls) == 1
     assert runtime.confirm_calls[0][1:] == ((20, 20), 1.0)
+
+    runtime.confirm_visible = False
+    assert combat_result.handle_experience_result(runtime) is True
+    assert runtime.exp_info_calls == 1
 
 
 @pytest.mark.parametrize(
@@ -239,5 +245,5 @@ def test_semantic_executor_rejects_unknown_option_value_before_binding() -> None
         _manager(
             "event_ui/exp_info_page_guard",
             RuntimeExecutorKind.EVENT_UI,
-            {"operations": ["handle_exp_info"], "blocked_page": "unknown"},
+            {"blocked_page": "unknown"},
         )

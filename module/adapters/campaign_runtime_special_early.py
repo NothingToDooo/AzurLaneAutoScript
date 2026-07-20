@@ -156,12 +156,6 @@ class _RyzaEventDestination(EventDestination):
 
 
 def _build_ryza_campaign(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    event_ui_options = context.options(RuntimeExecutorKind.EVENT_UI)
-    _require_operations(
-        event_ui_options,
-        frozenset(),
-        label="event_20221124 event UI",
-    )
     mechanic_options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
     _require_operations(
         mechanic_options,
@@ -194,6 +188,7 @@ def _build_ryza_campaign(context: RuntimeExecutorBuildContext) -> RuntimeExecuto
 
 def special_early_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescriptor, ...]:
     operations_only = RuntimeExecutorOptionsSchema(required=frozenset({"operations"}))
+    empty_options = RuntimeExecutorOptionsSchema()
     return (
         RuntimeExecutorFactoryDescriptor(
             _T4_IMPLEMENTATION,
@@ -203,7 +198,7 @@ def special_early_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactory
         RuntimeExecutorFactoryDescriptor(
             _RYZA_IMPLEMENTATION,
             {
-                RuntimeExecutorKind.EVENT_UI: operations_only,
+                RuntimeExecutorKind.EVENT_UI: empty_options,
                 RuntimeExecutorKind.MAP_MECHANIC: operations_only,
             },
             _build_ryza_campaign,

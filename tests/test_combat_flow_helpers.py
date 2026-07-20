@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, override
 import numpy as np
 
 from module.combat import combat
+from module.combat.auto_search_combat import AutoSearchCombat
+from module.combat.combat_result_ui import STANDARD_COMBAT_RESULT_UI
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -12,6 +14,7 @@ if TYPE_CHECKING:
     from module.base.timer import Timer
     from module.base.type_alias import ImageArray
     from module.combat.combat import CombatEnd
+    from module.combat.combat_result_ui import CombatResultRuntime, CombatResultUi
 
 
 class _FakeDevice:
@@ -281,6 +284,66 @@ class _CombatStatusContext(_CombatLoopContext):
         self.appear_calls.append((button, {"offset": offset}))
         return button == combat.BACK_ARROW and offset == (30, 30)
 
+    def install_combat_result_ui(self, result_ui: CombatResultUi) -> None:
+        self._combat_result_ui = result_ui
+
+    def handle_status_progress(
+        self,
+        *,
+        battle_status: bool,
+        exp_info: bool,
+    ) -> tuple[bool, bool, bool]:
+        return self._handle_combat_status_progress(
+            battle_status=battle_status,
+            exp_info=exp_info,
+        )
+
+
+class _CombatResultProbe:
+    def __init__(self, *, results: tuple[bool, ...]) -> None:
+        self.results = list(results)
+        self.calls: list[CombatResultRuntime] = []
+
+    def handle_experience_result(self, runtime: CombatResultRuntime) -> bool:
+        self.calls.append(runtime)
+        return self.results.pop(0)
+
+
+class _AutoSearchResultContext(AutoSearchCombat):
+    def __init__(self, result_ui: CombatResultUi) -> None:
+        self._combat_result_ui = result_ui
+        self._auto_search_status_confirm = True
+        self.exp_info_hook_calls = 0
+
+    @override
+    def handle_get_ship(self) -> bool:
+        return False
+
+    @override
+    def handle_get_items(self) -> bool:
+        return False
+
+    @override
+    def handle_battle_status(self) -> bool:
+        return False
+
+    @override
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del name, offset, interval
+        return False
+
+    def handle_exp_info(self) -> bool:
+        self.exp_info_hook_calls += 1
+        return True
+
+    def handle_status_confirm(self) -> tuple[bool, bool]:
+        return self._handle_auto_search_status_confirm(exp_info=False)
+
 
 class _CombatOrchestrationContext(combat.Combat):
     config: SimpleNamespace
@@ -414,3 +477,34 @@ def test_combat_status_checks_exp_info_first_after_battle_status() -> None:
     handler.combat_status(expected_end=lambda: expected_results.pop(0))
 
     assert handler.battle_status_calls == 1
+
+
+def test_standard_combat_result_uses_non_declarative_virtual_override() -> None:
+    handler = _CombatStatusContext()
+    handler.exp_info_results = [True]
+
+    assert STANDARD_COMBAT_RESULT_UI.handle_experience_result(handler)
+    assert handler.exp_info_results == []
+
+
+def test_combat_status_progress_uses_injected_result_ui_in_both_branches() -> None:
+    handler = _CombatStatusContext()
+    probe = _CombatResultProbe(results=(True, True))
+    handler.install_combat_result_ui(probe)
+    handler.exp_info_results = [True]
+
+    assert handler.handle_status_progress(battle_status=True, exp_info=False) == (True, True, True)
+    handler.battle_status_results = [False]
+    assert handler.handle_status_progress(battle_status=False, exp_info=False) == (True, False, True)
+
+    assert probe.calls == [handler, handler]
+    assert handler.exp_info_results == [True]
+
+
+def test_auto_search_status_confirm_uses_injected_result_ui() -> None:
+    probe = _CombatResultProbe(results=(True,))
+    handler = _AutoSearchResultContext(probe)
+
+    assert handler.handle_status_confirm() == (True, True)
+    assert probe.calls == [handler]
+    assert handler.exp_info_hook_calls == 0
