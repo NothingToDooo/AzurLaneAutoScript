@@ -106,7 +106,7 @@ class RuntimeStateSeed:
 
 @dataclass(slots=True)
 class RuntimeSharedState:
-    """同一 runtime profile 内跨 implementation 共享的显式 session 状态。"""
+    """同一 runtime profile 内跨 implementation 共享的显式 attempt 状态。"""
 
     map_has_mob_move: bool = False
     use_support_fleet: bool = False
@@ -613,7 +613,7 @@ def _number_tuning(value: RuntimeTuningValue, key: RuntimeTuningKey) -> float:
 
 
 class CampaignRuntimeProfileManager:
-    """把不可变 profile 编译为单 session 多 facet executor 链和 tuning 投影。"""
+    """把不可变 profile 编译为单 attempt 多 facet executor 链和 tuning 投影。"""
 
     __slots__ = (
         "_active_context",
@@ -648,7 +648,7 @@ class CampaignRuntimeProfileManager:
         self._shared_state = RuntimeSharedState()
         for instance in self._instances:
             instance.attach_shared_state(self._shared_state)
-        self._reset_shared_state()
+        self._seed_attempt_state()
         self._frames: list[_InvocationFrame] = []
         self._runtime: object | None = None
         self._compiled_map: CampaignMap | None = None
@@ -835,7 +835,8 @@ class CampaignRuntimeProfileManager:
         if not isinstance(context, RuntimeSessionContext):
             message = "runtime profile begin_session requires RuntimeSessionContext"
             raise TypeError(message)
-        self._reset_shared_state()
+        # attempt 状态在构造时按 seed 初始化，并允许 READY 阶段的进图 UI 修正；
+        # begin_session 只激活已经准备好的状态，最终 reset 才重新 seed。
         for instance in self._instances:
             instance.begin_session(context)
         self._active_context = context
@@ -871,7 +872,7 @@ class CampaignRuntimeProfileManager:
                 instance.reset()
             except BaseException as error:  # ruff:ignore[blind-except] - 各 executor 必须独立重置。
                 errors.append(error)
-        self._reset_shared_state()
+        self._seed_attempt_state()
         raise_cleanup_errors(errors, message="runtime profile reset failed")
 
     def apply_runtime_tunings(self, runtime: RuntimeProfileHost) -> None:
@@ -936,7 +937,7 @@ class CampaignRuntimeProfileManager:
         for instance in self._instances:
             instance.disable_support_fleet()
 
-    def _reset_shared_state(self) -> None:
+    def _seed_attempt_state(self) -> None:
         map_has_mob_move = False
         use_support_fleet = False
         use_single_fleet_override: bool | None = None

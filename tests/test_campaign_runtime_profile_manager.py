@@ -277,7 +277,7 @@ def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
     assert not manager.map_has_mob_move(AbortToken())
 
 
-def test_distinct_implementations_share_typed_session_state() -> None:
+def test_distinct_implementations_see_prepared_attempt_state_when_session_begins() -> None:
     def support_factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
         del context
         return RuntimeExecutorInstance(
@@ -309,17 +309,12 @@ def test_distinct_implementations_share_typed_session_state() -> None:
         RuntimeSessionEntryKind.FRESH,
     )
 
+    manager.disable_support_fleet()
     manager.begin_session(context)
 
-    assert manager.use_support_fleet(AbortToken())
-    assert manager.map_has_mob_move(AbortToken())
-    assert manager.use_single_fleet_override(AbortToken()) is None
-    manager.disable_support_fleet()
     assert not manager.use_support_fleet(AbortToken())
-    manager.end_session(RuntimeSessionOutcome.COMPLETED)
-    manager.begin_session(context)
-    assert manager.use_support_fleet(AbortToken())
-    assert manager.map_has_mob_move(AbortToken())
+    assert not manager.map_has_mob_move(AbortToken())
+    assert manager.use_single_fleet_override(AbortToken()) is None
 
 
 def test_same_kind_composes_base_to_derived_as_an_around_chain() -> None:
@@ -635,7 +630,7 @@ def test_map_and_camera_grid_ports_are_selected_independently() -> None:
     assert manager.camera_grid_class is _CameraGrid
 
 
-def test_lifecycle_distinguishes_fresh_and_resume_and_resets_session_state() -> None:
+def test_lifecycle_distinguishes_fresh_and_resume_and_new_manager_reseeds_state() -> None:
     traces: list[list[object]] = []
 
     def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:

@@ -125,13 +125,18 @@ def _submarine_binding() -> RuntimeExecutorBinding:
     )
 
 
-def _start(
+def _bind(
     manager: CampaignRuntimeProfileManager,
     runtime: _Runtime,
-    entry_kind: RuntimeSessionEntryKind,
 ) -> None:
     runtime.manager = manager
     manager.bind(runtime, CampaignMap("mechanic-test"))
+
+
+def _begin(
+    manager: CampaignRuntimeProfileManager,
+    entry_kind: RuntimeSessionEntryKind,
+) -> None:
     manager.begin_session(
         RuntimeSessionContext(
             CampaignRunVariant.LOOP,
@@ -141,16 +146,26 @@ def _start(
     )
 
 
+def _start(
+    manager: CampaignRuntimeProfileManager,
+    runtime: _Runtime,
+    entry_kind: RuntimeSessionEntryKind,
+) -> None:
+    _bind(manager, runtime)
+    _begin(manager, entry_kind)
+
+
 def test_support_fleet_state_is_shared_with_fresh_submarine_entry() -> None:
     manager = _manager(_support_binding(), _submarine_binding())
     runtime = _Runtime()
-    _start(manager, runtime, RuntimeSessionEntryKind.FRESH)
+    _bind(manager, runtime)
 
     manager.mechanic.invoke(
         RuntimeOperation.FLEET_PREPARATION,
         runtime,
         lambda: True,
     )
+    _begin(manager, RuntimeSessionEntryKind.FRESH)
     manager.mechanic.invoke(
         RuntimeOperation.MAP_INIT,
         runtime,
@@ -166,13 +181,33 @@ def test_empty_support_fleet_suppresses_submarine_and_updates_state() -> None:
     manager = _manager(_support_binding(), _submarine_binding())
     runtime = _Runtime()
     runtime.support_empty = True
-    _start(manager, runtime, RuntimeSessionEntryKind.FRESH)
+    _bind(manager, runtime)
 
     manager.mechanic.invoke(RuntimeOperation.FLEET_PREPARATION, runtime, lambda: True)
+    assert not manager.use_support_fleet(AbortToken())
+
+    _begin(manager, RuntimeSessionEntryKind.FRESH)
     manager.mechanic.invoke(RuntimeOperation.MAP_INIT, runtime, lambda map_: map_, None)
 
     assert not manager.use_support_fleet(AbortToken())
     assert runtime.combat_calls == 0
+
+
+def test_support_fleet_retry_replaces_the_previous_ui_observation() -> None:
+    manager = _manager(_support_binding())
+    runtime = _Runtime()
+    runtime.support_empty = True
+    _bind(manager, runtime)
+
+    manager.mechanic.invoke(RuntimeOperation.FLEET_PREPARATION, runtime, lambda: True)
+    assert not manager.use_support_fleet(AbortToken())
+
+    runtime.support_empty = False
+    manager.mechanic.invoke(RuntimeOperation.FLEET_PREPARATION, runtime, lambda: True)
+    assert manager.use_support_fleet(AbortToken())
+
+    _begin(manager, RuntimeSessionEntryKind.FRESH)
+    assert manager.use_support_fleet(AbortToken())
 
 
 def test_resume_does_not_repeat_submarine_entry_battle() -> None:

@@ -103,8 +103,9 @@ class SupportFleetExecutor(RuntimeExecutorInstance):
 
     def _fleet_preparation(self, runtime: object) -> object:
         host = _host(runtime)
-        if host.appear(FLEET_SUPPORT_EMPTY, offset=(5, 5)):
-            self.set_use_support_fleet(enabled=False)
+        self.set_use_support_fleet(
+            enabled=not host.appear(FLEET_SUPPORT_EMPTY, offset=(5, 5)),
+        )
         logger.attr("use_support_fleet", self.current_use_support_fleet())
         return host.runtime_super(RuntimeOperation.FLEET_PREPARATION)
 
