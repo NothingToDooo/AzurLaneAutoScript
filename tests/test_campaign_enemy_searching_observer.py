@@ -71,7 +71,7 @@ def _red_overlay_image(red: int) -> ImageArray:
 def test_red_overlay_detector_uses_strict_threshold(red: int, *, expected: bool) -> None:
     manager, observer = _observer_for(_real_profile("event_20220915_cn", "c1"))
     runtime = _ThresholdRuntime()
-    manager.apply_runtime_tunings(runtime)
+    manager.apply_runtime_thresholds(runtime)
 
     assert pytest.approx(0.5) == runtime.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD
     assert (
@@ -119,7 +119,7 @@ def test_real_profiles_wire_red_overlay_with_their_effective_threshold(
     profile = _real_profile(pack_id, stage_id)
     manager, observer = _observer_for(profile)
     runtime = _ThresholdRuntime()
-    manager.apply_runtime_tunings(runtime)
+    manager.apply_runtime_thresholds(runtime)
     red_bindings = tuple(
         binding
         for extension in profile.extensions

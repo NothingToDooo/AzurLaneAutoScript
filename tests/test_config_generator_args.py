@@ -1,10 +1,12 @@
 from copy import deepcopy
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_type_hints
 
 import pytest
 
 from module.config import config_updater
+from module.config.config_generated import ConfigOverrides
+from module.config.config_manual import FindPeaksParameter
 from module.config.config_updater import ConfigGenerator, build_template
 from module.config.deep import DeepValue, deep_exist, deep_get
 
@@ -222,6 +224,26 @@ def test_generated_values_preserve_explicit_strings_and_only_parse_datetime() ->
 
     assert generated["Error.SmtpUser"] == ""
     assert generated["Scheduler.NextRun"] == datetime(2026, 7, 15, 12, 30)
+
+
+def test_manual_override_types_prefer_explicit_classvar_annotations() -> None:
+    fields = {
+        name: type_name
+        for name, _value, type_name in config_updater._manual_override_fields()  # ruff:ignore[private-member-access] - 验证生成器内部类型源。
+    }
+
+    assert fields["COINCIDENT_POINT_ENCOURAGE_DISTANCE"] == "float"
+    assert fields["EDGE_LINES_FIND_PEAKS_PARAMETERS"] == "dict[str, FindPeaksParameter]"
+    assert fields["INTERNAL_LINES_FIND_PEAKS_PARAMETERS"] == "dict[str, FindPeaksParameter]"
+    assert fields["MAP_ENEMY_GENRE_DETECTION_SCALING"] == "dict[str, float | tuple[float, ...]]"
+    assert fields["HOMO_CORNER_OFFSET_LIST"] == "tuple[tuple[int, int], ...]"
+
+
+def test_generated_override_annotations_resolve_at_runtime() -> None:
+    annotations = get_type_hints(ConfigOverrides)
+
+    assert annotations["EDGE_LINES_FIND_PEAKS_PARAMETERS"] == dict[str, FindPeaksParameter]
+    assert annotations["INTERNAL_LINES_FIND_PEAKS_PARAMETERS"] == dict[str, FindPeaksParameter]
 
 
 def test_build_template_has_no_campaign_name_fallback(monkeypatch: pytest.MonkeyPatch) -> None:

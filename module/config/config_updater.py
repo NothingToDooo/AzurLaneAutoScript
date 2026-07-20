@@ -1,9 +1,10 @@
+import inspect
 import json
 import textwrap
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, ClassVar, cast, get_args, get_origin
 
 from module.application import ExecutionMode
 from module.base.atomic import atomic_write
@@ -40,6 +41,9 @@ CONFIG_IMPORT = """
 import datetime
 from typing import ClassVar, TypedDict
 
+from module.config.config_manual import (
+    FindPeaksParameter,  # ruff:ignore[typing-only-first-party-import] - get_type_hints 运行时解析。
+)
 from module.config.deep import MutableDeepValue
 
 # 本文件由 module/config/config_updater.py 自动生成。
@@ -148,12 +152,26 @@ def _generated_type(value: MutableDeepValue, *, none_type: str = "MutableDeepVal
     return result
 
 
-def _manual_override_fields() -> Iterator[tuple[str, MutableDeepValue]]:
+def _manual_override_type(annotation: object | None, value: MutableDeepValue) -> str:
+    if annotation is None:
+        return _generated_type(value)
+    if get_origin(annotation) is not ClassVar:
+        message = f"ManualConfig field annotation must be ClassVar: {annotation!r}"
+        raise TypeError(message)
+    arguments = get_args(annotation)
+    if len(arguments) != 1:
+        message = f"ManualConfig ClassVar annotation must contain one type: {annotation!r}"
+        raise TypeError(message)
+    return inspect.formatannotation(arguments[0])
+
+
+def _manual_override_fields() -> Iterator[tuple[str, MutableDeepValue, str]]:
+    annotations = inspect.get_annotations(ManualConfig, eval_str=True)
     for name, value in vars(ManualConfig).items():
         if name.startswith("_") or callable(value) or isinstance(value, (classmethod, property, staticmethod)):
             continue
         if isinstance(value, (bool, int, float, str, datetime, list, tuple, dict)) or value is None:
-            yield name, value
+            yield name, value, _manual_override_type(annotations.get(name), value)
 
 
 def _generated_value(name: str, value: MutableDeepValue) -> list[str]:
@@ -586,8 +604,8 @@ class ConfigGenerator:
         field_names = {path_to_arg(".".join(path)) for path, _data, _value in arguments}
         override_lines = ["class ConfigOverrides(TypedDict, total=False):"]
         visited_fields: set[str] = set()
-        for name, value in _manual_override_fields():
-            override_lines.append(f"{GENERATED_INDENT}{name}: {_generated_type(value)}")
+        for name, _value, type_name in _manual_override_fields():
+            override_lines.append(f"{GENERATED_INDENT}{name}: {type_name}")
             visited_fields.add(name)
         for path, data, value in arguments:
             name = path_to_arg(".".join(path))

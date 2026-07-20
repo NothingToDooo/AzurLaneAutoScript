@@ -497,12 +497,12 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             self.grid_class = camera_grid_class
         self._runtime_profile.apply_config(config)
         profile_boss_fleet = self._runtime_profile.configured_boss_fleet
-        self._configured_boss_fleet = config.fleet_boss if profile_boss_fleet is None else profile_boss_fleet
+        self._configured_boss_fleet = config.fleet_boss if profile_boss_fleet is None else profile_boss_fleet.index
         self.ENEMY_FILTER = definition.enemy_filter
         self.session_variant = CampaignRunVariant.NORMAL
         self._gems_behavior = None
         super().__init__(config=config, device=device)
-        self._runtime_profile.apply_runtime_tunings(self)
+        self._runtime_profile.apply_runtime_thresholds(self)
         self._runtime_profile.bind(self, self.MAP)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
         mechanic_instances = self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)

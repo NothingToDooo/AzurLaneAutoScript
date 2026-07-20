@@ -2,8 +2,13 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol
 
+from module.adapters.campaign_runtime_tunings import (
+    ConfiguredBossFleet,
+    RuntimeTuningValidationError,
+    compile_campaign_runtime_tuning_patch,
+)
 from module.base.failure import raise_cleanup_errors
 from module.config.config import AzurLaneConfig
 from module.content.campaign_session import CampaignRunVariant
@@ -14,7 +19,6 @@ from module.content.runtime_profile import (
     RuntimeExecutorBinding,
     RuntimeExecutorKind,
     RuntimeImplementationId,
-    RuntimeTuningKey,
     RuntimeTuningValue,
 )
 from module.map.map_base import CampaignMap
@@ -28,7 +32,6 @@ from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
     from module.application import CancellationSource
-    from module.config.config_generated import ConfigOverrides
 
 
 class CampaignRuntimeProfileError(RuntimeError):
@@ -454,103 +457,6 @@ class RuntimeFacetComposite:
         )
 
 
-_CONFIG_TUNING_FIELDS: Mapping[RuntimeTuningKey, str] = MappingProxyType(
-    {
-        RuntimeTuningKey.CAMPAIGN_MODE: "Campaign_Mode",
-        RuntimeTuningKey.COINCIDENT_POINT_ENCOURAGE_DISTANCE: "COINCIDENT_POINT_ENCOURAGE_DISTANCE",
-        RuntimeTuningKey.DETECTION_BACKEND: "DETECTION_BACKEND",
-        RuntimeTuningKey.DISTANCE_POINT_X_RANGE: "DISTANCE_POINT_X_RANGE",
-        RuntimeTuningKey.HOMO_EDGE_COLOR_RANGE: "HOMO_EDGE_COLOR_RANGE",
-        RuntimeTuningKey.HOMO_EDGE_HOUGHLINES_THRESHOLD: "HOMO_EDGE_HOUGHLINES_THRESHOLD",
-        RuntimeTuningKey.HOMO_CANNY_THRESHOLD: "HOMO_CANNY_THRESHOLD",
-        RuntimeTuningKey.HOMO_CENTER_OFFSET: "HOMO_CENTER_OFFSET",
-        RuntimeTuningKey.HOMO_TILE: "HOMO_TILE",
-        RuntimeTuningKey.INTERNAL_LINES_FIND_PEAKS_PARAMETERS: "INTERNAL_LINES_FIND_PEAKS_PARAMETERS",
-        RuntimeTuningKey.INTERNAL_LINES_HOUGHLINES_THRESHOLD: "INTERNAL_LINES_HOUGHLINES_THRESHOLD",
-        RuntimeTuningKey.EDGE_LINES_FIND_PEAKS_PARAMETERS: "EDGE_LINES_FIND_PEAKS_PARAMETERS",
-        RuntimeTuningKey.EDGE_LINES_HOUGHLINES_THRESHOLD: "EDGE_LINES_HOUGHLINES_THRESHOLD",
-        RuntimeTuningKey.GRID_IMAGE_A_MULTIPLY: "GRID_IMAGE_A_MULTIPLY",
-        RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_SHORT: "MAP_CLEAR_PERCENTAGE_SHORT",
-        RuntimeTuningKey.MAP_ENEMY_GENRE_DETECTION_SCALING: "MAP_ENEMY_GENRE_DETECTION_SCALING",
-        RuntimeTuningKey.MAP_ENEMY_GENRE_SIMILARITY: "MAP_ENEMY_GENRE_SIMILARITY",
-        RuntimeTuningKey.MAP_WALK_USE_CURRENT_FLEET: "MAP_WALK_USE_CURRENT_FLEET",
-        RuntimeTuningKey.MAP_SIREN_MOVE_WAIT: "MAP_SIREN_MOVE_WAIT",
-        RuntimeTuningKey.MAP_SWIPE_PREDICT_WITH_SEA_GRIDS: "MAP_SWIPE_PREDICT_WITH_SEA_GRIDS",
-        RuntimeTuningKey.MAP_SWIPE_PREDICT_WITH_CURRENT_FLEET: "MAP_SWIPE_PREDICT_WITH_CURRENT_FLEET",
-        RuntimeTuningKey.MAP_SWIPE_PREDICT: "MAP_SWIPE_PREDICT",
-        RuntimeTuningKey.MAP_ENEMY_TEMPLATE: "MAP_ENEMY_TEMPLATE",
-        RuntimeTuningKey.MAP_GRID_CENTER_TOLERANCE: "MAP_GRID_CENTER_TOLERANCE",
-        RuntimeTuningKey.MAP_HAS_CLEAR_PERCENTAGE: "MAP_HAS_CLEAR_PERCENTAGE",
-        RuntimeTuningKey.MAP_HAS_DECOY_ENEMY: "MAP_HAS_DECOY_ENEMY",
-        RuntimeTuningKey.MAP_HAS_MISSILE_ATTACK: "MAP_HAS_MISSILE_ATTACK",
-        RuntimeTuningKey.MAP_HAS_WALK_SPEEDUP: "MAP_HAS_WALK_SPEEDUP",
-        RuntimeTuningKey.MAP_MYSTERY_HAS_CARRIER: "MAP_MYSTERY_HAS_CARRIER",
-        RuntimeTuningKey.MAP_MYSTERY_MAP_CLICK: "MAP_MYSTERY_MAP_CLICK",
-        RuntimeTuningKey.MAP_SIREN_HAS_BOSS_ICON: "MAP_SIREN_HAS_BOSS_ICON",
-        RuntimeTuningKey.MAP_SIREN_HAS_BOSS_ICON_SMALL: "MAP_SIREN_HAS_BOSS_ICON_SMALL",
-        RuntimeTuningKey.MID_DIFF_RANGE_H: "MID_DIFF_RANGE_H",
-        RuntimeTuningKey.MID_DIFF_RANGE_V: "MID_DIFF_RANGE_V",
-        RuntimeTuningKey.POOR_MAP_DATA: "POOR_MAP_DATA",
-        RuntimeTuningKey.TRUST_EDGE_LINES: "TRUST_EDGE_LINES",
-        RuntimeTuningKey.TRUST_EDGE_LINES_THRESHOLD: "TRUST_EDGE_LINES_THRESHOLD",
-        RuntimeTuningKey.VANISH_POINT_RANGE: "VANISH_POINT_RANGE",
-    }
-)
-
-_RUNTIME_ATTRIBUTE_TUNINGS = frozenset(
-    {
-        RuntimeTuningKey.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD,
-        RuntimeTuningKey.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD,
-        RuntimeTuningKey.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD,
-    }
-)
-_DIRECT_CONFIG_TUNINGS = frozenset(
-    {
-        RuntimeTuningKey.FLEET_2,
-        RuntimeTuningKey.FLEET_BOSS,
-        RuntimeTuningKey.SUBMARINE,
-    }
-)
-_BEHAVIOR_TUNINGS = frozenset(
-    {
-        RuntimeTuningKey.BOSS_APPEAR_REFOCUS_PRESET,
-        RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_MULTIPLIER,
-        RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE,
-    }
-)
-_PROJECTED_TUNING_KEYS = (
-    frozenset(_CONFIG_TUNING_FIELDS) | _RUNTIME_ATTRIBUTE_TUNINGS | _DIRECT_CONFIG_TUNINGS | _BEHAVIOR_TUNINGS
-)
-if frozenset(RuntimeTuningKey) != _PROJECTED_TUNING_KEYS:
-    missing = sorted(key.value for key in frozenset(RuntimeTuningKey) - _PROJECTED_TUNING_KEYS)
-    extra = sorted(key.value for key in _PROJECTED_TUNING_KEYS - frozenset(RuntimeTuningKey))
-    message = f"runtime tuning projection is incomplete: missing={missing}, extra={extra}"
-    raise AssertionError(message)
-
-
-def _thaw_tuning(value: RuntimeTuningValue) -> object:
-    if isinstance(value, tuple):
-        return tuple(_thaw_tuning(item) for item in value)
-    if isinstance(value, Mapping):
-        typed = cast("Mapping[str, RuntimeTuningValue]", value)
-        return {key: _thaw_tuning(item) for key, item in typed.items()}
-    return value
-
-
-def _integer_tuning(value: RuntimeTuningValue, key: RuntimeTuningKey) -> int:
-    if type(value) is not int:
-        message = f"runtime tuning {key.value} must be an integer"
-        raise CampaignRuntimeProfileError(message)
-    return value
-
-
-def _number_tuning(value: RuntimeTuningValue, key: RuntimeTuningKey) -> float:
-    if type(value) not in (int, float):
-        message = f"runtime tuning {key.value} must be a number"
-        raise CampaignRuntimeProfileError(message)
-    return float(cast("int | float", value))
-
-
 def _resolve_support_fleet_state(
     instances: Iterable[RuntimeExecutorInstance],
 ) -> SupportFleetAttemptState | None:
@@ -572,18 +478,15 @@ class CampaignRuntimeProfileManager:
 
     __slots__ = (
         "_active_context",
-        "_behavior_tunings",
         "_compiled_map",
-        "_direct_config_tunings",
         "_facets",
         "_frames",
         "_instances",
         "_profile",
         "_registry",
         "_runtime",
-        "_runtime_attribute_tunings",
         "_shared_state",
-        "_standard_config_tunings",
+        "_tuning_patch",
     )
 
     def __init__(
@@ -608,28 +511,11 @@ class CampaignRuntimeProfileManager:
         self._runtime: object | None = None
         self._compiled_map: CampaignMap | None = None
         self._active_context: RuntimeSessionContext | None = None
-        standard: dict[str, object] = {}
-        direct: dict[RuntimeTuningKey, RuntimeTuningValue] = {}
-        runtime_attributes: dict[RuntimeTuningKey, RuntimeTuningValue] = {}
-        behavior: dict[RuntimeTuningKey, RuntimeTuningValue] = {}
-        for tuning in profile.tunings:
-            field = _CONFIG_TUNING_FIELDS.get(tuning.key)
-            if field is not None:
-                standard[field] = _thaw_tuning(tuning.value)
-            elif tuning.key in _DIRECT_CONFIG_TUNINGS:
-                direct[tuning.key] = tuning.value
-            elif tuning.key in _RUNTIME_ATTRIBUTE_TUNINGS:
-                runtime_attributes[tuning.key] = tuning.value
-            elif tuning.key in _BEHAVIOR_TUNINGS:
-                behavior[tuning.key] = tuning.value
-            else:
-                message = f"runtime tuning has no production projection: {tuning.key.value}"
-                raise CampaignRuntimeProfileError(message)
-        self._standard_config_tunings = MappingProxyType(standard)
-        self._direct_config_tunings = MappingProxyType(direct)
-        self._runtime_attribute_tunings = MappingProxyType(runtime_attributes)
-        self._behavior_tunings = MappingProxyType(behavior)
-        self._validate_projection_contracts()
+        try:
+            self._tuning_patch = compile_campaign_runtime_tuning_patch(profile.tunings)
+        except (RuntimeTuningValidationError, TypeError, ValueError) as error:
+            raise CampaignRuntimeProfileError(str(error)) from error
+        self._validate_grid_contracts()
 
     @staticmethod
     def _build_instances(
@@ -659,15 +545,7 @@ class CampaignRuntimeProfileManager:
                 facets.extend(_SessionFacet(binding, instance) for binding in bindings)
         return tuple(instances), tuple(facets)
 
-    def _validate_projection_contracts(self) -> None:
-        for key, value in self._direct_config_tunings.items():
-            _integer_tuning(value, key)
-        _ = self.configured_boss_fleet
-        for key, value in self._runtime_attribute_tunings.items():
-            _number_tuning(value, key)
-        _ = self.boss_appear_refocus_preset
-        _ = self.map_clear_percentage_multiplier
-        _ = self.combat_disable_stuck_detection_battle
+    def _validate_grid_contracts(self) -> None:
         _ = self.map_grid_class
         _ = self.camera_grid_class
 
@@ -714,26 +592,13 @@ class CampaignRuntimeProfileManager:
         if not isinstance(config, AzurLaneConfig):
             message = "runtime profile config projection requires AzurLaneConfig"
             raise TypeError(message)
-        overlay = dict(self._standard_config_tunings)
-        fleet_2 = self._direct_config_tunings.get(RuntimeTuningKey.FLEET_2)
-        if fleet_2 is not None:
-            overlay["Fleet_Fleet2"] = _integer_tuning(fleet_2, RuntimeTuningKey.FLEET_2)
-        submarine = self._direct_config_tunings.get(RuntimeTuningKey.SUBMARINE)
-        if submarine is not None:
-            overlay["Submarine_Fleet"] = _integer_tuning(submarine, RuntimeTuningKey.SUBMARINE)
+        overlay = self._tuning_patch.config.to_overrides()
         if overlay:
-            config.apply_runtime_overlay(**cast("ConfigOverrides", overlay))
+            config.apply_runtime_overlay(**overlay)
 
     @property
-    def configured_boss_fleet(self) -> int | None:
-        value = self._direct_config_tunings.get(RuntimeTuningKey.FLEET_BOSS)
-        if value is None:
-            return None
-        fleet = _integer_tuning(value, RuntimeTuningKey.FLEET_BOSS)
-        if fleet not in (1, 2):
-            message = "fleet_boss must be 1 or 2"
-            raise CampaignRuntimeProfileError(message)
-        return fleet
+    def configured_boss_fleet(self) -> ConfiguredBossFleet | None:
+        return self._tuning_patch.config.configured_boss_fleet
 
     def install_map_grid(self, compiled_map: CampaignMap) -> None:
         if not isinstance(compiled_map, CampaignMap):
@@ -834,45 +699,27 @@ class CampaignRuntimeProfileManager:
         self._seed_attempt_state()
         raise_cleanup_errors(errors, message="runtime profile reset failed")
 
-    def apply_runtime_tunings(self, runtime: RuntimeProfileHost) -> None:
-        for key, value in self._runtime_attribute_tunings.items():
-            number = _number_tuning(value, key)
-            if key is RuntimeTuningKey.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD:
-                runtime.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = number
-            elif key is RuntimeTuningKey.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD:
-                runtime.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = number
-            elif key is RuntimeTuningKey.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD:
-                runtime.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = number
-            else:
-                message = f"unreachable runtime attribute tuning: {key.value}"
-                raise AssertionError(message)
+    def apply_runtime_thresholds(self, runtime: RuntimeProfileHost) -> None:
+        thresholds = self._tuning_patch.thresholds
+        if thresholds.air_raid_overlay_transparency is not None:
+            runtime.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = thresholds.air_raid_overlay_transparency
+        if thresholds.ambush_overlay_transparency is not None:
+            runtime.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = thresholds.ambush_overlay_transparency
+        if thresholds.enemy_searching_overlay_transparency is not None:
+            runtime.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = thresholds.enemy_searching_overlay_transparency
 
     @property
     def boss_appear_refocus_preset(self) -> tuple[int, int] | None:
-        value = self._behavior_tunings.get(RuntimeTuningKey.BOSS_APPEAR_REFOCUS_PRESET)
-        if value is None:
-            return None
-        if not isinstance(value, tuple) or len(value) != 2 or any(type(item) is not int for item in value):
-            message = "boss_appear_refocus_preset must contain two integers"
-            raise CampaignRuntimeProfileError(message)
-        return cast("tuple[int, int]", value)
+        return self._tuning_patch.behavior.boss_appear_refocus_preset
 
     @property
     def map_clear_percentage_multiplier(self) -> float:
-        value = self._behavior_tunings.get(RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_MULTIPLIER)
-        if value is None:
-            return 1.0
-        return _number_tuning(value, RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_MULTIPLIER)
+        value = self._tuning_patch.behavior.map_clear_percentage_multiplier
+        return 1.0 if value is None else value
 
     @property
     def combat_disable_stuck_detection_battle(self) -> int | None:
-        value = self._behavior_tunings.get(RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE)
-        if value is None:
-            return None
-        return _integer_tuning(
-            value,
-            RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE,
-        )
+        return self._tuning_patch.behavior.combat_disable_stuck_detection_battle
 
     def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()

@@ -406,7 +406,7 @@ def test_registry_contracts_fail_before_runtime_binding(
         (
             RuntimeTuningKey.BOSS_APPEAR_REFOCUS_PRESET,
             (1,),
-            "boss_appear_refocus_preset must contain two integers",
+            "boss_appear_refocus_preset must be a pair of integers",
         ),
         (
             RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_MULTIPLIER,
@@ -466,14 +466,21 @@ def test_effective_grid_executor_conflict_fails_during_manager_construction(
         CampaignRuntimeProfileManager(profile, registry)
 
 
-def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() -> None:
-    values: dict[RuntimeTuningKey, object] = dict.fromkeys(RuntimeTuningKey, 1)
-    values[RuntimeTuningKey.CAMPAIGN_MODE] = "normal"
-    values[RuntimeTuningKey.BOSS_APPEAR_REFOCUS_PRESET] = [-3, 0]
-    values[RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_MULTIPLIER] = 0.5
+def test_tuning_patch_is_sparse_and_does_not_leak_between_runtimes() -> None:
     profile = CampaignRuntimeProfile(
         CampaignRuntimeProfileId("tunings"),
-        tunings=tuple(RuntimeTuning(key, value) for key, value in values.items()),
+        tunings=(
+            RuntimeTuning(RuntimeTuningKey.MAP_SWIPE_PREDICT, value=False),
+            RuntimeTuning(RuntimeTuningKey.FLEET_2, 0),
+            RuntimeTuning(RuntimeTuningKey.SUBMARINE, 0),
+            RuntimeTuning(RuntimeTuningKey.FLEET_BOSS, 1),
+            RuntimeTuning(RuntimeTuningKey.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD, 1),
+            RuntimeTuning(RuntimeTuningKey.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD, 1),
+            RuntimeTuning(RuntimeTuningKey.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD, 1),
+            RuntimeTuning(RuntimeTuningKey.BOSS_APPEAR_REFOCUS_PRESET, [-3, 0]),
+            RuntimeTuning(RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_MULTIPLIER, 0.5),
+            RuntimeTuning(RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE, 1),
+        ),
     )
     manager = CampaignRuntimeProfileManager(
         profile,
@@ -488,12 +495,14 @@ def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() ->
     untouched = _Runtime()
 
     manager.apply_config(config)
-    manager.apply_runtime_tunings(runtime)
+    manager.apply_runtime_thresholds(runtime)
 
     assert len(config.overlays) == 1
-    assert config.overlays[0]["Fleet_Fleet2"] == 1
-    assert config.overlays[0]["Submarine_Fleet"] == 1
-    assert manager.configured_boss_fleet == 1
+    assert config.overlays[0]["MAP_SWIPE_PREDICT"] is False
+    assert config.overlays[0]["Fleet_Fleet2"] == 0
+    assert config.overlays[0]["Submarine_Fleet"] == 0
+    assert manager.configured_boss_fleet is not None
+    assert manager.configured_boss_fleet.index == 1
     assert runtime.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
     assert runtime.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
     assert runtime.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
@@ -504,6 +513,26 @@ def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() ->
     assert other.boss_appear_refocus_preset is None
     assert other.map_clear_percentage_multiplier == 1.0
     assert other.configured_boss_fleet is None
+
+
+def test_empty_tuning_patch_preserves_nonzero_runtime_threshold_defaults() -> None:
+    class _RuntimeWithDefaults:
+        MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.25
+        MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = 0.35
+        MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.45
+
+    manager = CampaignRuntimeProfileManager(
+        CampaignRuntimeProfile.core(),
+        CampaignRuntimeExecutorRegistry(()),
+    )
+    runtime = _RuntimeWithDefaults()
+
+    manager.apply_runtime_thresholds(runtime)
+
+    assert pytest.approx(0.25) == runtime.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD
+    assert pytest.approx(0.35) == runtime.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD
+    assert pytest.approx(0.45) == runtime.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD
+    assert vars(runtime) == {}
 
 
 def test_map_and_camera_grid_ports_are_selected_independently() -> None:

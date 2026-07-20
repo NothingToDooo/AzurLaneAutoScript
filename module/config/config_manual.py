@@ -105,7 +105,7 @@ class ManualConfig:
     MAP_ENEMY_TEMPLATE: ClassVar[tuple[str, ...]] = ("Light", "Main", "Carrier", "Treasure")
     MAP_SIREN_TEMPLATE: ClassVar[tuple[str, ...]] = ("DD", "CL", "CA", "BB", "CV")
     # key 是模板名，value 是缩放系数。
-    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, float]] = {}
+    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, float | tuple[float, ...]]] = {}
     MAP_ENEMY_GENRE_SIMILARITY = 0.85
     MAP_SIREN_MOVE_WAIT = 1.5  # The enemy moving takes about 1.2 ~ 1.5s.
     MAP_SIREN_HAS_BOSS_ICON = False  # Anonymous siren with small boss icon at bottom-right
@@ -207,7 +207,7 @@ class ManualConfig:
     VANISH_POINT_RANGE = ((540, 740), (-3000, -1000))
     DISTANCE_POINT_X_RANGE = ((-3200, -1600),)
     # Parameters for line cleansing
-    COINCIDENT_POINT_ENCOURAGE_DISTANCE = 3
+    COINCIDENT_POINT_ENCOURAGE_DISTANCE = 3.0
     ERROR_LINES_TOLERANCE = (-10, 10)
     MID_DIFF_RANGE_H = (129 - 3, 129 + 3)
     MID_DIFF_RANGE_V = (129 - 3, 129 + 3)
