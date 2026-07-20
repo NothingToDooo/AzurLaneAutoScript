@@ -12,11 +12,9 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
 )
 from module.adapters.campaign_runtime_special_early import special_early_runtime_executor_descriptors
 from module.campaign.assets import EVENT_20221124_ENTRANCE, EVENT_20221124_PT_ICON
-from module.combat.assets import GET_ITEMS_1_RYZA
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -26,7 +24,6 @@ from module.content.runtime_profile import (
     RuntimeExecutorKind,
     RuntimeImplementationId,
 )
-from module.handler.assets import MYSTERY_ITEM
 from module.map.map_base import CampaignMap
 from module.map_detection.grid_info import GridInfo
 from module.ui.page import page_campaign_menu, page_event, page_main
@@ -58,8 +55,7 @@ class _Device:
 
 
 class _Runtime:
-    def __init__(self, manager: CampaignRuntimeProfileManager) -> None:
-        self.manager = manager
+    def __init__(self) -> None:
         self.device = _Device()
         self.map = CampaignMap("special-early-test")
         self.map.spawn_data = []
@@ -72,15 +68,6 @@ class _Runtime:
         self.appear_calls: list[tuple[object, tuple[object, ...]]] = []
         self.ensured_pages: list[object] = []
         self.ui_clicks: list[tuple[object, object, object]] = []
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        return self.manager.invoke_super(operation, self, *args, **kwargs)
 
     def appear(
         self,
@@ -181,11 +168,6 @@ def _ryza_manager() -> CampaignRuntimeProfileManager:
             RuntimeExecutorKind.EVENT_UI,
             None,
         ),
-        _binding(
-            _RYZA_IMPLEMENTATION,
-            RuntimeExecutorKind.MAP_MECHANIC,
-            ["handle_mystery_items"],
-        ),
     )
 
 
@@ -195,7 +177,7 @@ def _event_ui_services(manager: CampaignRuntimeProfileManager) -> CampaignEventU
 
 def test_t4_observation_preserves_base_result_and_destination_identity() -> None:
     manager = _t4_manager()
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
     destination = GridInfo()
     observed: list[tuple[MapObserverRuntime, GridInfo]] = []
 
@@ -235,7 +217,7 @@ def test_t4_observation_only_waits_for_a_fortress_camera_move(
 ) -> None:
     is_fortress, is_clear_mode, expected, expected_sleeps = scenario
     manager = _t4_manager()
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
     runtime.map_is_clear_mode = is_clear_mode
     destination = GridInfo()
     destination.is_fortress = is_fortress
@@ -249,7 +231,7 @@ def test_t4_observation_only_waits_for_a_fortress_camera_move(
 
 def test_ryza_event_ui_recognizes_the_existing_event_page() -> None:
     manager = _ryza_manager()
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
     runtime.visible_asset = EVENT_20221124_PT_ICON
     runtime.visible_page = page_event
 
@@ -263,7 +245,7 @@ def test_ryza_event_ui_recognizes_the_existing_event_page() -> None:
 
 def test_ryza_event_ui_uses_the_closed_event_assets() -> None:
     manager = _ryza_manager()
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
     runtime.event_entrance_available = True
 
     result = _event_ui_services(manager).destination.open(runtime)
@@ -281,62 +263,13 @@ def test_ryza_event_ui_uses_the_closed_event_assets() -> None:
 
 def test_ryza_event_ui_stops_when_the_event_entrance_is_unavailable() -> None:
     manager = _ryza_manager()
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
 
     result = _event_ui_services(manager).destination.open(runtime)
 
     assert result is False
     assert runtime.ensured_pages == [page_campaign_menu]
     assert runtime.ui_clicks == []
-
-
-def test_ryza_mystery_handler_preserves_the_base_handler() -> None:
-    manager = _ryza_manager()
-    runtime = _Runtime(manager)
-    mystery = object()
-
-    result = manager.mechanic.invoke(
-        RuntimeOperation.HANDLE_MYSTERY_ITEMS,
-        runtime,
-        lambda button=None: button is mystery,
-        mystery,
-    )
-
-    assert result is True
-    assert runtime.appear_calls == []
-    assert runtime.device.clicks == []
-
-
-def test_ryza_mystery_handler_uses_the_closed_item_assets() -> None:
-    manager = _ryza_manager()
-    runtime = _Runtime(manager)
-    runtime.visible_asset = GET_ITEMS_1_RYZA
-
-    result = manager.mechanic.invoke(
-        RuntimeOperation.HANDLE_MYSTERY_ITEMS,
-        runtime,
-        lambda _button=None: False,
-    )
-
-    assert result is True
-    assert runtime.appear_calls == [(GET_ITEMS_1_RYZA, (-20, -100, 20, 20))]
-    assert runtime.device.clicks == [MYSTERY_ITEM]
-    assert runtime.device.sleeps == [0.5]
-    assert runtime.device.screenshot_count == 1
-
-
-def test_ryza_mystery_handler_returns_false_without_a_special_popup() -> None:
-    manager = _ryza_manager()
-    runtime = _Runtime(manager)
-
-    result = manager.mechanic.invoke(
-        RuntimeOperation.HANDLE_MYSTERY_ITEMS,
-        runtime,
-        lambda _button=None: False,
-    )
-
-    assert result is False
-    assert runtime.device.clicks == []
 
 
 def test_special_early_descriptors_reject_unknown_options() -> None:
@@ -355,17 +288,6 @@ def test_t4_observer_rejects_obsolete_operations_field() -> None:
         )
 
 
-def test_ryza_executor_requires_both_facets() -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match="requires exactly one map_mechanic binding"):
-        _manager(
-            _binding(
-                _RYZA_IMPLEMENTATION,
-                RuntimeExecutorKind.EVENT_UI,
-                None,
-            )
-        )
-
-
 def test_ryza_event_ui_rejects_obsolete_operations_field() -> None:
     with pytest.raises(CampaignRuntimeProfileError, match="unknown option: operations"):
         _manager(
@@ -373,10 +295,5 @@ def test_ryza_event_ui_rejects_obsolete_operations_field() -> None:
                 _RYZA_IMPLEMENTATION,
                 RuntimeExecutorKind.EVENT_UI,
                 [],
-            ),
-            _binding(
-                _RYZA_IMPLEMENTATION,
-                RuntimeExecutorKind.MAP_MECHANIC,
-                ["handle_mystery_items"],
             ),
         )

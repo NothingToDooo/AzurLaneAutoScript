@@ -19,6 +19,7 @@ from module.adapters.campaign_map_session_mumu12 import (
     Mumu12CampaignMapSessionOwner,
     apply_campaign_map_mutations,
 )
+from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
 from module.adapters.campaign_program_mumu12 import (
     Mumu12CampaignBattleProgramExecutor,
     Mumu12CommittedBattleProgramUnit,
@@ -494,6 +495,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
             map_clear_percentage_multiplier=self._runtime_profile.map_clear_percentage_multiplier,
         )
+        self._mystery_item_service = build_campaign_mystery_item_service(
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
+        )
         self._event_ui_services = build_campaign_event_ui_services(
             self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
         )
@@ -620,15 +624,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             RuntimeOperation.FLEET_PREPARATION,
             self,
             self._base_fleet_preparation,
-        )
-        return bool(result)
-
-    def handle_mystery_items(self, button: object = None) -> bool:
-        result = self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.HANDLE_MYSTERY_ITEMS,
-            self,
-            lambda *, button=None: CampaignEngine.handle_mystery_items(self, button=button),
-            button=button,
         )
         return bool(result)
 

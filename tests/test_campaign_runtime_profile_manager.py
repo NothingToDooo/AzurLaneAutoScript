@@ -388,7 +388,7 @@ def test_same_kind_composes_base_to_derived_as_an_around_chain() -> None:
 
 
 def test_derived_executor_can_short_circuit_without_calling_next() -> None:
-    operation = RuntimeOperation.HANDLE_MYSTERY_ITEMS
+    operation = RuntimeOperation.HANDLE_SUBMARINE_SUPPORT_POPUP
     called: list[str] = []
 
     def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:

@@ -23,10 +23,7 @@
           "implementation": "map_mechanic/non_counting_mystery_popup",
           "kind": "map_mechanic",
           "options": {
-            "count_as_mystery": false,
-            "operations": [
-              "handle_mystery_items"
-            ]
+            "count_as_mystery": false
           }
         }
       ],
@@ -928,13 +925,9 @@
           }
         },
         {
-          "implementation": "event_20221124_cn/campaign_base/campaign_base",
+          "implementation": "map_mechanic/ryza_mystery_items",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "handle_mystery_items"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "event_20221124_cn/campaign_base/campaign_base"

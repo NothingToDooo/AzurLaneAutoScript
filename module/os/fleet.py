@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, override
+from typing import TYPE_CHECKING, override
 
 import numpy as np
 
@@ -10,6 +10,7 @@ from module.base.timer import Timer
 from module.base.utils import point_limit
 from module.exception import MapWalkError
 from module.handler.assets import MAINTENANCE_ANNOUNCE
+from module.handler.mystery_item import MysteryKind, MysteryResult
 from module.logger import logger
 from module.map.fleet import Fleet
 from module.map.map_grids import SelectedGrids
@@ -146,13 +147,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             return True
         return False
 
-    def handle_mystery(self, button: Grid | None = None) -> Literal["get_item", False]:
+    def handle_mystery(self, button: Grid | None = None) -> MysteryResult | None:
         """处理伏击后，舰队已到达时按神秘事件处理，否则仍按伏击处理。"""
         if button is None:
-            return False
+            return None
         if self._os_map_event_handled and button.predict_fleet() and button.predict_current_fleet():
-            return "get_item"
-        return False
+            return MysteryResult(MysteryKind.GET_ITEM, counts_toward_mystery=True)
+        return None
 
     @staticmethod
     def _get_goto_expected(grid: RadarGrid) -> str:

@@ -2,6 +2,7 @@ from .campaign_runtime_event_ui import event_ui_runtime_executor_descriptors
 from .campaign_runtime_grid_registry import grid_runtime_executor_descriptors
 from .campaign_runtime_hard import hard_runtime_executor_descriptors
 from .campaign_runtime_mechanics import mechanic_runtime_executor_descriptors
+from .campaign_runtime_mystery import mystery_runtime_executor_descriptors
 from .campaign_runtime_navigation import navigation_runtime_executor_descriptors
 from .campaign_runtime_observation import observation_runtime_executor_descriptors
 from .campaign_runtime_profile import (
@@ -22,6 +23,7 @@ def default_campaign_runtime_executor_descriptors() -> tuple[RuntimeExecutorFact
         *hard_runtime_executor_descriptors(),
         *semantic_runtime_executor_descriptors(),
         *mechanic_runtime_executor_descriptors(),
+        *mystery_runtime_executor_descriptors(),
         *navigation_runtime_executor_descriptors(),
         *observation_runtime_executor_descriptors(),
         *event_ui_runtime_executor_descriptors(),

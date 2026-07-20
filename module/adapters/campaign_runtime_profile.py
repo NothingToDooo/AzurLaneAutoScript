@@ -39,7 +39,6 @@ class RuntimeOperation(StrEnum):
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
     FLEET_PREPARATION = "fleet_preparation"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
-    HANDLE_MYSTERY_ITEMS = "handle_mystery_items"
     HANDLE_SUBMARINE_SUPPORT_POPUP = "handle_submarine_support_popup"
     MAP_DATA_INIT = "map_data_init"
     MAP_INIT = "map_init"

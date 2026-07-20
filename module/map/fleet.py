@@ -367,11 +367,12 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - å¾
 
     def _goto_handle_mystery(self, state: _GotoState) -> None:
         mystery = self.handle_mystery(button=state.grid)
-        if not mystery:
+        if mystery is None:
             return
-        self.mystery_count += 1
+        if mystery.counts_toward_mystery:
+            self.mystery_count += 1
         state.result = "mystery"
-        state.result_mystery = mystery
+        state.result_mystery = mystery.kind.value
 
     def _goto_handle_cat_attack(self, state: _GotoState) -> bool:
         if not self.handle_map_cat_attack():

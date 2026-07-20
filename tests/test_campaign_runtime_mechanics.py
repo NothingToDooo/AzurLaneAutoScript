@@ -270,32 +270,6 @@ def test_mob_move_strategy_executor_owns_session_state() -> None:
     assert manager.map_has_mob_move(AbortToken())
 
 
-def test_non_counting_mystery_executes_base_handler_but_returns_false() -> None:
-    manager = _manager(
-        _binding(
-            "map_mechanic/non_counting_mystery_popup",
-            RuntimeExecutorKind.MAP_MECHANIC,
-            {
-                "operations": ["handle_mystery_items"],
-                "count_as_mystery": False,
-            },
-        )
-    )
-    runtime = _Runtime()
-    _start(manager, runtime, RuntimeSessionEntryKind.FRESH)
-    fallback_calls: list[object] = []
-
-    result = manager.mechanic.invoke(
-        RuntimeOperation.HANDLE_MYSTERY_ITEMS,
-        runtime,
-        lambda button=None: fallback_calls.append(button) or True,
-        "item",
-    )
-
-    assert result is False
-    assert fallback_calls == ["item"]
-
-
 def test_session_state_policy_projects_stage_specific_fleet_order() -> None:
     manager = _manager(
         _support_binding(),

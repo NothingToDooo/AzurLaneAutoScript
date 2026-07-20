@@ -253,30 +253,6 @@ class MobMoveStrategyStateExecutor(RuntimeExecutorInstance):
         return result
 
 
-class NonCountingMysteryExecutor(RuntimeExecutorInstance):
-    """执行标准 mystery 处理，但不把活动专用弹窗计入 mystery 数量。"""
-
-    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
-        options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
-        _require_operations(options, frozenset({"handle_mystery_items"}))
-        if options["count_as_mystery"] is not False:
-            message = "non-counting mystery executor requires count_as_mystery=false"
-            raise CampaignRuntimeProfileError(message)
-        super().__init__(
-            {RuntimeExecutorKind.MAP_MECHANIC},
-            methods={
-                RuntimeExecutorKind.MAP_MECHANIC: {
-                    RuntimeOperation.HANDLE_MYSTERY_ITEMS: self._handle_mystery_items,
-                }
-            },
-        )
-
-    @staticmethod
-    def _handle_mystery_items(runtime: object, button: object = None) -> object:
-        _host(runtime).runtime_super(RuntimeOperation.HANDLE_MYSTERY_ITEMS, button=button)
-        return False
-
-
 class SessionStatePolicyExecutor(RuntimeExecutorInstance):
     """在 MAP_INIT 后从本次地图运行事实计算十六图的 typed session state。"""
 
@@ -347,10 +323,6 @@ def _build_mob_move_strategy_state(context: RuntimeExecutorBuildContext) -> Runt
     return MobMoveStrategyStateExecutor(context)
 
 
-def _build_non_counting_mystery(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    return NonCountingMysteryExecutor(context)
-
-
 def _build_session_state_policy(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     return SessionStatePolicyExecutor(context)
 
@@ -387,15 +359,6 @@ def mechanic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("map_mechanic/mob_move_strategy_state"),
             {RuntimeExecutorKind.MAP_MECHANIC: mechanic_schema},
             _build_mob_move_strategy_state,
-        ),
-        RuntimeExecutorFactoryDescriptor(
-            RuntimeImplementationId("map_mechanic/non_counting_mystery_popup"),
-            {
-                RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "count_as_mystery"}),
-                )
-            },
-            _build_non_counting_mystery,
         ),
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("map_mechanic/session_state_policy"),
