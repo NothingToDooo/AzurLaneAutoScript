@@ -61,7 +61,9 @@ def _context() -> RuntimeSessionContext:
 
 def _hard_runtime(manager: _SessionManager) -> DeclarativeCampaignMapRuntime:
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    vars(runtime)["_runtime_profile_lease"] = RuntimeProfileLease(manager)
+    lease = RuntimeProfileLease(manager)
+    manager.lease = lease
+    vars(runtime)["_runtime_profile_lease"] = lease
     return runtime
 
 
@@ -246,7 +248,8 @@ def test_hard_attempt_uses_a_direct_loop_context_and_completes(
     ]
     assert runtime.session_variant is CampaignRunVariant.LOOP
     assert runtime.map_is_clear_mode is True
-    assert runtime.runtime_session_active is False
+    assert manager.lease is not None
+    assert manager.lease.active is False
 
 
 def test_hard_attempt_maps_abort_to_interrupted(
@@ -271,7 +274,8 @@ def test_hard_attempt_maps_abort_to_interrupted(
 
     assert raised.value is abort
     assert manager.calls[-2:] == [("end", RuntimeSessionOutcome.INTERRUPTED), "reset"]
-    assert runtime.runtime_session_active is False
+    assert manager.lease is not None
+    assert manager.lease.active is False
 
 
 def test_hard_attempt_maps_other_errors_to_failed(
@@ -296,7 +300,8 @@ def test_hard_attempt_maps_other_errors_to_failed(
 
     assert raised.value is failure
     assert manager.calls[-2:] == [("end", RuntimeSessionOutcome.FAILED), "reset"]
-    assert runtime.runtime_session_active is False
+    assert manager.lease is not None
+    assert manager.lease.active is False
 
 
 def test_hard_attempt_preserves_body_and_cleanup_failures(
@@ -322,4 +327,5 @@ def test_hard_attempt_preserves_body_and_cleanup_failures(
 
     assert raised.value.exceptions == (body_error, cleanup_error)
     assert manager.calls[-2:] == [("end", RuntimeSessionOutcome.FAILED), "reset"]
-    assert runtime.runtime_session_active is False
+    assert manager.lease is not None
+    assert manager.lease.active is False
