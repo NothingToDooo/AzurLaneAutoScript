@@ -1,7 +1,5 @@
 import pytest
 
-from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
-from module.adapters.campaign_runtime_hard import CampaignClearModeExecutor
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeSessionOutcome,
@@ -10,13 +8,6 @@ from module.adapters.campaign_runtime_session import (
     RuntimeProfileLease,
     RuntimeProfileLeaseState,
 )
-from module.adapters.campaign_submarine import (
-    CampaignSubmarineFreshCombatService,
-    CampaignSubmarineServices,
-)
-from module.application import AbortRequested, AbortToken, CancellationSource
-from module.base.button import Button
-from module.content.campaign_session import CampaignRunVariant
 
 
 class _SessionManager:
@@ -52,19 +43,6 @@ class _SessionManager:
             self.cleanup_states.append(self.lease.state)
         if self.reset_error is not None:
             raise self.reset_error
-
-
-def _hard_runtime(manager: _SessionManager) -> DeclarativeCampaignMapRuntime:
-    runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    lease = RuntimeProfileLease(manager)
-    manager.lease = lease
-    vars(runtime)["_hard_behavior"] = object.__new__(CampaignClearModeExecutor)
-    vars(runtime)["_runtime_profile_lease"] = lease
-    return runtime
-
-
-def _entrance() -> Button:
-    return Button(area=(), color=(), button=(1, 2, 3, 4), name="HARD_ENTRANCE")
 
 
 def test_lease_runs_one_session_and_closes_in_order() -> None:
@@ -204,119 +182,3 @@ def test_lease_validates_contract_values_before_mutating_state() -> None:
     with pytest.raises(TypeError, match="RuntimeSessionOutcome"):
         lease.close("failed")  # ty: ignore[invalid-argument-type] - 验证运行时边界。
     assert lease.state is RuntimeProfileLeaseState.ACTIVE
-
-
-def test_hard_attempt_uses_a_direct_loop_session_and_completes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    manager = _SessionManager()
-    runtime = _hard_runtime(manager)
-    body_calls: list[tuple[Button, CancellationSource]] = []
-    fresh_combat_calls: list[object] = []
-    vars(runtime)["_submarine_services"] = CampaignSubmarineServices(
-        fresh_combat=CampaignSubmarineFreshCombatService(fresh_combat_calls.append),
-    )
-
-    def complete_body(
-        _runtime: DeclarativeCampaignMapRuntime,
-        entrance: Button,
-        cancellation: CancellationSource,
-    ) -> None:
-        body_calls.append((entrance, cancellation))
-
-    monkeypatch.setattr(DeclarativeCampaignMapRuntime, "_execute_hard_attempt_body", complete_body)
-    entrance = _entrance()
-    cancellation = AbortToken()
-
-    runtime.execute_hard_attempt(entrance, cancellation)
-
-    assert body_calls == [(entrance, cancellation)]
-    assert fresh_combat_calls == []
-    assert manager.calls == [
-        "begin",
-        ("end", RuntimeSessionOutcome.COMPLETED),
-        "reset",
-    ]
-    assert runtime.session_variant is CampaignRunVariant.LOOP
-    assert runtime.map_is_clear_mode is True
-    assert manager.lease is not None
-    assert manager.lease.active is False
-
-
-def test_hard_attempt_maps_abort_to_interrupted(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    abort = AbortRequested("hard attempt cancelled")
-    manager = _SessionManager()
-    runtime = _hard_runtime(manager)
-
-    def abort_body(
-        _runtime: DeclarativeCampaignMapRuntime,
-        entrance: Button,
-        cancellation: CancellationSource,
-    ) -> None:
-        del entrance, cancellation
-        raise abort
-
-    monkeypatch.setattr(DeclarativeCampaignMapRuntime, "_execute_hard_attempt_body", abort_body)
-
-    with pytest.raises(AbortRequested) as raised:
-        runtime.execute_hard_attempt(_entrance(), AbortToken())
-
-    assert raised.value is abort
-    assert manager.calls[-2:] == [("end", RuntimeSessionOutcome.INTERRUPTED), "reset"]
-    assert manager.lease is not None
-    assert manager.lease.active is False
-
-
-def test_hard_attempt_maps_other_errors_to_failed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    failure = RuntimeError("hard attempt failed")
-    manager = _SessionManager()
-    runtime = _hard_runtime(manager)
-
-    def fail_body(
-        _runtime: DeclarativeCampaignMapRuntime,
-        entrance: Button,
-        cancellation: CancellationSource,
-    ) -> None:
-        del entrance, cancellation
-        raise failure
-
-    monkeypatch.setattr(DeclarativeCampaignMapRuntime, "_execute_hard_attempt_body", fail_body)
-
-    with pytest.raises(RuntimeError) as raised:
-        runtime.execute_hard_attempt(_entrance(), AbortToken())
-
-    assert raised.value is failure
-    assert manager.calls[-2:] == [("end", RuntimeSessionOutcome.FAILED), "reset"]
-    assert manager.lease is not None
-    assert manager.lease.active is False
-
-
-def test_hard_attempt_preserves_body_and_cleanup_failures(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    body_error = RuntimeError("hard attempt failed")
-    cleanup_error = OSError("hard cleanup failed")
-    manager = _SessionManager(end_error=cleanup_error)
-    runtime = _hard_runtime(manager)
-
-    def fail_body(
-        _runtime: DeclarativeCampaignMapRuntime,
-        entrance: Button,
-        cancellation: CancellationSource,
-    ) -> None:
-        del entrance, cancellation
-        raise body_error
-
-    monkeypatch.setattr(DeclarativeCampaignMapRuntime, "_execute_hard_attempt_body", fail_body)
-
-    with pytest.raises(BaseExceptionGroup) as raised:
-        runtime.execute_hard_attempt(_entrance(), AbortToken())
-
-    assert raised.value.exceptions == (body_error, cleanup_error)
-    assert manager.calls[-2:] == [("end", RuntimeSessionOutcome.FAILED), "reset"]
-    assert manager.lease is not None
-    assert manager.lease.active is False

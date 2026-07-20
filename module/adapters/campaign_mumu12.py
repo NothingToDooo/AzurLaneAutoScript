@@ -14,6 +14,7 @@ from module.adapters.campaign_clear_mode_config import (
 )
 from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
 from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
+from module.adapters.campaign_hard_attempt_mumu12 import Mumu12CampaignHardAttemptOwner
 from module.adapters.campaign_live import (
     CampaignMapRuntime,
     CommittedCampaignUnit,
@@ -92,7 +93,7 @@ from module.content.stage_rules import (
     StageEntrancePreset,
 )
 from module.device.device import Device
-from module.exception import CampaignEnd, MapAchievementReached
+from module.exception import MapAchievementReached
 from module.gameplay.campaign import (
     CampaignDifficulty,
     CampaignExecutionSettings,
@@ -661,53 +662,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
 
     def handle_map_stop(self) -> None:
         """地图成就只产生事实；task disable/关卡推进由 typed workflow 提交。"""
-
-    def execute_hard_attempt(self, entrance: Button, cancellation: CancellationSource) -> None:
-        """完成一次困难图结算；hard clear-mode 的一次 attempt 是最小可恢复业务单元。"""
-
-        cancellation.raise_if_requested()
-        if self._hard_behavior is None:
-            message = "hard campaign attempt requires the typed clear-mode behavior"
-            raise CampaignRuntimeProfileError(message)
-        self.session_variant = CampaignRunVariant.LOOP
-        self.map_is_clear_mode = True
-        self._runtime_profile_lease.start()
-        try:
-            self._execute_hard_attempt_body(entrance, cancellation)
-        except AbortRequested as error:
-            preserve_cleanup_failure(
-                error,
-                partial(self._runtime_profile_lease.close, RuntimeSessionOutcome.INTERRUPTED),
-                message="cancelled hard campaign attempt and cleanup both failed",
-            )
-            raise
-        except BaseException as error:
-            preserve_cleanup_failure(
-                error,
-                partial(self._runtime_profile_lease.close, RuntimeSessionOutcome.FAILED),
-                message="hard campaign attempt and cleanup both failed",
-            )
-            raise
-        self._runtime_profile_lease.close(RuntimeSessionOutcome.COMPLETED)
-
-    def _execute_hard_attempt_body(self, entrance: Button, cancellation: CancellationSource) -> None:
-        entrance.area = entrance.button
-        self.enter_map(entrance, mode="hard")
-        if not self.map_is_auto_search:
-            message = "hard campaign attempt requires the game's clear-mode auto search"
-            raise CampaignRuntimeEvidenceError(message)
-        self.map = self.MAP
-        self.battle_count = 0
-        self.lv_reset()
-        self.lv_get()
-        for _ in range(20):
-            cancellation.raise_if_requested()
-            try:
-                self.auto_search_execute_a_battle()
-            except CampaignEnd:
-                return
-        message = "hard campaign attempt did not reach settlement within 20 battles"
-        raise CampaignRuntimeEvidenceError(message)
 
 
 @dataclass(slots=True)
@@ -1416,15 +1370,30 @@ class Mumu12CampaignRuntimeProvider:
         self._release_handle(outcome)
 
 
+@dataclass(frozen=True, slots=True)
+class _HardRuntimeHandle:
+    runtime: DeclarativeCampaignMapRuntime
+    owner: Mumu12CampaignHardAttemptOwner
+    stage: StageRef
+    entrance: Button
+
+
+def _require_hard_behavior(runtime: DeclarativeCampaignMapRuntime) -> None:
+    if not isinstance(
+        runtime._hard_behavior,  # ruff:ignore[private-member-access] - port 在交互前验证 runtime capability。
+        CampaignClearModeExecutor,
+    ):
+        message = "hard campaign attempt requires the typed clear-mode behavior"
+        raise CampaignRuntimeProfileError(message)
+
+
 class Mumu12HardCampaignPort:
     """用同一 declarative map runtime 执行困难图，不再加载 campaign Python module。"""
 
     __slots__ = (
-        "_active_entrance",
-        "_active_runtime",
-        "_active_stage",
         "_config",
         "_device",
+        "_handle",
         "_remaining_reader",
         "_runtime_factory",
         "_sessions",
@@ -1465,19 +1434,18 @@ class Mumu12HardCampaignPort:
         self._sessions = sessions
         self._runtime_factory = runtime_factory
         self._remaining_reader = _read_hard_remaining if remaining_reader is None else remaining_reader
-        self._active_runtime: DeclarativeCampaignMapRuntime | None = None
-        self._active_stage: StageRef | None = None
-        self._active_entrance: Button | None = None
+        self._handle: _HardRuntimeHandle | None = None
 
     def _stage_ref(self, settings: HardSettings) -> StageRef:
         return self._sessions.resolve_hard_stage_ref(settings.stage)
 
-    def _require_active(self, settings: HardSettings) -> DeclarativeCampaignMapRuntime:
+    def _require_handle(self, settings: HardSettings) -> _HardRuntimeHandle:
         stage = self._stage_ref(settings)
-        if self._active_runtime is None or self._active_stage != stage:
+        handle = self._handle
+        if handle is None or handle.stage != stage:
             message = "hard campaign operation does not match the active stage"
             raise CampaignRuntimeEvidenceError(message)
-        return self._active_runtime
+        return handle
 
     def remaining_attempts(
         self,
@@ -1485,7 +1453,7 @@ class Mumu12HardCampaignPort:
         cancellation: CancellationSource,
     ) -> int:
         cancellation.raise_if_requested()
-        if self._active_runtime is not None:
+        if self._handle is not None:
             message = "hard campaign already has an active runtime"
             raise CampaignRuntimeEvidenceError(message)
         stage = self._stage_ref(settings)
@@ -1502,19 +1470,28 @@ class Mumu12HardCampaignPort:
         if not isinstance(runtime, DeclarativeCampaignMapRuntime):
             message = "hard campaign runtime factory returned an invalid runtime"
             raise TypeError(message)
-        runtime.device = cast("Device", CancellationAwareMumu12Device(self._device, cancellation))
+        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - owner 构造前由 port 保护唯一 READY lease。
         try:
+            owner = Mumu12CampaignHardAttemptOwner(runtime, lease)
+        except BaseException as error:
+            preserve_cleanup_failure(
+                error,
+                lease.discard,
+                message="hard campaign attempt owner construction and cleanup both failed",
+            )
+            raise
+        try:
+            _require_hard_behavior(runtime)
+            runtime.device = cast("Device", CancellationAwareMumu12Device(self._device, cancellation))
             remaining, entrance = self._read_remaining_attempts(runtime, settings, cancellation)
         except BaseException as error:
             preserve_cleanup_failure(
                 error,
-                runtime._runtime_profile_lease.discard,  # ruff:ignore[private-member-access] - hard runtime 直接持有唯一 lease。
+                owner.release,
                 message="hard campaign attempt discovery and cleanup both failed",
             )
             raise
-        self._active_runtime = runtime
-        self._active_stage = stage
-        self._active_entrance = entrance
+        self._handle = _HardRuntimeHandle(runtime, owner, stage, entrance)
         return remaining
 
     def _read_remaining_attempts(
@@ -1538,13 +1515,9 @@ class Mumu12HardCampaignPort:
         settings: HardSettings,
         cancellation: CancellationSource,
     ) -> HardBattleOutcome:
-        runtime = self._require_active(settings)
-        entrance = self._active_entrance
-        if entrance is None:
-            message = "hard campaign has no selected stage entrance"
-            raise CampaignRuntimeEvidenceError(message)
+        handle = self._require_handle(settings)
         cancellation.raise_if_requested()
-        runtime.execute_hard_attempt(entrance, cancellation)
+        handle.owner.execute(handle.entrance, cancellation)
         return HardBattleOutcome.SETTLED
 
     def exit_ui(
@@ -1552,25 +1525,19 @@ class Mumu12HardCampaignPort:
         settings: HardSettings,
         cancellation: CancellationSource,
     ) -> None:
-        runtime = self._require_active(settings)
+        handle = self._require_handle(settings)
         cancellation.raise_if_requested()
-        runtime.ensure_auto_search_exit()
+        handle.runtime.ensure_auto_search_exit()
         cancellation.raise_if_requested()
 
     def release(self) -> None:
         """无条件释放当前 turn 的 runtime，不依赖已可能取消的交互信号。"""
 
-        runtime = self._active_runtime
-        self._active_runtime = None
-        self._active_stage = None
-        self._active_entrance = None
-        if runtime is None:
+        handle = self._handle
+        self._handle = None
+        if handle is None:
             return
-        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - hard runtime 直接持有唯一 lease。
-        if lease.active:
-            lease.close(RuntimeSessionOutcome.INTERRUPTED)
-        else:
-            lease.discard()
+        handle.owner.release()
 
 
 def _read_hard_remaining(device: Device) -> int:
