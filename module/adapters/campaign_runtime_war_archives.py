@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast, override
 
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 from module.ui.assets import WAR_ARCHIVES_CHECK
 from module.ui.page import page_archives
@@ -252,7 +252,7 @@ class WarArchivesCatalogExecutor(RuntimeExecutorInstance):
                     "Respective server may not yet support the chosen War Archives campaign, "
                     "check back in the next app update"
                 )
-                raise RequestHumanTakeover
+                raise HumanTakeoverRequiredError
             host.ui_click(
                 entrance,
                 appear_button=WAR_ARCHIVES_CHECK,

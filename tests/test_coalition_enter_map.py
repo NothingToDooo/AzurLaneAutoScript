@@ -11,7 +11,7 @@ from module.combat.assets import BATTLE_PREPARATION
 from module.content.activity_catalog import ActivityCatalog
 from module.content.activity_profile import CoalitionFleetMode, CoalitionStageId
 from module.content.manifest import load_default_event_manifests
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -179,5 +179,5 @@ def test_enter_map_raises_after_stage_click_limit(monkeypatch: pytest.MonkeyPatc
     coalition.battle_results = [False] * 7
     coalition.in_coalition_results = [True] * 6
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         coalition.enter_map()

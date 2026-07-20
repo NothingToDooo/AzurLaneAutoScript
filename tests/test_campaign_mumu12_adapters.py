@@ -79,7 +79,7 @@ from module.content.stage_rules import (
     SwipeScale,
 )
 from module.device.device import Device
-from module.exception import OilExhausted, ScriptEnd
+from module.exception import CampaignSelectionError, MapAchievementReached, OilExhausted
 from module.gameplay.campaign import (
     CampaignAutomationSettings,
     CampaignDifficulty,
@@ -324,7 +324,7 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
         self.calls.append(("enter_map", mode))
         if type(self).trigger_map_stop:
             message = "map achievement reached"
-            raise ScriptEnd(message)
+            raise MapAchievementReached(message)
         return True
 
     def triggered_map_stop(self) -> bool:
@@ -1225,38 +1225,39 @@ def test_provider_returns_typed_map_achievement_evidence_from_entry_stop() -> No
     assert not any(call[0] == "initialize_session" for call in runtime.calls if isinstance(call, tuple))
 
 
-def test_provider_preserves_rejected_map_stop_and_discard_failure() -> None:
+def test_provider_preserves_campaign_selection_and_discard_failures() -> None:
+    selection_error = CampaignSelectionError("campaign selection failed")
     cleanup_error = OSError("runtime discard failed")
 
-    class _RejectedStopRuntime(_FakeDeclarativeRuntime):
+    class _SelectionFailingRuntime(_FakeDeclarativeRuntime):
         created: ClassVar[list[object]] = []
-        trigger_map_stop = True
 
         @override
-        def triggered_map_stop(self) -> bool:
-            return False
+        def enter_map(self, button: Button, mode: str = "normal", *, skip_first_screenshot: bool = True) -> bool:
+            del button, skip_first_screenshot
+            self.calls.append(("enter_map", mode))
+            raise selection_error
 
         def discard_runtime(self) -> None:
             self.calls.append("discard_runtime")
             raise cleanup_error
 
     provider = Mumu12CampaignRuntimeProvider(
-        in_memory_config("campaign-map-stop-cleanup-failure", {}),
+        in_memory_config("campaign-selection-failure", {}),
         object.__new__(Device),
-        runtime_factory=_RejectedStopRuntime,
+        runtime_factory=_SelectionFailingRuntime,
     )
 
     with pytest.raises(ExceptionGroup) as raised:
         provider.activate(_job(), AbortToken())
 
-    stop_error, observed_cleanup_error = raised.value.exceptions
-    assert isinstance(stop_error, ScriptEnd)
+    observed_selection_error, observed_cleanup_error = raised.value.exceptions
+    assert observed_selection_error is selection_error
     assert observed_cleanup_error is cleanup_error
 
 
-def test_provider_preserves_map_stop_inspection_and_discard_failures() -> None:
+def test_provider_does_not_reinspect_map_achievement() -> None:
     inspection_error = RuntimeError("map-stop inspection failed")
-    cleanup_error = OSError("runtime discard failed")
 
     class _InspectionFailingStopRuntime(_FakeDeclarativeRuntime):
         created: ClassVar[list[object]] = []
@@ -1266,25 +1267,18 @@ def test_provider_preserves_map_stop_inspection_and_discard_failures() -> None:
         def triggered_map_stop(self) -> bool:
             raise inspection_error
 
-        def discard_runtime(self) -> None:
-            self.calls.append("discard_runtime")
-            raise cleanup_error
-
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-map-stop-inspection-failure", {}),
         object.__new__(Device),
         runtime_factory=_InspectionFailingStopRuntime,
     )
 
-    with pytest.raises(ExceptionGroup) as raised:
-        provider.activate(_job(), AbortToken())
+    result = provider.activate(_job(), AbortToken())
 
-    handling_error, observed_cleanup_error = raised.value.exceptions
-    assert isinstance(handling_error, ExceptionGroup)
-    stop_error, observed_inspection_error = handling_error.exceptions
-    assert isinstance(stop_error, ScriptEnd)
-    assert observed_inspection_error is inspection_error
-    assert observed_cleanup_error is cleanup_error
+    assert isinstance(result, CampaignMapAchievementReached)
+    runtime = _InspectionFailingStopRuntime.created[-1]
+    assert isinstance(runtime, _InspectionFailingStopRuntime)
+    assert "discard_runtime" in runtime.calls
 
 
 def test_resource_free_selection_projects_exact_completion_runtime_policy() -> None:
@@ -1525,7 +1519,7 @@ def test_hard_workflow_closes_each_real_runtime_across_three_attempts(
     ("failure", "expected"),
     [
         (OilExhausted(), HardStopReason.RESOURCE_LIMIT),
-        (ScriptEnd(), HardStopReason.FAILED),
+        (CampaignSelectionError(), HardStopReason.FAILED),
     ],
 )
 def test_hard_workflow_releases_real_runtime_before_retry(

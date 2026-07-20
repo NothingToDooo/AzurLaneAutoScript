@@ -4,7 +4,7 @@ from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
 from module.base.utils import color_similar, get_color, resize
 from module.combat.assets import GET_ITEMS_1
-from module.exception import RequestHumanTakeover, ScriptError
+from module.exception import HumanTakeoverRequiredError, ScriptError
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF, AUTO_SEARCH_MAP_OPTION_ON
 from module.logger import logger
 from module.retire import assets as retire_assets
@@ -464,7 +464,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
     def _raise_no_ship_retired(message: str) -> Never:
         logger.critical("No ship retired")
         logger.critical(message)
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     def _retry_one_click_retire_after_filter_reset(self, total: int) -> int:
         if total:

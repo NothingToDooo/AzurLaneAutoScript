@@ -6,7 +6,7 @@ from module.device.method.pool import WORKER_POOL
 from module.device.method.utils import possible_reasons
 from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, mumu12_shifted_serials
 from module.device.mumu_discovery import MumuDeviceDiscovery
-from module.exception import EmulatorNotRunningError, RequestHumanTakeover
+from module.exception import EmulatorNotRunningError, HumanTakeoverRequiredError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ class MumuTcpConnection(MumuDeviceDiscovery):
         if self._is_mumu_tcp_serial(self.serial):
             return
         logger.critical(f'当前个人分支只支持 MuMu12 TCP serial，例如 "{MUMU12_SERIAL_EXAMPLE}"，当前为 "{self.serial}"')
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     def _recover_mumu12_shifted_port(self) -> bool:
         """MuMu12 端口被占用时会漂移；返回是否已在相邻端口找到新 serial。"""
@@ -76,7 +76,7 @@ class MumuTcpConnection(MumuDeviceDiscovery):
                 return True
             if "bad port" in msg:
                 possible_reasons("Serial incorrect, might be a typo")
-                raise RequestHumanTakeover
+                raise HumanTakeoverRequiredError
             # cannot connect to 127.0.0.1:55555:
             # No connection could be made because the target machine actively refused it. (10061)
             if "(10061)" in msg and self._handle_adb_connect_refused():

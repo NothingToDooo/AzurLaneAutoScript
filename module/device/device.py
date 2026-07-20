@@ -17,7 +17,7 @@ from module.exception import (
     GameNotRunningError,
     GameStuckError,
     GameTooManyClickError,
-    RequestHumanTakeover,
+    HumanTakeoverRequiredError,
 )
 from module.handler.assets import GET_MISSION
 from module.logger import logger
@@ -53,7 +53,7 @@ def show_function_call() -> None:
     logger.info("Function calls:" + "".join(func_list))
 
 
-class Device(Screenshot, Control, Connection):
+class Device(Screenshot, Control, Connection):  # ruff:ignore[too-many-public-methods] - 设备服务门面。
     stuck_long_wait_list: ClassVar[tuple[str, ...]] = ("BATTLE_STATUS_S", "PAUSE", "LOGIN_CHECK")
 
     def __init__(self, config: AzurLaneConfig) -> None:
@@ -72,14 +72,14 @@ class Device(Screenshot, Control, Connection):
             except EmulatorNotRunningError as e:
                 if trial >= 3:
                     logger.critical("Failed to start emulator after 3 trial")
-                    raise RequestHumanTakeover from e
+                    raise HumanTakeoverRequiredError from e
                 if self.emulator_instance is not None:
                     self.emulator_start()
                 else:
                     logger.critical(
                         f'No emulator with serial "{self.config.Emulator_Serial}" found, please set a correct serial'
                     )
-                    raise RequestHumanTakeover from e
+                    raise HumanTakeoverRequiredError from e
 
         self.method_check()
         self.screenshot_interval_set()
@@ -162,7 +162,7 @@ class Device(Screenshot, Control, Connection):
         instance = self.emulator_instance
         if instance is None or instance.type != EmulatorBase.MuMuPlayer12:
             logger.critical("当前个人版只保留 MuMu + nemu_ipc 截图 + minitouch 控制，当前需要 MuMu12 实例")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
 
     def handle_night_commission(self, daily_trigger: str = "21:00", threshold: int = 30) -> bool:
         """仅在 daily_trigger 前后 threshold 秒内处理夜间委托。"""
@@ -300,7 +300,7 @@ class Device(Screenshot, Control, Connection):
         if not self.config.Error_HandleError:
             logger.critical("No app stop/start, because HandleError disabled")
             logger.critical("Please enable Alas.Error.HandleError or manually login to AzurLane")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         result = self._app_start_service()
         self.stuck_record_clear()
         self.click_record_clear()
@@ -310,7 +310,7 @@ class Device(Screenshot, Control, Connection):
         if not self.config.Error_HandleError:
             logger.critical("No app stop/start, because HandleError disabled")
             logger.critical("Please enable Alas.Error.HandleError or manually login to AzurLane")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         result = self._app_stop_service()
         self.stuck_record_clear()
         self.click_record_clear()

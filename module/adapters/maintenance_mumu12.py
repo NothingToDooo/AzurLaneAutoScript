@@ -7,7 +7,7 @@ from module.base.utils import random_rectangle_point
 from module.config.config import AzurLaneConfig, name_to_function
 from module.daemon.benchmark import Benchmark, BenchmarkResult
 from module.device.device import Device
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.handler.login import LoginHandler
 from module.logger import logger
 from module.maintenance import (
@@ -155,7 +155,7 @@ class Mumu12BenchmarkAdapter:
         try:
             cancellation.raise_if_requested()
             runner.ensure_campaign_ui(safe_stage, mode="normal")
-        except RequestHumanTakeover:
+        except HumanTakeoverRequiredError:
             self._runner = None
             return BenchmarkUnavailable("campaign scene unavailable")
         self._runner = runner

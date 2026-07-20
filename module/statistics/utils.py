@@ -15,7 +15,7 @@ class ImageError(Exception):
     """解析图片时发生错误。"""
 
 
-class ImageInvalidResolution(ImageError):
+class InvalidImageResolutionError(ImageError):
     """图片不是 1280x720 或其纵向拼接尺寸。"""
 
 
@@ -41,11 +41,11 @@ def pack(img_list: Sequence[ImageArray]) -> ImageArray:
 
 
 def unpack(image: ImageArray) -> list[ImageArray]:
-    """按 720 像素高度拆分 1280 宽图片；尺寸不符时抛出 ImageInvalidResolution。"""
+    """按 720 像素高度拆分 1280 宽图片；尺寸不符时抛出 InvalidImageResolutionError。"""
     size = image_size(image)
     if size == (1280, 720):
         return [image]
     if size[0] != 1280 or size[1] % 720 != 0:
         message = UNEXPECTED_IMAGE_SIZE_TEMPLATE.format(size=size)
-        raise ImageInvalidResolution(message)
+        raise InvalidImageResolutionError(message)
     return [crop(image, (0, n * 720, 1280, (n + 1) * 720)) for n in range(size[1] // 720)]

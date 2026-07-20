@@ -63,7 +63,7 @@ type GemsFleetReplacementFactory = Callable[[AzurLaneConfig, Device], GemsFleetR
 _HARD_PREPARATION_NO_REPLACEMENT = "hard fleet preparation found no valid replacement"
 
 
-class GemsHardPreparationFailed(RuntimeError):
+class GemsHardPreparationError(RuntimeError):
     pass
 
 
@@ -119,7 +119,7 @@ class Mumu12GemsRuntimeBehavior:
         bound = _BoundGemsFleetReplacement.bind(runner, runtime, self.policy, cancellation)
         if bound.prepare_hard_fleet(cancellation):
             return True
-        raise GemsHardPreparationFailed(_HARD_PREPARATION_NO_REPLACEMENT)
+        raise GemsHardPreparationError(_HARD_PREPARATION_NO_REPLACEMENT)
 
     @staticmethod
     def _withdraw(runtime: CampaignEngine) -> None:

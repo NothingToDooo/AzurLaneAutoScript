@@ -64,7 +64,7 @@ class CampaignMapAdapterError(RuntimeError):
     pass
 
 
-class CampaignActionInterrupted(RuntimeError):
+class CampaignActionInterrupted(RuntimeError):  # ruff:ignore[error-suffix-on-exception-name] - 表示执行已安全中断并返回编排层。
     """UI primitive 已闭合到非 battle 安全点，需要 workflow 执行显式转移。"""
 
     def __init__(self, reason: BattleInterruptionReason) -> None:

@@ -7,7 +7,7 @@ from module.base.timer import Timer
 from module.combat.emotion import Emotion, FleetEmotion
 from module.equipment import assets as equipment_assets
 from module.equipment.fleet_equipment import FleetEquipment
-from module.exception import CampaignEnd, RequestHumanTakeover, ScriptError
+from module.exception import CampaignEnd, HumanTakeoverRequiredError, ScriptError
 from module.logger import logger
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 from module.retire.assets import (
@@ -258,7 +258,7 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         success = self.code_apply() if take_on else self.code_clear()
         if not success:
             logger.critical(EQUIPMENT_CODE_CHANGE_FAILED_MESSAGE)
-            raise RequestHumanTakeover(EQUIPMENT_CODE_CHANGE_FAILED_MESSAGE)
+            raise HumanTakeoverRequiredError(EQUIPMENT_CODE_CHANGE_FAILED_MESSAGE)
 
         if self.is_hard_mode:
             self.ui_back(check_button=FLEET_PREPARATION)

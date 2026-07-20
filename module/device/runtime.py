@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     )
 
 
-class EmulatorUnknown(Exception):
+class UnknownEmulatorError(Exception):
     pass
 
 
@@ -74,7 +74,7 @@ class MumuRuntime(MumuRuntimeBase):
         exe: str = instance.emulator.path
         if instance.type != Emulator.MuMuPlayer12:
             message = f"Cannot start an unknown emulator instance: {instance}"
-            raise EmulatorUnknown(message)
+            raise UnknownEmulatorError(message)
         # 通过 MuMuManager 启动，避免多个 MuMuNxMain.exe 同时启动时请求被吞掉。
         instance_id = self._require_mumu_player_12_id(instance)
         self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance_id), "launch_player"])
@@ -83,7 +83,7 @@ class MumuRuntime(MumuRuntimeBase):
         exe: str = instance.emulator.path
         if instance.type != Emulator.MuMuPlayer12:
             message = f"Cannot stop an unknown emulator instance: {instance}"
-            raise EmulatorUnknown(message)
+            raise UnknownEmulatorError(message)
         instance_id = self._require_mumu_player_12_id(instance)
         self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance_id), "shutdown_player"])
 
@@ -92,7 +92,7 @@ class MumuRuntime(MumuRuntimeBase):
         instance_id = instance.mumu_player_12_id
         if instance_id is None:
             message = f"Cannot get MuMu instance index from name {instance.name!r}"
-            raise EmulatorUnknown(message)
+            raise UnknownEmulatorError(message)
         return instance_id
 
     def _emulator_function_wrapper(self, func: Callable[[EmulatorInstance], None]) -> bool:
@@ -113,7 +113,7 @@ class MumuRuntime(MumuRuntimeBase):
                 logger.error("To start/stop MuMuPlayer, ALAS needs to be run as administrator")
             else:
                 logger.error(e)
-        except (EmulatorUnknown, psutil.Error) as e:
+        except (UnknownEmulatorError, psutil.Error) as e:
             logger.error(e)
         else:
             return True

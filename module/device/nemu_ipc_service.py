@@ -9,9 +9,9 @@ import cv2
 import numpy as np
 
 from module.base.decorator import cached_property, del_cached_property, has_cached_property
-from module.device.method.pool import WORKER_POOL, JobTimeout
+from module.device.method.pool import WORKER_POOL, JobTimeoutError
 from module.device.method.utils import RETRY_TRIES, retry_sleep
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ class _NemuRetryTarget(Protocol):
     def reconnect(self) -> None: ...
 
 
-class NemuIpcIncompatible(Exception):
+class NemuIpcCompatibilityError(Exception):
     pass
 
 
@@ -152,7 +152,7 @@ class CaptureNemuIpc(CaptureStd):
 
         # 旧 MuMu12 3.4.0/3.7.3 会分别返回 rpc error 1783/1745。
         if b"error: 1783" in self.stderr or b"error: 1745" in self.stderr:
-            raise NemuIpcIncompatible(NEMU_IPC_MIN_VERSION_MESSAGE)
+            raise NemuIpcCompatibilityError(NEMU_IPC_MIN_VERSION_MESSAGE)
         # 连接 id 错误时会提示找不到 rpc connection。
         if b"cannot find rpc connection" in self.stderr:
             raise NemuIpcError(self.stderr)
@@ -167,13 +167,13 @@ def _noop_recovery() -> None:
 
 def _nemu_ipc_error_recovery(
     self: _NemuRetryTarget,
-    error: NemuIpcIncompatible | JobTimeout | NemuIpcError | OSError | ValueError | ctypes.ArgumentError,
+    error: NemuIpcCompatibilityError | JobTimeoutError | NemuIpcError | OSError | ValueError | ctypes.ArgumentError,
     func_name: str,
 ) -> Recovery | None:
-    if isinstance(error, NemuIpcIncompatible):
+    if isinstance(error, NemuIpcCompatibilityError):
         logger.error(error)
         return None
-    if isinstance(error, JobTimeout):
+    if isinstance(error, JobTimeoutError):
         logger.critical(f"Func {func_name}() call timeout; stop using this NemuIpc connection")
         return None
     if isinstance(error, NemuIpcError):
@@ -196,17 +196,24 @@ def _run_with_retry[TargetT: _NemuRetryTarget, ResultT](
                 time.sleep(retry_sleep(trial))
                 recovery()
             return invoke(trial)
-        except RequestHumanTakeover:
+        except HumanTakeoverRequiredError:
             raise
-        except (NemuIpcIncompatible, JobTimeout, NemuIpcError, OSError, ValueError, ctypes.ArgumentError) as error:
+        except (
+            NemuIpcCompatibilityError,
+            JobTimeoutError,
+            NemuIpcError,
+            OSError,
+            ValueError,
+            ctypes.ArgumentError,
+        ) as error:
             terminal_error = error
             recovery = _nemu_ipc_error_recovery(target, error, func_name)
             if recovery is None:
                 break
 
-    message = NEMU_IPC_TIMEOUT_MESSAGE if isinstance(terminal_error, JobTimeout) else f"Retry {func_name}() failed"
+    message = NEMU_IPC_TIMEOUT_MESSAGE if isinstance(terminal_error, JobTimeoutError) else f"Retry {func_name}() failed"
     logger.critical(message)
-    raise RequestHumanTakeover(message) from terminal_error
+    raise HumanTakeoverRequiredError(message) from terminal_error
 
 
 class NemuIpcImpl:
@@ -241,7 +248,7 @@ class NemuIpcImpl:
                 continue
         if lib is None:
             message = f"{NEMU_IPC_MIN_VERSION_MESSAGE}. None of the following path exists: {list_dll}"
-            raise NemuIpcIncompatible(message)
+            raise NemuIpcCompatibilityError(message)
         self.lib = lib
         logger.info(
             f"NemuIpcImpl init, "
@@ -257,7 +264,7 @@ class NemuIpcImpl:
 
     def _require_usable(self) -> None:
         if self._timed_out:
-            raise RequestHumanTakeover(NEMU_IPC_TIMEOUT_MESSAGE)
+            raise HumanTakeoverRequiredError(NEMU_IPC_TIMEOUT_MESSAGE)
 
     def connect(self, *, on_thread: bool = True) -> None:
         self._require_usable()
@@ -306,9 +313,9 @@ class NemuIpcImpl:
     def run_func[*ArgsT, ResultT](
         self, func: Callable[[*ArgsT], ResultT], *args: *ArgsT, on_thread: bool = True, timeout: float = 0.5
     ) -> ResultT:
-        """on_thread=True 时在工作线程运行同步函数，timeout 秒后抛出 JobTimeout。
+        """on_thread=True 时在工作线程运行同步函数，timeout 秒后抛出 JobTimeoutError。
 
-        底层调用还可抛出 NemuIpcIncompatible 或 NemuIpcError。
+        底层调用还可抛出 NemuIpcCompatibilityError 或 NemuIpcError。
         """
         self._require_usable()
         try:
@@ -317,7 +324,7 @@ class NemuIpcImpl:
                 result = job.get_or_timeout(timeout)
             else:
                 result = func(*args)
-        except JobTimeout:
+        except JobTimeoutError:
             self._timed_out = True
             raise
 
@@ -421,10 +428,10 @@ class NemuIpcCapture:
         instance = self.mumu_runtime.emulator_instance
         if instance is None:
             logger.error("Unable to use NemuIpc because emulator instance not found")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         if "MuMuPlayerGlobal" in instance.path:
             logger.info(f"当前个人版不支持 MuMuPlayerGlobal：{instance.path}")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         try:
             instance_id = _require_mumu_instance_id(instance)
             impl = NemuIpcImpl(
@@ -433,10 +440,10 @@ class NemuIpcCapture:
                 display_id=0,
             )
             impl.connect_with_retry()
-        except (NemuIpcIncompatible, NemuIpcError, JobTimeout) as e:
+        except (NemuIpcCompatibilityError, NemuIpcError, JobTimeoutError) as e:
             logger.error(e)
             logger.error("Unable to initialize NemuIpc")
-            raise RequestHumanTakeover from e
+            raise HumanTakeoverRequiredError from e
         else:
             return impl
 

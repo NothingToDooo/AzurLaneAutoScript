@@ -494,7 +494,7 @@ def get_color(image: ImageArray, area: Area) -> tuple[float, float, float]:
     return color[:3]
 
 
-class ImageNotSupported(Exception):
+class ImageBoundingBoxError(Exception):
     """图像形状或内容不支持当前计算。"""
 
 
@@ -504,7 +504,7 @@ PURE_BLACK_BBOX_MESSAGE = "Cannot get bbox from a pure black image"
 def get_bbox(image: ImageArray, threshold: int = 0) -> tuple[int, int, int, int]:
     """返回所有亮度大于 threshold 内容的外接 (x1, y1, x2, y2)。
 
-    不支持的通道数、纯黑图或空外接框会抛出 ImageNotSupported。
+    不支持的通道数、纯黑图或空外接框会抛出 ImageBoundingBoxError。
     """
     channel = image_channel(image)
     if channel == 3:
@@ -517,7 +517,7 @@ def get_bbox(image: ImageArray, threshold: int = 0) -> tuple[int, int, int, int]
         cv2.threshold(mask, threshold, 255, cv2.THRESH_BINARY, dst=mask)
     else:
         message = f"shape={image.shape}"
-        raise ImageNotSupported(message)
+        raise ImageBoundingBoxError(message)
 
     mask = cast("ImageArray", mask)
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -525,7 +525,7 @@ def get_bbox(image: ImageArray, threshold: int = 0) -> tuple[int, int, int, int]
     max_x = 0
     max_y = 0
     if not contours:
-        raise ImageNotSupported(PURE_BLACK_BBOX_MESSAGE)
+        raise ImageBoundingBoxError(PURE_BLACK_BBOX_MESSAGE)
     for contour in contours:
         x1, y1, x2, y2 = cv2.boundingRect(contour)
         x2 += x1
@@ -538,13 +538,13 @@ def get_bbox(image: ImageArray, threshold: int = 0) -> tuple[int, int, int, int]
         return min_x, min_y, max_x, max_y
     bbox = (min_x, min_y, max_x, max_y)
     message = f"Empty bbox {bbox}"
-    raise ImageNotSupported(message)
+    raise ImageBoundingBoxError(message)
 
 
 def get_bbox_reversed(image: ImageArray, threshold: int = 255) -> tuple[int, int, int, int]:
     """返回所有亮度小于 threshold 内容的外接 (x1, y1, x2, y2)。
 
-    不支持的通道数、纯黑图或空外接框会抛出 ImageNotSupported。
+    不支持的通道数、纯黑图或空外接框会抛出 ImageBoundingBoxError。
     """
     channel = image_channel(image)
     if channel == 3:
@@ -557,7 +557,7 @@ def get_bbox_reversed(image: ImageArray, threshold: int = 255) -> tuple[int, int
         cv2.threshold(mask, 0, threshold, cv2.THRESH_BINARY, dst=mask)
     else:
         message = f"shape={image.shape}"
-        raise ImageNotSupported(message)
+        raise ImageBoundingBoxError(message)
 
     mask = cast("ImageArray", mask)
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -565,7 +565,7 @@ def get_bbox_reversed(image: ImageArray, threshold: int = 255) -> tuple[int, int
     max_x = 0
     max_y = 0
     if not contours:
-        raise ImageNotSupported(PURE_BLACK_BBOX_MESSAGE)
+        raise ImageBoundingBoxError(PURE_BLACK_BBOX_MESSAGE)
     for contour in contours:
         x1, y1, x2, y2 = cv2.boundingRect(contour)
         x2 += x1
@@ -578,7 +578,7 @@ def get_bbox_reversed(image: ImageArray, threshold: int = 255) -> tuple[int, int
         return min_x, min_y, max_x, max_y
     bbox = (min_x, min_y, max_x, max_y)
     message = f"Empty bbox {bbox}"
-    raise ImageNotSupported(message)
+    raise ImageBoundingBoxError(message)
 
 
 def color_similarity(color1: Color, color2: Color) -> Scalar:

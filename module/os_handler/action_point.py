@@ -107,7 +107,7 @@ ACTION_POINT_BOX = {
 }
 
 
-class ActionPointLimit(Exception):
+class ActionPointLimit(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 表示行动力达到业务限制。
     pass
 
 

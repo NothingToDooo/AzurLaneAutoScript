@@ -6,7 +6,7 @@ from adbutils import AdbClient
 
 from module.device.mumu_runtime_base import MumuRuntimeBase, serial_to_id
 from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.map.map_grids import SelectedGrids
 
 if TYPE_CHECKING:
@@ -301,7 +301,7 @@ def test_check_mumu_bridge_network_rejects_enabled_bridge(tmp_path: Path) -> Non
         ],
     )
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         runtime.check_mumu_bridge_network()
 
 
@@ -314,7 +314,7 @@ def test_check_mumu_app_keep_alive_accepts_disabled_getprop() -> None:
 def test_check_mumu_app_keep_alive_rejects_enabled_getprop() -> None:
     runtime = _make_keep_alive_runtime(app_keep_alive="true")
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         runtime.check_mumu_app_keep_alive()
 
 
@@ -341,5 +341,5 @@ def test_check_mumu_app_keep_alive_400_rejects_enabled_config(tmp_path: Path) ->
     instance.config_path = config_file.as_posix()
     runtime = _make_keep_alive_runtime(app_keep_alive="", player_version="", instances=[instance])
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         runtime.check_mumu_app_keep_alive()

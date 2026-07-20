@@ -208,25 +208,6 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
     def fleet_low_resolve_appear(self) -> bool:
         return self.image_color_count(FLEET_LOW_RESOLVE, color=FLEET_LOW_RESOLVE.color, threshold=221, count=250)
 
-    def get_sea_grids(self) -> SelectedGrids[GridInfo]:
-        """返回当前视野内按舰队或相机距离排序的海面格 SelectedGrids。"""
-        sea = []
-        for local in self.view:
-            if not local.predict_sea() or local.predict_current_fleet():
-                continue
-            if local.location is None:
-                message = "OS view grid has no location"
-                raise ValueError(message)
-            location = np.array(local.location) + self.camera - self.view.center_loca
-            location = (int(location[0]), int(location[1]))
-            if location == self.fleet_current or location not in self.map:
-                continue
-            sea.append(self.map[location])
-
-        fleet_current = self.fleet_current
-        center = fleet_current if len(fleet_current) else self.camera
-        return SelectedGrids(sea).sort_by_camera_distance(center)
-
     def wait_until_camera_stable(self, *, skip_first_screenshot: bool = True) -> None:
         """在 homography 检测模式下等待镜头定位稳定。"""
         logger.hr("Wait until camera stable")

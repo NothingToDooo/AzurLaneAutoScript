@@ -8,7 +8,7 @@ from adbutils import AdbClient, AdbDevice
 
 from module.base.decorator import del_cached_property
 from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -75,7 +75,7 @@ class ConnectionAttr:
         if is_mumu12_serial(self.serial):
             return
         logger.critical(f'当前个人分支只支持 MuMu12 TCP serial，例如 "{MUMU12_SERIAL_EXAMPLE}"，当前为 "{self.serial}"')
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     @cached_property
     def port(self) -> int:

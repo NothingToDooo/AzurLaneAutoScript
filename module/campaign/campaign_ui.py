@@ -7,7 +7,7 @@ from module.base.utils import area_offset
 from module.campaign import assets as campaign_assets
 from module.campaign.campaign_ocr import CampaignOcr
 from module.campaign.event_navigation import EventCampaignNavigation
-from module.exception import CampaignEnd, CampaignNameError, ScriptEnd
+from module.exception import CampaignEnd, CampaignNameError, CampaignSelectionError
 from module.logger import logger
 from module.map.assets import WITHDRAW
 from module.map.map_operation import MapOperation
@@ -325,7 +325,7 @@ class CampaignUI(MapOperation, EventCampaignNavigation, CampaignOcr):
         *,
         skip_first_screenshot: bool = True,
     ) -> bool:
-        """切换到指定关卡和 normal/hard 模式；重试后仍失败则抛出 ScriptEnd。"""
+        """切换到指定关卡和 normal/hard 模式；重试后仍失败则抛出 CampaignSelectionError。"""
         timeout = Timer(5, count=20).start()
         while 1:
             if skip_first_screenshot:
@@ -347,7 +347,7 @@ class CampaignUI(MapOperation, EventCampaignNavigation, CampaignOcr):
                 continue
 
         logger.warning(CAMPAIGN_NAME_ERROR_MESSAGE)
-        raise ScriptEnd(CAMPAIGN_NAME_ERROR_MESSAGE)
+        raise CampaignSelectionError(CAMPAIGN_NAME_ERROR_MESSAGE)
 
     def commission_notice_show_at_campaign(self) -> bool:
         return self.appear(CAMPAIGN_CHECK, offset=(20, 20)) and self.appear(

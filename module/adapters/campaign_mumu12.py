@@ -21,7 +21,7 @@ from module.adapters.campaign_runtime_profile import (
     RuntimeSessionOutcome,
 )
 from module.adapters.gems_mumu12 import (
-    GemsHardPreparationFailed,
+    GemsHardPreparationError,
     Mumu12GemsFleetReplacementExecutor,
     Mumu12GemsRuntimeBehavior,
 )
@@ -56,7 +56,7 @@ from module.content.stage_rules import (
     StageEntrancePreset,
 )
 from module.device.device import Device
-from module.exception import CampaignEnd, HardNotSatisfied, ScriptEnd
+from module.exception import CampaignEnd, HardFleetRequirementsError, MapAchievementReached
 from module.gameplay.campaign import (
     CampaignDifficulty,
     CampaignExecutionSettings,
@@ -456,7 +456,7 @@ def compose_campaign_attempt_definition(
     return replace(definition, runtime_profile=effective_profile)
 
 
-class DeclarativeCampaignMapRuntime(CampaignEngine):
+class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-public-methods] - 当前生产运行协议尚未按能力拆分。
     """固定运行类型；关卡差异只来自已编译 definition，不生成 Campaign 子类。"""
 
     definition: CampaignStageDefinition
@@ -1192,16 +1192,16 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def _base_fleet_preparation(self) -> bool:
         try:
             return CampaignEngine.fleet_preparation(self)
-        except HardNotSatisfied:
+        except HardFleetRequirementsError:
             behavior = self._gems_behavior
             if behavior is None:
                 raise
             behavior.prepare_hard_fleet(self)
             try:
                 return CampaignEngine.fleet_preparation(self)
-            except HardNotSatisfied as retry_error:
+            except HardFleetRequirementsError as retry_error:
                 message = "hard fleet still does not satisfy its constraints after replacement"
-                raise GemsHardPreparationFailed(message) from retry_error
+                raise GemsHardPreparationError(message) from retry_error
 
     def read_battle_flag(self, flag: BattleFlag) -> bool:
         """只暴露 StagePolicy 条件需要的稳定事实；关卡局部状态由 BattleProgram 持有。"""
@@ -1901,7 +1901,7 @@ class Mumu12CampaignRuntimeProvider:
         runtime.ENTRANCE.area = runtime.ENTRANCE.button
         try:
             runtime.enter_map(runtime.ENTRANCE, mode=job.difficulty.value)
-        except GemsHardPreparationFailed as error:
+        except GemsHardPreparationError as error:
             self._active_runtime = runtime
             self._active_session = session
             self._active_unit_cancellation = unit_cancellation
@@ -1912,20 +1912,13 @@ class Mumu12CampaignRuntimeProvider:
                 ),
                 str(error),
             )
-        except ScriptEnd as stop_error:
-            try:
-                reached = runtime.triggered_map_stop()
-            except BaseException as inspection_error:  # ruff:ignore[blind-except] - 必须保留 ScriptEnd 与检查失败。
-                message = "campaign map-stop inspection failed"
-                raise BaseExceptionGroup(message, (stop_error, inspection_error)) from None
-            if reached:
-                runtime.discard_runtime()
-                return CampaignMapAchievementReached(
-                    full_clear=bool(runtime.map_is_100_percent_clear),
-                    three_stars=bool(runtime.map_is_3_stars),
-                    threat_safe=bool(runtime.map_is_threat_safe),
-                )
-            raise
+        except MapAchievementReached:
+            runtime.discard_runtime()
+            return CampaignMapAchievementReached(
+                full_clear=bool(runtime.map_is_100_percent_clear),
+                three_stars=bool(runtime.map_is_3_stars),
+                threat_safe=bool(runtime.map_is_threat_safe),
+            )
 
         runtime.handle_map_fleet_lock()
         variant = CampaignRunVariant.LOOP if runtime.map_is_clear_mode else CampaignRunVariant.NORMAL

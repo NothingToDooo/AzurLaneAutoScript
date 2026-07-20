@@ -26,7 +26,7 @@ class DailyDigitCounter(DigitCounter):
         return image_left_strip(image, threshold=120, length=35)
 
 
-class AshBeaconFinished(Exception):
+class AshBeaconFinished(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 表示信标战斗循环正常结束。
     pass
 
 

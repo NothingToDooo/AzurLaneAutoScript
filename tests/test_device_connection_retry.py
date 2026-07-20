@@ -2,8 +2,8 @@ import pytest
 from adbutils.errors import AdbError
 
 from module.device import adb_session as adb_session_module
-from module.device.method.utils import PackageNotInstalled
-from module.exception import RequestHumanTakeover
+from module.device.method.utils import PackageNotInstalledError
+from module.exception import HumanTakeoverRequiredError
 
 
 class _Logger:
@@ -103,7 +103,7 @@ def test_connection_retry_stops_on_unhandled_adb_error(monkeypatch: pytest.Monke
         message = "boom"
         raise AdbError(message)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         always_boom(device)
 
     assert device.calls == ["run"]
@@ -111,7 +111,7 @@ def test_connection_retry_stops_on_unhandled_adb_error(monkeypatch: pytest.Monke
 
 
 def test_connection_retry_recovers_missing_package(monkeypatch: pytest.MonkeyPatch) -> None:
-    result, device, logger = _run_retry(monkeypatch, PackageNotInstalled("pkg"))
+    result, device, logger = _run_retry(monkeypatch, PackageNotInstalledError("pkg"))
 
     assert result == "ok"
     assert logger.errors == ["pkg"]
@@ -146,7 +146,7 @@ def test_connection_retry_converges_when_adb_server_start_fails(monkeypatch: pyt
         message = "adb server is stopped"
         raise ConnectionRefusedError(message)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         always_refused(device)
 
     assert "adb_start_server" in device.calls

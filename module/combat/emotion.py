@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal
 
 from module.base.decorator import cached_property
 from module.base.utils import random_normal_distribution_int
-from module.exception import RequestHumanTakeover, ScriptError
+from module.exception import HumanTakeoverRequiredError, ScriptError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -105,7 +105,7 @@ class FleetEmotion:
                 f'Fleet {self.fleet} Recover Location="Docks" can not be used together, '
                 "please check your emotion settings"
             )
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         # 14-4 使用双倍书时预计消耗 32 点，无法保持大于 120；这里限为 29，避免任务无限延迟。
         if self.control == "keep_exp_bonus" and expected_reduce >= 29:
             expected_reduce = 29

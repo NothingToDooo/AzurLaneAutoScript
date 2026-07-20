@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from module.device import nemu_ipc_service as nemu_ipc_module
-from module.device.method.pool import JobTimeout
-from module.device.nemu_ipc_service import NemuIpcError, NemuIpcImpl, NemuIpcIncompatible
-from module.exception import RequestHumanTakeover
+from module.device.method.pool import JobTimeoutError
+from module.device.nemu_ipc_service import NemuIpcCompatibilityError, NemuIpcError, NemuIpcImpl
+from module.exception import HumanTakeoverRequiredError
 
 if TYPE_CHECKING:
     from module.base.type_alias import ImageArray
@@ -66,9 +66,9 @@ def test_nemu_ipc_retry_recovers_ipc_error(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch: pytest.MonkeyPatch) -> None:
-    device, calls, logger = _connect_retry_device(monkeypatch, NemuIpcIncompatible("old"))
+    device, calls, logger = _connect_retry_device(monkeypatch, NemuIpcCompatibilityError("old"))
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         device.connect_with_retry(on_thread=False)
 
     assert calls == ["connect:False"]
@@ -84,11 +84,11 @@ def test_nemu_ipc_timeout_stops_without_reusing_the_connection(monkeypatch: pyte
 
     def screenshot_once(_device: NemuIpcImpl, timeout: float) -> ImageArray:
         timeouts.append(timeout)
-        raise JobTimeout
+        raise JobTimeoutError
 
     monkeypatch.setattr(NemuIpcImpl, "_screenshot_once", screenshot_once)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         device.screenshot()
 
     assert timeouts == [0.5]
@@ -102,7 +102,7 @@ def test_native_timeout_poison_prevents_later_calls(monkeypatch: pytest.MonkeyPa
     class _TimedOutJob:
         @staticmethod
         def get_or_timeout(_timeout: float) -> None:
-            raise JobTimeout
+            raise JobTimeoutError
 
     class _Pool:
         def __init__(self) -> None:
@@ -117,9 +117,9 @@ def test_native_timeout_poison_prevents_later_calls(monkeypatch: pytest.MonkeyPa
     device = object.__new__(NemuIpcImpl)
     device._timed_out = False  # ruff:ignore[private-member-access] - 构造不加载本机 DLL 的最小 NemuIpc 实例。
 
-    with pytest.raises(JobTimeout):
+    with pytest.raises(JobTimeoutError):
         device.run_func(lambda: 0)
-    with pytest.raises(RequestHumanTakeover, match="can no longer be used"):
+    with pytest.raises(HumanTakeoverRequiredError, match="can no longer be used"):
         device.run_func(lambda: 0, on_thread=False)
 
     assert pool.calls == 1

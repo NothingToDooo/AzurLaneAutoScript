@@ -8,7 +8,7 @@ from rich.text import Text
 from module.base.utils import float2str as float2str_
 from module.base.utils import random_rectangle_point
 from module.campaign.campaign_ui import CampaignUI
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import emit_renderables, logger
 
 if TYPE_CHECKING:
@@ -72,8 +72,8 @@ class Benchmark(CampaignUI):
 
                 try:
                     func(*args, **kwargs)
-                except RequestHumanTakeover:
-                    logger.critical("RequestHumanTakeover")
+                except HumanTakeoverRequiredError:
+                    logger.critical("HumanTakeoverRequiredError")
                     logger.warning(f"Benchmark tests failed on func: {function_name}")
                     return "Failed"
 

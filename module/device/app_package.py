@@ -2,7 +2,7 @@ import re
 
 from module.config.server import CN_PACKAGE
 from module.device.adb_session import AdbSession, retry
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 
 
@@ -33,7 +33,7 @@ class AppPackage(AdbSession):
             return
 
         logger.critical(f'未在设备 "{self.serial}" 上找到国服客户端包名 "{CN_PACKAGE}"，请确认碧蓝航线国服已安装')
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     def confirm_fixed_package(self) -> None:
         self.package = CN_PACKAGE

@@ -44,7 +44,7 @@ class _GotoState:
     arrived: bool = False
 
 
-class Fleet(Camera, AmbushHandler):
+class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - 待拆分轮次状态与舰队定位。
     fleet_1_location: FleetLocation = ()
     fleet_2_location: FleetLocation = ()
     fleet_submarine_location: FleetLocation = ()

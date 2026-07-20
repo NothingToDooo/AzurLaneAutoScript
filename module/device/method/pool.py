@@ -80,7 +80,7 @@ def capture[**P, ResultT](sync_fn: Callable[P, ResultT], *args: P.args, **kwargs
         return Error(exc)
 
 
-class JobTimeout(Exception):
+class JobTimeoutError(Exception):
     pass
 
 
@@ -118,11 +118,11 @@ class Job[ResultT]:
         return item.unwrap()
 
     def get_or_timeout(self, timeout: float) -> ResultT:
-        """timeout 秒内未完成则抛出 JobTimeout，底层调用继续占用原 worker。"""
+        """timeout 秒内未完成则抛出 JobTimeoutError，底层调用继续占用原 worker。"""
         if self.notify_get.acquire(timeout=timeout):
             item = self.queue.popleft()
             return item.unwrap()
-        raise JobTimeout
+        raise JobTimeoutError
 
     def run(self, worker: WorkerThread) -> None:
         result = capture(self.func)

@@ -39,7 +39,7 @@ CELL_A = CellId(0, 0)
 CELL_B = CellId(1, 0)
 
 
-class RequestedCancellation(RuntimeError):
+class RequestedCancellation(RuntimeError):  # ruff:ignore[error-suffix-on-exception-name] - 测试取消传播的控制流信号。
     pass
 
 

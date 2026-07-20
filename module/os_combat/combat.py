@@ -27,7 +27,7 @@ _OS_AUTO_SEARCH_BATTLE_STATUS_BUTTONS = (
 )
 
 
-class ContinuousCombat(Exception):
+class ContinuousCombat(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 表示连续战斗需要进入下一轮。
     pass
 
 

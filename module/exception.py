@@ -1,12 +1,12 @@
-class CampaignEnd(Exception):
+class CampaignEnd(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 表示关卡流程正常结束。
     pass
 
 
-class OilExhausted(Exception):
+class OilExhausted(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 表示资源耗尽的业务停止条件。
     pass
 
 
-class OilMaxed(Exception):
+class OilMaxed(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 表示资源达到上限的业务停止条件。
     pass
 
 
@@ -18,7 +18,7 @@ class MapWalkError(Exception):
     pass
 
 
-class MapEnemyMoved(Exception):
+class MapEnemyMoved(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 通知调用方重新扫描并计算路径。
     pass
 
 
@@ -31,7 +31,11 @@ class ScriptError(Exception):
     pass
 
 
-class ScriptEnd(Exception):
+class CampaignSelectionError(Exception):
+    pass
+
+
+class MapAchievementReached(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 表示地图成就条件已满足。
     pass
 
 
@@ -60,10 +64,10 @@ class GamePageUnknownError(Exception):
     pass
 
 
-class RequestHumanTakeover(Exception):
+class HumanTakeoverRequiredError(Exception):
     # 自动处理失败时请求人工接管，常见原因是配置错误。
     pass
 
 
-class HardNotSatisfied(RequestHumanTakeover):
+class HardFleetRequirementsError(HumanTakeoverRequiredError):
     """困难关卡舰队要求未满足，允许 GemsFarming 先补齐空位。"""

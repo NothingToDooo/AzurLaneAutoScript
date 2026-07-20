@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from module.device.device import Device
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 
 
 def _device_context(
@@ -27,5 +27,5 @@ def test_method_check_accepts_mumu12_instance_regardless_of_serial_shape() -> No
 def test_method_check_rejects_non_mumu12_instances(emulator_type: str | None) -> None:
     device = _device_context(emulator_type=emulator_type)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         device.method_check()

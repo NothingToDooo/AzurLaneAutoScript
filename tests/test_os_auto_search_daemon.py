@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 import numpy as np
 import pytest
 
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.os import map as map_module
 from module.os.map import OSMap
 
@@ -156,7 +156,7 @@ def test_os_auto_search_daemon_raises_when_auto_search_never_unlocks() -> None:
     runner = _AutoSearchMap()
     _Timer.reached_results = {0: [True]}
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         runner.os_auto_search_daemon()
 
 

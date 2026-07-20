@@ -92,7 +92,7 @@ E1 = CellId(4, 0)
 F1 = CellId(5, 0)
 
 
-class RequestedCancellation(RuntimeError):
+class RequestedCancellation(RuntimeError):  # ruff:ignore[error-suffix-on-exception-name] - 测试取消传播的控制流信号。
     pass
 
 
@@ -210,7 +210,7 @@ class _VisualGrid:
         return True
 
 
-class _Runtime:
+class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRuntime 测试协议。
     def __init__(self, grids: list[GridInfo] | None = None) -> None:
         self.events: list[object] = []
         self.map = _Map(grids or [_grid(A1), _grid(B1), _grid(C1), _grid(D1), _grid(E1), _grid(F1)])

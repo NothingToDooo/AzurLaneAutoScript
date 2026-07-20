@@ -23,7 +23,7 @@ type FortressItem = GridInfo | str
 type FortressGroup = FortressItem | tuple[FortressItem, ...] | list[FortressItem] | SelectedGrids[GridInfo]
 
 
-class CampaignMap:
+class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、寻路与缺口推断。
     def __init__(self, name: str | None = None) -> None:
         self.name = name
         self.grid_class: type[GridInfo] = GridInfo

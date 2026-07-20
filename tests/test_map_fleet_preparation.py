@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, TypedDict, cast, override
 import numpy as np
 import pytest
 
-from module.exception import HardNotSatisfied, RequestHumanTakeover
+from module.exception import HardFleetRequirementsError, HumanTakeoverRequiredError
 from module.map import assets as map_assets
 from module.map import map_fleet_preparation as fleet_preparation_module
 from module.map.map_fleet_preparation import FleetOperator, FleetOperatorAssets, FleetPreparation
@@ -188,10 +188,10 @@ def test_hard_not_satisfied_remains_a_human_takeover_signal(monkeypatch: pytest.
     monkeypatch.setattr(operator, "is_hard_satisfied", lambda: False)
     monkeypatch.setattr(FleetOperator, "__str__", lambda _self: "fleet1")
 
-    with pytest.raises(HardNotSatisfied) as exc_info:
+    with pytest.raises(HardFleetRequirementsError) as exc_info:
         operator.raise_hard_not_satisfied()
 
-    assert isinstance(exc_info.value, RequestHumanTakeover)
+    assert isinstance(exc_info.value, HumanTakeoverRequiredError)
 
 
 @pytest.mark.parametrize(

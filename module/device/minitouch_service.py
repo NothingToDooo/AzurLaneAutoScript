@@ -13,7 +13,7 @@ from module.base.runtime_random import runtime_random
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_point
 from module.device.method.utils import RETRY_TRIES, handle_adb_error, handle_unknown_host_service, retry_sleep
-from module.exception import RequestHumanTakeover, ScriptError
+from module.exception import HumanTakeoverRequiredError, ScriptError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -299,7 +299,7 @@ def _minitouch_error_recovery(
         return lambda: _reset_minitouch_after_adb_reconnect(self)
     if isinstance(error, MinitouchNotInstalledError):
         logger.critical(error)
-        raise RequestHumanTakeover from error
+        raise HumanTakeoverRequiredError from error
     if isinstance(error, MinitouchOccupiedError):
         logger.error(error)
         return lambda: _restart_minitouch_service_and_reset(self)
@@ -326,7 +326,7 @@ def retry[TargetT: _MinitouchRecoveryTarget, **P, ResultT](
                     time.sleep(retry_sleep(_))
                     recovery()
                 return func(self, *args, **kwargs)
-            except RequestHumanTakeover:
+            except HumanTakeoverRequiredError:
                 break
             except (AdbError, MinitouchNotInstalledError, MinitouchOccupiedError, OSError) as e:
                 recovery = _minitouch_error_recovery(self, e)
@@ -335,7 +335,7 @@ def retry[TargetT: _MinitouchRecoveryTarget, **P, ResultT](
 
         func_name = getattr(func, "__name__", type(func).__name__)
         logger.critical(f"Retry {func_name}() failed")
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     return retry_wrapper
 
@@ -528,7 +528,7 @@ class MinitouchController:
         client = self._minitouch_client
         if client is None:
             logger.critical("minitouch socket is not connected")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         client.sendall(byte_content)
         client.recv(0)
         time.sleep(builder.delay / 1000 + builder.DEFAULT_DELAY)

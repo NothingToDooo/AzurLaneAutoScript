@@ -7,7 +7,7 @@ from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
 from module.event_hospital.assets import HOSPITAL_BATTLE_PREPARE
 from module.event_hospital.ui import HospitalUI
-from module.exception import OilExhausted, RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError, OilExhausted
 from module.logger import logger
 from module.map.assets import (
     FLEET_1_ADVICE,
@@ -47,7 +47,7 @@ class HospitalCombat(Combat, HospitalUI, CampaignStatus):
         logger.error(
             "Fleet not prepared and fleet recommend is not enabled, please prepare fleets manually before running"
         )
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     def _handle_hospital_preparation_page(
         self,
