@@ -6,8 +6,10 @@ from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplement
 from module.logger import logger
 from module.map.assets import FLEET_SUPPORT_EMPTY
 from module.map.map_swipe import MapSwipePolicy
+from module.map.support_fleet import SupportFleetAttemptState, SupportFleetStatus
 from module.map_detection.utils_assets import ASSETS
 
+from .campaign_fleet_preparation import CampaignFleetPreparationContributor
 from .campaign_program_capabilities import (
     CampaignProgramCapabilityContribution,
 )
@@ -26,9 +28,11 @@ from .campaign_runtime_profile import (
 from .campaign_strategy_set import CampaignStrategySetObserverContributor
 
 if TYPE_CHECKING:
+    from module.adapters.campaign_fleet_preparation import FleetPreparationNext
     from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
     from module.handler.strategy_set import StrategySetRequest, StrategySetRuntime
+    from module.map.map_fleet_preparation import FleetPreparationRuntime
 
 _SUPPORT_SWIPE_POLICY = MapSwipePolicy(default_box=(239, 159, 1175, 628))
 _UI_MASK_CACHE_KEYS = ("ui_mask", "ui_mask_stroke", "ui_mask_in_map")
@@ -91,33 +95,45 @@ def _require_operations(
 class SupportFleetExecutor(RuntimeExecutorInstance):
     """维护支援舰队可用性，并限制地图拖动区域。"""
 
-    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
-        options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
-        _require_operations(options, frozenset({"fleet_preparation"}))
-        if _strings(options, "state") != ("use_support_fleet",):
-            message = "support-fleet executor must own use_support_fleet state"
-            raise CampaignRuntimeProfileError(message)
-        super().__init__(
-            {RuntimeExecutorKind.MAP_MECHANIC},
-            methods={
-                RuntimeExecutorKind.MAP_MECHANIC: {
-                    RuntimeOperation.FLEET_PREPARATION: self._fleet_preparation,
-                }
-            },
-            state_seed=RuntimeStateSeed(use_support_fleet=True),
-        )
+    __slots__ = ("_fleet_preparation_contributor", "_support_fleet_state")
 
-    def _fleet_preparation(self, runtime: object) -> object:
-        host = _host(runtime)
-        self.set_use_support_fleet(
-            enabled=not host.appear(FLEET_SUPPORT_EMPTY, offset=(5, 5)),
+    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
+        _ = context.options(RuntimeExecutorKind.MAP_MECHANIC)
+        self._support_fleet_state = SupportFleetAttemptState()
+        self._fleet_preparation_contributor = CampaignFleetPreparationContributor(
+            self._observe_support_fleet,
         )
-        logger.attr("use_support_fleet", self.current_use_support_fleet())
-        return host.runtime_super(RuntimeOperation.FLEET_PREPARATION)
+        super().__init__({RuntimeExecutorKind.MAP_MECHANIC})
+
+    def _observe_support_fleet(
+        self,
+        runtime: FleetPreparationRuntime,
+        next_handler: FleetPreparationNext,
+    ) -> bool:
+        host = _host(runtime)
+        status = (
+            SupportFleetStatus.EMPTY if host.appear(FLEET_SUPPORT_EMPTY, offset=(5, 5)) else SupportFleetStatus.PRESENT
+        )
+        self._support_fleet_state.observe(status)
+        logger.attr("use_support_fleet", self._support_fleet_state.available)
+        return next_handler(runtime)
+
+    @property
+    def fleet_preparation_contributor(self) -> CampaignFleetPreparationContributor:
+        return self._fleet_preparation_contributor
+
+    @property
+    def support_fleet_state(self) -> SupportFleetAttemptState:
+        return self._support_fleet_state
 
     @property
     def map_swipe_policy(self) -> MapSwipePolicy:
         return _SUPPORT_SWIPE_POLICY
+
+    @override
+    def reset(self) -> None:
+        self._support_fleet_state.reset()
+        super().reset()
 
 
 class RuntimeUiMaskExecutor(RuntimeExecutorInstance):
@@ -350,13 +366,10 @@ def _build_session_state_policy(context: RuntimeExecutorBuildContext) -> Runtime
 
 
 def mechanic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescriptor, ...]:
-    mechanic_schema = RuntimeExecutorOptionsSchema(
-        required=frozenset({"operations", "state"}),
-    )
     return (
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("map_mechanic/support_fleet"),
-            {RuntimeExecutorKind.MAP_MECHANIC: mechanic_schema},
+            {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()},
             _build_support_fleet,
         ),
         RuntimeExecutorFactoryDescriptor(

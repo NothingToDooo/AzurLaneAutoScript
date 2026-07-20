@@ -176,19 +176,6 @@ class _CleanupFailingLifecycleExecutor(_LifecycleExecutor):
         raise self._reset_error
 
 
-class _SupportDependentSingleFleetExecutor(RuntimeExecutorInstance):
-    def __init__(self) -> None:
-        super().__init__(
-            {RuntimeExecutorKind.MAP_MECHANIC},
-            state_seed=RuntimeStateSeed(use_single_fleet_override=False),
-        )
-
-    @override
-    def begin_session(self, context: RuntimeSessionContext) -> None:
-        super().begin_session(context)
-        self.set_use_single_fleet_override(enabled=self.current_use_support_fleet())
-
-
 def _binding(
     implementation: str,
     kind: RuntimeExecutorKind,
@@ -242,7 +229,6 @@ def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
         builds.append(context)
         return RuntimeExecutorInstance(
             {RuntimeExecutorKind.MAP_MECHANIC, RuntimeExecutorKind.ENGINE_EXTENSION},
-            state_seed=RuntimeStateSeed(use_support_fleet=True),
         )
 
     registry = CampaignRuntimeExecutorRegistry(
@@ -265,55 +251,13 @@ def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
         )
     )
 
-    manager = CampaignRuntimeProfileManager(profile, registry)
+    CampaignRuntimeProfileManager(profile, registry)
 
     assert len(builds) == 1
     assert {binding.kind for binding in builds[0].bindings} == {
         RuntimeExecutorKind.MAP_MECHANIC,
         RuntimeExecutorKind.ENGINE_EXTENSION,
     }
-    assert manager.use_support_fleet(AbortToken())
-    manager.disable_support_fleet()
-    assert not manager.use_support_fleet(AbortToken())
-
-
-def test_distinct_implementations_see_prepared_attempt_state_when_session_begins() -> None:
-    def support_factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-        del context
-        return RuntimeExecutorInstance(
-            {RuntimeExecutorKind.MAP_MECHANIC},
-            state_seed=RuntimeStateSeed(use_support_fleet=True),
-        )
-
-    def dependent_factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-        del context
-        return _SupportDependentSingleFleetExecutor()
-
-    schema = {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()}
-    manager = CampaignRuntimeProfileManager(
-        _profile(
-            _extension("support", _binding("support", RuntimeExecutorKind.MAP_MECHANIC)),
-            _extension("dependent", _binding("dependent", RuntimeExecutorKind.MAP_MECHANIC)),
-        ),
-        CampaignRuntimeExecutorRegistry(
-            (
-                _descriptor("support", schema, support_factory),
-                _descriptor("dependent", schema, dependent_factory),
-            )
-        ),
-    )
-    manager.bind(_Runtime(), CampaignMap("shared-state"))
-    context = RuntimeSessionContext(
-        CampaignRunVariant.LOOP,
-        0,
-        RuntimeSessionEntryKind.FRESH,
-    )
-
-    manager.disable_support_fleet()
-    manager.begin_session(context)
-
-    assert not manager.use_support_fleet(AbortToken())
-    assert manager.use_single_fleet_override(AbortToken()) is False
 
 
 def test_same_kind_composes_base_to_derived_as_an_around_chain() -> None:
@@ -638,7 +582,6 @@ def test_lifecycle_distinguishes_fresh_and_resume_and_new_manager_reseeds_state(
         return _LifecycleExecutor(
             frozenset(binding.kind for binding in context.bindings),
             trace,
-            state_seed=RuntimeStateSeed(use_support_fleet=True),
         )
 
     registry = CampaignRuntimeExecutorRegistry(
@@ -667,8 +610,6 @@ def test_lifecycle_distinguishes_fresh_and_resume_and_new_manager_reseeds_state(
             RuntimeSessionEntryKind.FRESH,
         )
     )
-    manager.disable_support_fleet()
-    assert not manager.use_support_fleet(AbortToken())
     manager.end_session(RuntimeSessionOutcome.COMPLETED)
     manager.reset()
 
@@ -692,7 +633,7 @@ def test_lifecycle_distinguishes_fresh_and_resume_and_new_manager_reseeds_state(
         "bind",
         ("begin", RuntimeSessionEntryKind.RESUME, 3),
     ]
-    assert other.use_support_fleet(AbortToken())
+    assert not other.use_support_fleet(AbortToken())
 
 
 def test_lease_rolls_back_a_partially_started_real_profile_in_reverse_order() -> None:

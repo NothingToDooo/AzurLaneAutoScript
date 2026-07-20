@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, override
 
 import cv2
 import numpy as np
@@ -23,6 +23,23 @@ from module.map import assets as map_assets
 
 if TYPE_CHECKING:
     from module.base.type_alias import ImageArray
+
+
+class FleetPreparationRuntime(Protocol):
+    def _standard_fleet_preparation(self) -> bool: ...
+
+
+class FleetPreparationService(Protocol):
+    def prepare(self, runtime: FleetPreparationRuntime) -> bool: ...
+
+
+class _StandardFleetPreparationService(FleetPreparationService):
+    @override
+    def prepare(self, runtime: FleetPreparationRuntime) -> bool:
+        return runtime._standard_fleet_preparation()  # ruff:ignore[private-member-access] - typed service 持有标准算法 primitive。
+
+
+STANDARD_FLEET_PREPARATION_SERVICE: FleetPreparationService = _StandardFleetPreparationService()
 
 
 @dataclass(slots=True)
@@ -246,6 +263,7 @@ class FleetOperator:
 
 
 class FleetPreparation(InfoHandler):
+    _fleet_preparation_service: FleetPreparationService = STANDARD_FLEET_PREPARATION_SERVICE
     map_fleet_checked = False
     map_is_hard_mode = False
 
@@ -373,6 +391,9 @@ class FleetPreparation(InfoHandler):
             self.config.submarine = 0
 
     def fleet_preparation(self) -> bool:
+        return self._fleet_preparation_service.prepare(self)
+
+    def _standard_fleet_preparation(self) -> bool:
         logger.info(f"Using fleet: {[self.config.Fleet_Fleet1, self.config.Fleet_Fleet2, self.config.Submarine_Fleet]}")
         if self.map_fleet_checked:
             return False

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from config_factory import in_memory_config
 
+from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
 from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
 from module.adapters.campaign_program_capabilities import (
     CampaignProgramCapabilities,
@@ -87,6 +88,10 @@ class _Runtime:
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool:
         del button, offset
         return self.support_empty
+
+    @staticmethod
+    def _standard_fleet_preparation() -> bool:
+        return True
 
     def combat(
         self,
@@ -244,7 +249,8 @@ def test_real_chapter_16_map_init_updates_live_override_and_reset_clears_it(
         support_empty=support_empty,
     )
     manager.bind(runtime, CampaignMap("capability-test"))
-    manager.mechanic.invoke(RuntimeOperation.FLEET_PREPARATION, runtime, lambda: True)
+    service = build_campaign_fleet_preparation_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
+    assert service.prepare(runtime)
     manager.begin_session(
         RuntimeSessionContext(
             CampaignRunVariant.LOOP,

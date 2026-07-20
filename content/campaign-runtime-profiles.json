@@ -159,14 +159,7 @@
         {
           "implementation": "map_mechanic/support_fleet",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "fleet_preparation"
-            ],
-            "state": [
-              "use_support_fleet"
-            ]
-          }
+          "options": {}
         },
         {
           "implementation": "engine/ui_mask",

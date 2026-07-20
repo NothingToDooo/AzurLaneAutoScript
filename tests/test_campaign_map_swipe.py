@@ -88,14 +88,11 @@ class _RecordingOSCamera(OSCamera):
         return self._map_swipe(vector)
 
 
-def _support_binding(operations: list[str] | None = None) -> RuntimeExecutorBinding:
+def _support_binding(options: dict[str, object] | None = None) -> RuntimeExecutorBinding:
     return RuntimeExecutorBinding(
         RuntimeExecutorKind.MAP_MECHANIC,
         RuntimeImplementationId(_SUPPORT_IMPLEMENTATION),
-        {
-            "operations": ["fleet_preparation"] if operations is None else operations,
-            "state": ["use_support_fleet"],
-        },
+        {} if options is None else options,
     )
 
 
@@ -194,9 +191,16 @@ def test_request_and_policy_are_frozen_and_policy_requires_a_canonical_box() -> 
         MapSwipePolicy(default_box=cast("MapSwipeBox", (1, 2, 3)))
 
 
-def test_support_executor_rejects_the_obsolete_map_swipe_operation() -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match="operations mismatch"):
-        _manager(_support_binding(["_map_swipe", "fleet_preparation"]))
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [("operations", ["_map_swipe", "fleet_preparation"]), ("state", ["use_support_fleet"])],
+)
+def test_support_executor_rejects_obsolete_operation_and_state_schema(
+    option: str,
+    value: list[str],
+) -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match=f"unknown option: {option}"):
+        _manager(_support_binding({option: value}))
 
 
 @pytest.fixture(scope="module")

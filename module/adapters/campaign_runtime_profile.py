@@ -18,6 +18,11 @@ from module.content.runtime_profile import (
     RuntimeTuningValue,
 )
 from module.map.map_base import CampaignMap
+from module.map.support_fleet import (
+    SupportFleetAttemptState,
+    SupportFleetStateSource,
+    SupportFleetStatus,
+)
 from module.map_detection.grid import Grid
 from module.map_detection.grid_info import GridInfo
 
@@ -36,7 +41,6 @@ class RuntimeOperation(StrEnum):
     EXPECTED_END = "expected_end"
     CLEAR_BOSS = "clear_boss"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
-    FLEET_PREPARATION = "fleet_preparation"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
     HANDLE_SUBMARINE_SUPPORT_POPUP = "handle_submarine_support_popup"
     MAP_DATA_INIT = "map_data_init"
@@ -88,7 +92,6 @@ class RuntimeProfileHost(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class RuntimeStateSeed:
-    use_support_fleet: bool | None = None
     use_single_fleet_override: bool | None = None
 
 
@@ -96,7 +99,7 @@ class RuntimeStateSeed:
 class RuntimeSharedState:
     """同一 runtime profile 内跨 implementation 共享的显式 attempt 状态。"""
 
-    use_support_fleet: bool = False
+    support_fleet: SupportFleetAttemptState | None = None
     use_single_fleet_override: bool | None = None
 
 
@@ -159,7 +162,6 @@ class RuntimeExecutorInstance:
         "_shared_state",
         "_supported_kinds",
         "_use_single_fleet_override",
-        "_use_support_fleet",
     )
 
     def __init__(
@@ -202,7 +204,6 @@ class RuntimeExecutorInstance:
         self._camera_grid_class = camera_grid_class
         self._runtime: object | None = None
         self._shared_state: RuntimeSharedState | None = None
-        self._use_support_fleet = state_seed.use_support_fleet
         self._use_single_fleet_override = state_seed.use_single_fleet_override
 
     @property
@@ -258,13 +259,7 @@ class RuntimeExecutorInstance:
 
     def reset(self) -> None:
         self._runtime = None
-        self._use_support_fleet = self._seed.use_support_fleet
         self._use_single_fleet_override = self._seed.use_single_fleet_override
-
-    def use_support_fleet(self) -> bool | None:
-        if self._use_support_fleet is not None and self._shared_state is not None:
-            return self._shared_state.use_support_fleet
-        return self._use_support_fleet
 
     def use_single_fleet_override(self) -> bool | None:
         if self._use_single_fleet_override is not None and self._shared_state is not None:
@@ -276,7 +271,16 @@ class RuntimeExecutorInstance:
         if state is None:
             message = "runtime executor shared state is not attached"
             raise CampaignRuntimeProfileError(message)
-        return state.use_support_fleet
+        support_fleet = state.support_fleet
+        return support_fleet is not None and support_fleet.available
+
+    def current_support_fleet_status(self) -> SupportFleetStatus | None:
+        state = self._shared_state
+        if state is None:
+            message = "runtime executor shared state is not attached"
+            raise CampaignRuntimeProfileError(message)
+        support_fleet = state.support_fleet
+        return None if support_fleet is None else support_fleet.status
 
     def current_use_single_fleet_override(self) -> bool | None:
         state = self._shared_state
@@ -284,17 +288,6 @@ class RuntimeExecutorInstance:
             message = "runtime executor shared state is not attached"
             raise CampaignRuntimeProfileError(message)
         return state.use_single_fleet_override
-
-    def set_use_support_fleet(self, *, enabled: bool) -> None:
-        if type(enabled) is not bool:
-            message = "use_support_fleet state must be a boolean"
-            raise TypeError(message)
-        if self._use_support_fleet is None:
-            message = "runtime executor does not own use_support_fleet state"
-            raise CampaignRuntimeProfileError(message)
-        self._use_support_fleet = enabled
-        if self._shared_state is not None:
-            self._shared_state.use_support_fleet = enabled
 
     def set_use_single_fleet_override(self, *, enabled: bool) -> None:
         if type(enabled) is not bool:
@@ -306,10 +299,6 @@ class RuntimeExecutorInstance:
         self._use_single_fleet_override = enabled
         if self._shared_state is not None:
             self._shared_state.use_single_fleet_override = enabled
-
-    def disable_support_fleet(self) -> None:
-        if self._use_support_fleet is not None:
-            self.set_use_support_fleet(enabled=False)
 
 
 type RuntimeExecutorFactory = Callable[[RuntimeExecutorBuildContext], RuntimeExecutorInstance]
@@ -569,6 +558,22 @@ def _number_tuning(value: RuntimeTuningValue, key: RuntimeTuningKey) -> float:
     return float(cast("int | float", value))
 
 
+def _resolve_support_fleet_state(
+    instances: Iterable[RuntimeExecutorInstance],
+) -> SupportFleetAttemptState | None:
+    sources = [instance for instance in instances if isinstance(instance, SupportFleetStateSource)]
+    if len(sources) > 1:
+        message = "runtime profile accepts at most one support fleet state source"
+        raise CampaignRuntimeProfileError(message)
+    if not sources:
+        return None
+    state = sources[0].support_fleet_state
+    if not isinstance(state, SupportFleetAttemptState):
+        message = "support fleet state source must provide SupportFleetAttemptState"
+        raise CampaignRuntimeProfileError(message)
+    return state
+
+
 class CampaignRuntimeProfileManager:
     """把不可变 profile 编译为单 attempt 多 facet executor 链和 tuning 投影。"""
 
@@ -602,7 +607,7 @@ class CampaignRuntimeProfileManager:
         self._profile = profile
         self._registry = registry
         self._instances, self._facets = self._build_instances(profile, registry)
-        self._shared_state = RuntimeSharedState()
+        self._shared_state = RuntimeSharedState(support_fleet=_resolve_support_fleet_state(self._instances))
         for instance in self._instances:
             instance.attach_shared_state(self._shared_state)
         self._seed_attempt_state()
@@ -788,8 +793,10 @@ class CampaignRuntimeProfileManager:
         if not isinstance(context, RuntimeSessionContext):
             message = "runtime profile begin_session requires RuntimeSessionContext"
             raise TypeError(message)
-        # attempt 状态在构造时按 seed 初始化，并允许 READY 阶段的进图 UI 修正；
-        # begin_session 只激活已经准备好的状态，最终 reset 才重新 seed。
+        # 支援舰队允许 READY 阶段反复观察；session 一旦开始，后续消费者只能读取封存事实。
+        support_fleet = self._shared_state.support_fleet
+        if support_fleet is not None:
+            support_fleet.seal()
         for instance in self._instances:
             instance.begin_session(context)
         self._active_context = context
@@ -872,26 +879,27 @@ class CampaignRuntimeProfileManager:
 
     def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
-        return self._shared_state.use_support_fleet
+        support_fleet = self._shared_state.support_fleet
+        return support_fleet is not None and support_fleet.available
+
+    def support_fleet_status(
+        self,
+        cancellation: CancellationSource,
+    ) -> SupportFleetStatus | None:
+        cancellation.raise_if_requested()
+        support_fleet = self._shared_state.support_fleet
+        return None if support_fleet is None else support_fleet.status
 
     def use_single_fleet_override(self, cancellation: CancellationSource) -> bool | None:
         cancellation.raise_if_requested()
         return self._shared_state.use_single_fleet_override
 
-    def disable_support_fleet(self) -> None:
-        for instance in self._instances:
-            instance.disable_support_fleet()
-
     def _seed_attempt_state(self) -> None:
-        use_support_fleet = False
         use_single_fleet_override: bool | None = None
         for instance in self._instances:
             seed = instance.state_seed
-            if seed.use_support_fleet is not None:
-                use_support_fleet = seed.use_support_fleet
             if seed.use_single_fleet_override is not None:
                 use_single_fleet_override = seed.use_single_fleet_override
-        self._shared_state.use_support_fleet = use_support_fleet
         self._shared_state.use_single_fleet_override = use_single_fleet_override
 
     def invoke_super(

@@ -33,7 +33,11 @@ from module.adapters.campaign_runtime_profile import (
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
 from module.adapters.campaign_stage_navigator import ProfileCampaignStageNavigator
-from module.adapters.gems_mumu12 import GemsHardPreparationError, Mumu12GemsRuntimeBehavior
+from module.adapters.gems_mumu12 import (
+    GemsHardPreparationError,
+    GemsHardRetryFleetPreparationService,
+    Mumu12GemsRuntimeBehavior,
+)
 from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, SafeUnitCancellation, TaskId
 from module.base.button import Button
 from module.content.battle_policy import BossStrategy, ClearBoss, StagePolicy
@@ -128,6 +132,7 @@ from module.gameplay.emotion import (
     FleetEmotionSettings,
 )
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
+from module.map.map_fleet_preparation import STANDARD_FLEET_PREPARATION_SERVICE
 from module.ui.page import page_event
 
 if TYPE_CHECKING:
@@ -508,6 +513,8 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
         self.map_is_3_stars = type(self).three_stars
         self.map_is_threat_safe = type(self).threat_safe
         self._gems_behavior = None
+        self._profile_fleet_preparation_service = STANDARD_FLEET_PREPARATION_SERVICE
+        self._fleet_preparation_service = self._profile_fleet_preparation_service
         self._runtime_released = False
         self.calls: list[object] = []
         self.session_variant = CampaignRunVariant.NORMAL
@@ -847,6 +854,8 @@ def test_refreshing_gems_cancellation_preserves_the_active_map_emotion_ledger() 
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
     runtime.config = config
     runtime._gems_behavior = None  # ruff:ignore[private-member-access] - 构造最小 runtime 以验证跨 turn 账本。
+    runtime._profile_fleet_preparation_service = STANDARD_FLEET_PREPARATION_SERVICE  # ruff:ignore[private-member-access] - 构造完整 Gems 准备链。
+    runtime._fleet_preparation_service = STANDARD_FLEET_PREPARATION_SERVICE  # ruff:ignore[private-member-access] - Gems wrapper 从标准链开始。
     first = Mumu12GemsRuntimeBehavior(config, policy, SafeUnitCancellation(AbortToken()))
     runtime.configure_gems_behavior(first)
     ledger = runtime.emotion
@@ -856,6 +865,10 @@ def test_refreshing_gems_cancellation_preserves_the_active_map_emotion_ledger() 
 
     assert second.emotion is ledger
     assert runtime.emotion is ledger
+    service = runtime._fleet_preparation_service  # ruff:ignore[private-member-access] - 刷新 cancellation 必须替换而非嵌套 wrapper。
+    assert isinstance(service, GemsHardRetryFleetPreparationService)
+    assert service.inner is runtime._profile_fleet_preparation_service  # ruff:ignore[private-member-access] - wrapper 始终围绕稳定 profile 链。
+    assert service.replace_hard_fleet == second.prepare_hard_fleet
 
 
 def test_runtime_applies_only_the_requested_before_battle_patches() -> None:

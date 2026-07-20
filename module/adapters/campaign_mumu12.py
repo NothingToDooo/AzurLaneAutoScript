@@ -9,6 +9,7 @@ from module.adapters.campaign_auto_search_mumu12 import (
     Mumu12CommittedAutoSearchUnit,
 )
 from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
+from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
 from module.adapters.campaign_live import (
     CampaignMapRuntime,
     CommittedCampaignUnit,
@@ -48,6 +49,7 @@ from module.adapters.campaign_stage_navigator import build_campaign_stage_naviga
 from module.adapters.campaign_strategy_set import build_campaign_strategy_set_service
 from module.adapters.gems_mumu12 import (
     GemsHardPreparationError,
+    GemsHardRetryFleetPreparationService,
     Mumu12GemsFleetReplacementExecutor,
     Mumu12GemsRuntimeBehavior,
 )
@@ -82,7 +84,7 @@ from module.content.stage_rules import (
     StageEntrancePreset,
 )
 from module.device.device import Device
-from module.exception import CampaignEnd, HardFleetRequirementsError, MapAchievementReached
+from module.exception import CampaignEnd, MapAchievementReached
 from module.gameplay.campaign import (
     CampaignDifficulty,
     CampaignExecutionSettings,
@@ -123,6 +125,7 @@ if TYPE_CHECKING:
     from module.content.models import StageRef
     from module.content.stage_rules import MapCalibration, StageNavigation
     from module.gameplay.campaign_factories import CampaignSessionSource
+    from module.map.map_fleet_preparation import FleetPreparationService
     from module.map.type_alias import GridLocation
     from module.map_detection.grid import Grid
 
@@ -460,6 +463,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     session_variant: CampaignRunVariant
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
     _event_ui_services: CampaignEventUiServices
+    _profile_fleet_preparation_service: FleetPreparationService
     _program_capabilities: CampaignProgramCapabilityReader
     _runtime_profile: CampaignRuntimeProfileManager
     _runtime_profile_lease: RuntimeProfileLease
@@ -498,6 +502,8 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         self._runtime_profile.bind(self, self.MAP)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
         mechanic_instances = self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
+        self._profile_fleet_preparation_service = build_campaign_fleet_preparation_service(mechanic_instances)
+        self._fleet_preparation_service = self._profile_fleet_preparation_service
         self._strategy_set_service = build_campaign_strategy_set_service(mechanic_instances)
         self._program_capabilities = build_campaign_program_capability_reader(mechanic_instances)
         self._map_observer = build_campaign_map_observer(
@@ -609,14 +615,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         )
         return bool(result)
 
-    def fleet_preparation(self) -> bool:
-        result = self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.FLEET_PREPARATION,
-            self,
-            self._base_fleet_preparation,
-        )
-        return bool(result)
-
     def handle_submarine_support_popup(self) -> bool:
         result = self._runtime_profile.mechanic.invoke(
             RuntimeOperation.HANDLE_SUBMARINE_SUPPORT_POPUP,
@@ -659,6 +657,10 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             if "emotion" in self.__dict__:
                 self.__dict__["emotion"] = behavior.emotion
         self._gems_behavior = behavior
+        self._fleet_preparation_service = GemsHardRetryFleetPreparationService(
+            self._profile_fleet_preparation_service,
+            behavior.prepare_hard_fleet,
+        )
 
     @cached_property
     def emotion(self) -> Emotion:
@@ -674,20 +676,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         if behavior is None:
             return super().handle_combat_low_emotion()
         return behavior.handle_low_emotion(self)
-
-    def _base_fleet_preparation(self) -> bool:
-        try:
-            return CampaignEngine.fleet_preparation(self)
-        except HardFleetRequirementsError:
-            behavior = self._gems_behavior
-            if behavior is None:
-                raise
-            behavior.prepare_hard_fleet(self)
-            try:
-                return CampaignEngine.fleet_preparation(self)
-            except HardFleetRequirementsError as retry_error:
-                message = "hard fleet still does not satisfy its constraints after replacement"
-                raise GemsHardPreparationError(message) from retry_error
 
     def read_battle_flag(self, flag: BattleFlag) -> bool:
         """只暴露 StagePolicy 条件需要的稳定事实；关卡局部状态由 BattleProgram 持有。"""

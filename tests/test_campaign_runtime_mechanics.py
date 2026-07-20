@@ -1,6 +1,7 @@
 import pytest
 
 import module.adapters.campaign_runtime_mechanics as mechanics_module
+from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
 from module.adapters.campaign_program_capabilities import build_campaign_program_capability_reader
 from module.adapters.campaign_runtime_mechanics import mechanic_runtime_executor_descriptors
 from module.adapters.campaign_runtime_profile import (
@@ -26,6 +27,7 @@ from module.content.runtime_profile import (
 )
 from module.handler.strategy_set import StrategySetRequest
 from module.map.map_base import CampaignMap
+from module.map.support_fleet import SupportFleetStatus
 from module.map_detection.utils_assets import ASSETS
 
 
@@ -41,6 +43,7 @@ class _Runtime:
         self.combat_calls = 0
         self.mob_move_checks = 0
         self.mob_move_visible = True
+        self.fleet_preparation_calls = 0
         self.strategy_requests: list[StrategySetRequest] = []
         self.super_calls: list[tuple[RuntimeOperation, tuple[object, ...], dict[str, object]]] = []
 
@@ -67,6 +70,10 @@ class _Runtime:
 
     def _standard_strategy_set_execute(self, request: StrategySetRequest) -> None:
         self.strategy_requests.append(request)
+
+    def _standard_fleet_preparation(self) -> bool:
+        self.fleet_preparation_calls += 1
+        return True
 
     def handle_popup_confirm(self, name: str) -> bool:
         assert name == "SUBMARINE_SUPPORT"
@@ -123,10 +130,7 @@ def _support_binding() -> RuntimeExecutorBinding:
     return _binding(
         "map_mechanic/support_fleet",
         RuntimeExecutorKind.MAP_MECHANIC,
-        {
-            "operations": ["fleet_preparation"],
-            "state": ["use_support_fleet"],
-        },
+        {},
     )
 
 
@@ -168,16 +172,17 @@ def _start(
     _begin(manager, entry_kind)
 
 
+def _prepare(manager: CampaignRuntimeProfileManager, runtime: _Runtime) -> bool:
+    service = build_campaign_fleet_preparation_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
+    return service.prepare(runtime)
+
+
 def test_support_fleet_state_is_shared_with_fresh_submarine_entry() -> None:
     manager = _manager(_support_binding(), _submarine_binding())
     runtime = _Runtime()
     _bind(manager, runtime)
 
-    manager.mechanic.invoke(
-        RuntimeOperation.FLEET_PREPARATION,
-        runtime,
-        lambda: True,
-    )
+    assert _prepare(manager, runtime)
     _begin(manager, RuntimeSessionEntryKind.FRESH)
     manager.mechanic.invoke(
         RuntimeOperation.MAP_INIT,
@@ -196,8 +201,9 @@ def test_empty_support_fleet_suppresses_submarine_and_updates_state() -> None:
     runtime.support_empty = True
     _bind(manager, runtime)
 
-    manager.mechanic.invoke(RuntimeOperation.FLEET_PREPARATION, runtime, lambda: True)
+    assert _prepare(manager, runtime)
     assert not manager.use_support_fleet(AbortToken())
+    assert manager.support_fleet_status(AbortToken()) is SupportFleetStatus.EMPTY
 
     _begin(manager, RuntimeSessionEntryKind.FRESH)
     manager.mechanic.invoke(RuntimeOperation.MAP_INIT, runtime, lambda map_: map_, None)
@@ -212,12 +218,13 @@ def test_support_fleet_retry_replaces_the_previous_ui_observation() -> None:
     runtime.support_empty = True
     _bind(manager, runtime)
 
-    manager.mechanic.invoke(RuntimeOperation.FLEET_PREPARATION, runtime, lambda: True)
+    assert _prepare(manager, runtime)
     assert not manager.use_support_fleet(AbortToken())
 
     runtime.support_empty = False
-    manager.mechanic.invoke(RuntimeOperation.FLEET_PREPARATION, runtime, lambda: True)
+    assert _prepare(manager, runtime)
     assert manager.use_support_fleet(AbortToken())
+    assert manager.support_fleet_status(AbortToken()) is SupportFleetStatus.PRESENT
 
     _begin(manager, RuntimeSessionEntryKind.FRESH)
     assert manager.use_support_fleet(AbortToken())
