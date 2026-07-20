@@ -42,7 +42,6 @@ class RuntimeOperation(StrEnum):
     CLEAR_BOSS = "clear_boss"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
-    HANDLE_SUBMARINE_SUPPORT_POPUP = "handle_submarine_support_popup"
     MAP_DATA_INIT = "map_data_init"
     MAP_INIT = "map_init"
     RUNTIME_CREATED = "runtime_created"

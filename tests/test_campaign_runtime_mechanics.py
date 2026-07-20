@@ -39,8 +39,6 @@ class _Runtime:
         self.config = _Config()
         self.manager: CampaignRuntimeProfileManager | None = None
         self.support_empty = False
-        self.popup = False
-        self.combat_calls = 0
         self.mob_move_checks = 0
         self.mob_move_visible = True
         self.fleet_preparation_calls = 0
@@ -74,23 +72,6 @@ class _Runtime:
     def _standard_fleet_preparation(self) -> bool:
         self.fleet_preparation_calls += 1
         return True
-
-    def handle_popup_confirm(self, name: str) -> bool:
-        assert name == "SUBMARINE_SUPPORT"
-        return self.popup
-
-    def combat(
-        self,
-        *,
-        balance_hp: bool,
-        emotion_reduce: bool,
-        expected_end: str,
-    ) -> object:
-        assert not balance_hp
-        assert not emotion_reduce
-        assert expected_end == "no_searching"
-        self.combat_calls += 1
-        return None
 
 
 class _Config:
@@ -134,14 +115,6 @@ def _support_binding() -> RuntimeExecutorBinding:
     )
 
 
-def _submarine_binding() -> RuntimeExecutorBinding:
-    return _binding(
-        "map_mechanic/submarine_fresh_entry",
-        RuntimeExecutorKind.MAP_MECHANIC,
-        {"operations": ["handle_submarine_support_popup", "map_init"]},
-    )
-
-
 def _bind(
     manager: CampaignRuntimeProfileManager,
     runtime: _Runtime,
@@ -177,41 +150,6 @@ def _prepare(manager: CampaignRuntimeProfileManager, runtime: _Runtime) -> bool:
     return service.prepare(runtime)
 
 
-def test_support_fleet_state_is_shared_with_fresh_submarine_entry() -> None:
-    manager = _manager(_support_binding(), _submarine_binding())
-    runtime = _Runtime()
-    _bind(manager, runtime)
-
-    assert _prepare(manager, runtime)
-    _begin(manager, RuntimeSessionEntryKind.FRESH)
-    manager.mechanic.invoke(
-        RuntimeOperation.MAP_INIT,
-        runtime,
-        lambda map_: map_,
-        None,
-    )
-
-    assert manager.use_support_fleet(AbortToken())
-    assert runtime.combat_calls == 1
-
-
-def test_empty_support_fleet_suppresses_submarine_and_updates_state() -> None:
-    manager = _manager(_support_binding(), _submarine_binding())
-    runtime = _Runtime()
-    runtime.support_empty = True
-    _bind(manager, runtime)
-
-    assert _prepare(manager, runtime)
-    assert not manager.use_support_fleet(AbortToken())
-    assert manager.support_fleet_status(AbortToken()) is SupportFleetStatus.EMPTY
-
-    _begin(manager, RuntimeSessionEntryKind.FRESH)
-    manager.mechanic.invoke(RuntimeOperation.MAP_INIT, runtime, lambda map_: map_, None)
-
-    assert not manager.use_support_fleet(AbortToken())
-    assert runtime.combat_calls == 0
-
-
 def test_support_fleet_retry_replaces_the_previous_ui_observation() -> None:
     manager = _manager(_support_binding())
     runtime = _Runtime()
@@ -228,16 +166,6 @@ def test_support_fleet_retry_replaces_the_previous_ui_observation() -> None:
 
     _begin(manager, RuntimeSessionEntryKind.FRESH)
     assert manager.use_support_fleet(AbortToken())
-
-
-def test_resume_does_not_repeat_submarine_entry_battle() -> None:
-    manager = _manager(_support_binding(), _submarine_binding())
-    runtime = _Runtime()
-    _start(manager, runtime, RuntimeSessionEntryKind.RESUME)
-
-    manager.mechanic.invoke(RuntimeOperation.MAP_INIT, runtime, lambda map_: map_, None)
-
-    assert runtime.combat_calls == 0
 
 
 def test_runtime_ui_mask_restores_all_derived_caches() -> None:

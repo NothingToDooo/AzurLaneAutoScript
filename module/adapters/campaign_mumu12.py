@@ -47,6 +47,7 @@ from module.adapters.campaign_runtime_profile import (
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
 from module.adapters.campaign_stage_navigator import build_campaign_stage_navigator
 from module.adapters.campaign_strategy_set import build_campaign_strategy_set_service
+from module.adapters.campaign_submarine import CampaignSubmarineServices, build_campaign_submarine_services
 from module.adapters.gems_mumu12 import (
     GemsHardPreparationError,
     GemsHardRetryFleetPreparationService,
@@ -465,6 +466,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     _event_ui_services: CampaignEventUiServices
     _profile_fleet_preparation_service: FleetPreparationService
     _program_capabilities: CampaignProgramCapabilityReader
+    _submarine_services: CampaignSubmarineServices
     _runtime_profile: CampaignRuntimeProfileManager
     _runtime_profile_lease: RuntimeProfileLease
     grid_class: type[Grid]
@@ -504,6 +506,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         mechanic_instances = self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
         self._profile_fleet_preparation_service = build_campaign_fleet_preparation_service(mechanic_instances)
         self._fleet_preparation_service = self._profile_fleet_preparation_service
+        self._submarine_services = build_campaign_submarine_services(mechanic_instances)
         self._strategy_set_service = build_campaign_strategy_set_service(mechanic_instances)
         self._program_capabilities = build_campaign_program_capability_reader(mechanic_instances)
         self._map_observer = build_campaign_map_observer(
@@ -616,12 +619,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         return bool(result)
 
     def handle_submarine_support_popup(self) -> bool:
-        result = self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.HANDLE_SUBMARINE_SUPPORT_POPUP,
-            self,
-            CampaignEngine.handle_submarine_support_popup,
-        )
-        return bool(result)
+        return self._submarine_services.popup.handle(self)
 
     def map_init(self, map_: CampaignMap | None) -> None:
         self._runtime_profile.mechanic.invoke(
@@ -875,6 +873,7 @@ class Mumu12CampaignRuntimeProvider:
         owner = Mumu12CampaignMapSessionOwner(
             runtime,
             runtime._runtime_profile_lease,  # ruff:ignore[private-member-access] - runtime 构造的唯一 lease 由 session owner 接管。
+            runtime._submarine_services.fresh_combat,  # ruff:ignore[private-member-access] - owner 显式持有构造期编译的 fresh hook。
         )
         try:
             unit_cancellation = self._refresh_runtime_cancellation(job, runtime, cancellation)

@@ -11,6 +11,10 @@ from module.adapters.campaign_runtime_session import (
     RuntimeProfileLease,
     RuntimeProfileLeaseState,
 )
+from module.adapters.campaign_submarine import (
+    CampaignSubmarineFreshCombatService,
+    CampaignSubmarineServices,
+)
 from module.application import AbortRequested, AbortToken, CancellationSource
 from module.base.button import Button
 from module.content.campaign_session import CampaignRunVariant
@@ -221,6 +225,10 @@ def test_hard_attempt_uses_a_direct_loop_context_and_completes(
     manager = _SessionManager()
     runtime = _hard_runtime(manager)
     body_calls: list[tuple[Button, CancellationSource]] = []
+    fresh_combat_calls: list[object] = []
+    vars(runtime)["_submarine_services"] = CampaignSubmarineServices(
+        fresh_combat=CampaignSubmarineFreshCombatService(fresh_combat_calls.append),
+    )
 
     def complete_body(
         _runtime: DeclarativeCampaignMapRuntime,
@@ -241,6 +249,7 @@ def test_hard_attempt_uses_a_direct_loop_context_and_completes(
         RuntimeSessionEntryKind.FRESH,
     )
     assert body_calls == [(entrance, cancellation)]
+    assert fresh_combat_calls == []
     assert manager.calls == [
         ("begin", context),
         ("end", RuntimeSessionOutcome.COMPLETED),

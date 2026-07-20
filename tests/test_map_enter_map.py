@@ -171,6 +171,7 @@ class _MapOperation(MapOperation):
         return self._next(self.data_key_results)
 
     def handle_submarine_support_popup(self) -> bool:
+        self.calls.append(("handle_submarine_support_popup",))
         return self._next(self.submarine_popup_results)
 
     def handle_combat_low_emotion(self) -> bool:
@@ -288,3 +289,19 @@ def test_enter_map_breaks_when_auto_search_running(monkeypatch: pytest.MonkeyPat
     operation.auto_search_running_results = [True]
 
     assert operation.enter_map(map_assets.MAP_PREPARATION) is True
+
+
+def test_enter_map_retries_submarine_popup_on_the_next_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_timers(monkeypatch, [_Timer([False]), _Timer([False]), _Timer([False])])
+    operation = _MapOperation()
+    operation.in_map_results = [False]
+    operation.submarine_popup_results = [True, False]
+    operation.enemy_searching_results = [True]
+
+    assert operation.enter_map(map_assets.MAP_PREPARATION) is True
+
+    popup_calls = [call for call in operation.calls if call == ("handle_submarine_support_popup",)]
+    assert popup_calls == [
+        ("handle_submarine_support_popup",),
+        ("handle_submarine_support_popup",),
+    ]

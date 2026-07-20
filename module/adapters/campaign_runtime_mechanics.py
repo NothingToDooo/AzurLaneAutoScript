@@ -20,8 +20,6 @@ from .campaign_runtime_profile import (
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
     RuntimeOperation,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
     RuntimeStateSeed,
 )
@@ -43,7 +41,6 @@ _MASKS = {
 
 
 class _MechanicRuntimeHost(Protocol):
-    FUNCTION_NAME_BASE: str
     config: AzurLaneConfig
     map_is_clear_mode: bool
 
@@ -58,16 +55,6 @@ class _MechanicRuntimeHost(Protocol):
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool: ...
 
     def strategy_has_mob_move(self) -> bool: ...
-
-    def handle_popup_confirm(self, name: str) -> bool: ...
-
-    def combat(
-        self,
-        *,
-        balance_hp: bool,
-        emotion_reduce: bool,
-        expected_end: str,
-    ) -> object: ...
 
 
 def _host(runtime: object) -> _MechanicRuntimeHost:
@@ -202,48 +189,6 @@ class RuntimeUiMaskExecutor(RuntimeExecutorInstance):
         super().reset()
 
 
-class SubmarineFreshEntryExecutor(RuntimeExecutorInstance):
-    """只在真正的新进图边界处理支援潜艇的开场战斗。"""
-
-    __slots__ = ("_fresh_entry",)
-
-    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
-        options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
-        _require_operations(
-            options,
-            frozenset({"handle_submarine_support_popup", "map_init"}),
-        )
-        self._fresh_entry = False
-        super().__init__(
-            {RuntimeExecutorKind.MAP_MECHANIC},
-            methods={
-                RuntimeExecutorKind.MAP_MECHANIC: {
-                    RuntimeOperation.HANDLE_SUBMARINE_SUPPORT_POPUP: self._handle_submarine_support_popup,
-                    RuntimeOperation.MAP_INIT: self._map_init,
-                }
-            },
-        )
-
-    @override
-    def begin_session(self, context: RuntimeSessionContext) -> None:
-        super().begin_session(context)
-        self._fresh_entry = context.entry_kind is RuntimeSessionEntryKind.FRESH
-
-    def _map_init(self, runtime: object, map_: object) -> object:
-        host = _host(runtime)
-        if self._fresh_entry and self.current_use_support_fleet():
-            logger.hr(f"{host.FUNCTION_NAME_BASE}SUBMARINE", level=2)
-            host.combat(
-                balance_hp=False,
-                emotion_reduce=False,
-                expected_end="no_searching",
-            )
-        return host.runtime_super(RuntimeOperation.MAP_INIT, map_)
-
-    def _handle_submarine_support_popup(self, runtime: object) -> object:
-        return self.current_use_support_fleet() and _host(runtime).handle_popup_confirm("SUBMARINE_SUPPORT")
-
-
 class MobMoveFeatureExecutor(RuntimeExecutorInstance):
     """声明十五图敌舰移动能力，并在策略设置成功后记录 UI 事实。"""
 
@@ -353,10 +298,6 @@ def _build_ui_mask(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInsta
     return RuntimeUiMaskExecutor(context)
 
 
-def _build_submarine_fresh_entry(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    return SubmarineFreshEntryExecutor(context)
-
-
 def _build_mob_move_feature(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     return MobMoveFeatureExecutor(context)
 
@@ -380,15 +321,6 @@ def mechanic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
                 )
             },
             _build_ui_mask,
-        ),
-        RuntimeExecutorFactoryDescriptor(
-            RuntimeImplementationId("map_mechanic/submarine_fresh_entry"),
-            {
-                RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations"}),
-                )
-            },
-            _build_submarine_fresh_entry,
         ),
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("map_mechanic/mob_move_feature"),

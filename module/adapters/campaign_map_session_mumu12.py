@@ -7,6 +7,10 @@ from module.adapters.campaign_runtime_profile import (
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
+from module.adapters.campaign_submarine import (
+    CampaignSubmarineFreshCombatService,
+    SubmarineFreshCombatRuntime,
+)
 from module.application import AbortRequested
 from module.base.failure import preserve_cleanup_failure
 from module.content.campaign_session import CampaignRunVariant, CampaignSessionState
@@ -17,7 +21,7 @@ if TYPE_CHECKING:
     from module.map.map_base import CampaignMap
 
 
-class Mumu12CampaignMapSessionRuntime(Protocol):
+class Mumu12CampaignMapSessionRuntime(SubmarineFreshCombatRuntime, Protocol):
     definition: CampaignStageDefinition
     MAP: CampaignMap
     map: CampaignMap
@@ -51,12 +55,13 @@ def apply_campaign_map_mutations(
 class Mumu12CampaignMapSessionOwner:
     """持有一张普通 campaign 地图的 profile session 与地图初始化状态。"""
 
-    __slots__ = ("_lease", "_runtime")
+    __slots__ = ("_fresh_combat", "_lease", "_runtime")
 
     def __init__(
         self,
         runtime: Mumu12CampaignMapSessionRuntime,
         lease: RuntimeProfileLease,
+        fresh_combat: CampaignSubmarineFreshCombatService,
     ) -> None:
         if isinstance(runtime, type) or not callable(getattr(runtime, "map_init", None)):
             message = "campaign map session owner requires a map runtime"
@@ -64,8 +69,12 @@ class Mumu12CampaignMapSessionOwner:
         if not isinstance(lease, RuntimeProfileLease):
             message = "campaign map session owner requires a RuntimeProfileLease"
             raise TypeError(message)
+        if not isinstance(fresh_combat, CampaignSubmarineFreshCombatService):
+            message = "campaign map session owner requires a typed fresh combat service"
+            raise TypeError(message)
         self._runtime = runtime
         self._lease = lease
+        self._fresh_combat = fresh_combat
 
     @property
     def active(self) -> bool:
@@ -88,6 +97,8 @@ class Mumu12CampaignMapSessionOwner:
         runtime.map_is_clear_mode = state.variant is CampaignRunVariant.LOOP
         self._lease.start(context)
         try:
+            if entry_kind is RuntimeSessionEntryKind.FRESH:
+                self._fresh_combat.start(runtime)
             runtime.map_init(runtime.MAP)
             runtime.battle_count = state.battle_index
             apply_campaign_map_mutations(

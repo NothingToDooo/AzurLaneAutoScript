@@ -33,6 +33,7 @@ from module.adapters.campaign_runtime_profile import (
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
 from module.adapters.campaign_stage_navigator import ProfileCampaignStageNavigator
+from module.adapters.campaign_submarine import STANDARD_CAMPAIGN_SUBMARINE_SERVICES
 from module.adapters.gems_mumu12 import (
     GemsHardPreparationError,
     GemsHardRetryFleetPreparationService,
@@ -515,6 +516,7 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
         self._gems_behavior = None
         self._profile_fleet_preparation_service = STANDARD_FLEET_PREPARATION_SERVICE
         self._fleet_preparation_service = self._profile_fleet_preparation_service
+        self._submarine_services = STANDARD_CAMPAIGN_SUBMARINE_SERVICES
         self._runtime_released = False
         self.calls: list[object] = []
         self.session_variant = CampaignRunVariant.NORMAL
@@ -993,7 +995,11 @@ def test_map_session_owner_rejects_invalid_battle_index_before_mutating_map() ->
         object.__new__(Device),
         _definition(),
     )
-    owner = Mumu12CampaignMapSessionOwner(runtime, runtime._runtime_profile_lease)  # ruff:ignore[private-member-access]
+    owner = Mumu12CampaignMapSessionOwner(
+        runtime,
+        runtime._runtime_profile_lease,  # ruff:ignore[private-member-access] - 测试显式接管 runtime lease。
+        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
+    )
 
     with pytest.raises(ValueError, match="non-negative"):
         owner.prepare_battle(-1)
@@ -1025,7 +1031,11 @@ def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None
     )
     lease.start(context)
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    owner = Mumu12CampaignMapSessionOwner(runtime, lease)
+    owner = Mumu12CampaignMapSessionOwner(
+        runtime,
+        lease,
+        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
+    )
 
     with pytest.raises(RuntimeError) as raised:
         owner.close(RuntimeSessionOutcome.FAILED)
@@ -1081,7 +1091,11 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
             map_init=fail_map_init,
         ),
     )
-    owner = Mumu12CampaignMapSessionOwner(runtime, RuntimeProfileLease(_CleanupFailingProfile()))
+    owner = Mumu12CampaignMapSessionOwner(
+        runtime,
+        RuntimeProfileLease(_CleanupFailingProfile()),
+        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
+    )
     state = CampaignSessionState(
         CampaignRunVariant.NORMAL,
         CampaignSessionStatus.ACTIVE,
@@ -1117,7 +1131,11 @@ def test_map_session_owner_maps_map_initialization_abort_to_interrupted() -> Non
         object.__new__(Device),
         _definition(),
     )
-    owner = Mumu12CampaignMapSessionOwner(runtime, runtime._runtime_profile_lease)  # ruff:ignore[private-member-access]
+    owner = Mumu12CampaignMapSessionOwner(
+        runtime,
+        runtime._runtime_profile_lease,  # ruff:ignore[private-member-access] - 测试显式接管 runtime lease。
+        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
+    )
     session = CampaignSession(runtime.definition, CampaignRunVariant.NORMAL)
 
     with pytest.raises(AbortRequested) as raised:
