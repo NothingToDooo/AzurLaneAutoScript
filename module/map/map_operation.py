@@ -66,7 +66,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             if self.handle_story_skip():
                 timeout.reset()
                 continue
-            if self.handle_in_stage():
+            if self._map_transition_ui.handle_stage_return(self):
                 timeout.reset()
                 continue
 
@@ -376,7 +376,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
                 self.device.click(BACK_ARROW)
                 continue
 
-            if self.handle_in_stage():
+            if self._map_transition_ui.handle_stage_return(self):
                 raise CampaignEnd(MAP_WITHDRAW_MESSAGE)
 
     def handle_map_cat_attack(self) -> bool:

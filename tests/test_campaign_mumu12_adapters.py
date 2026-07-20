@@ -26,6 +26,7 @@ from module.adapters.campaign_mumu12 import (
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
+    RuntimeOperation,
     RuntimeSessionContext,
     RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
@@ -130,12 +131,14 @@ from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings
 from module.ui.page import page_event
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionRuntime
+    from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
     from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
     from module.config.config_generated import ConfigOverrides
+    from module.handler.map_transition_ui import MapTransitionUi
     from module.map.map_base import CampaignMap
 
 
@@ -189,7 +192,9 @@ def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
 
     services = runtime._event_ui_services  # ruff:ignore[private-member-access] - 验证 runtime 构造期的能力 wiring。
     combat_result = runtime._combat_result_ui  # ruff:ignore[private-member-access] - 删除生产 wiring 时本测试必须失败。
+    map_transition = runtime._map_transition_ui  # ruff:ignore[private-member-access] - transition 必须注入所有 consumer。
     assert combat_result is services.combat_result
+    assert map_transition is services.map_transition
     assert isinstance(runtime.stage_navigator, ProfileCampaignStageNavigator)
     assert runtime.stage_navigator._event_ui is services  # ruff:ignore[private-member-access] - navigator 必须复用同一次组合结果。
 
@@ -206,6 +211,118 @@ def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
     monkeypatch.setattr(runtime, "appear", event_page_visible)
 
     assert combat_result.handle_experience_result(runtime) is False
+
+
+class _ExpectedEndTransitionProbe:
+    def __init__(self, override: object | None) -> None:
+        self.override = override
+        self.calls = 0
+
+    @staticmethod
+    def handle_stage_return(runtime: object) -> bool:
+        del runtime
+        raise AssertionError
+
+    @staticmethod
+    def stage_page_ready(runtime: object) -> bool:
+        del runtime
+        raise AssertionError
+
+    @staticmethod
+    def event_animation_visible(runtime: object) -> bool:
+        del runtime
+        raise AssertionError
+
+    def combat_end_override(self, runtime: object) -> object | None:
+        del runtime
+        self.calls += 1
+        return self.override
+
+
+class _ExpectedEndHardFacet:
+    _DELEGATE = object()
+
+    def __init__(self, result: object = _DELEGATE) -> None:
+        self.result = result
+        self.calls: list[tuple[RuntimeOperation, str]] = []
+
+    def invoke(
+        self,
+        operation: RuntimeOperation,
+        runtime: object,
+        fallback: Callable[[str], object],
+        expected: str,
+    ) -> object:
+        del runtime
+        self.calls.append((operation, expected))
+        if self.result is not self._DELEGATE:
+            return self.result
+        return fallback(expected)
+
+
+def _expected_end_runtime(
+    hard: _ExpectedEndHardFacet,
+    transition: _ExpectedEndTransitionProbe,
+) -> DeclarativeCampaignMapRuntime:
+    runtime = object.__new__(DeclarativeCampaignMapRuntime)
+    runtime._runtime_profile = cast(  # ruff:ignore[private-member-access] - 构造最小 expected-end runtime。
+        "CampaignRuntimeProfileManager",
+        SimpleNamespace(hard=hard),
+    )
+    runtime._map_transition_ui = cast(  # ruff:ignore[private-member-access] - 注入可观察 transition probe。
+        "MapTransitionUi",
+        transition,
+    )
+    runtime.battle_count = 3
+    return runtime
+
+
+def test_expected_end_keeps_hard_override_outside_typed_transition() -> None:
+    hard = _ExpectedEndHardFacet("in_stage")
+    transition = _ExpectedEndTransitionProbe(lambda: True)
+    runtime = _expected_end_runtime(hard, transition)
+
+    result = DeclarativeCampaignMapRuntime._expected_end(runtime, "no_searching")  # ruff:ignore[private-member-access]
+
+    assert result == "in_stage"
+    assert hard.calls == [(RuntimeOperation.EXPECTED_END, "no_searching")]
+    assert transition.calls == 0
+
+
+def test_expected_end_uses_typed_transition_callback_inside_hard_fallback() -> None:
+    def callback() -> bool:
+        return True
+
+    hard = _ExpectedEndHardFacet()
+    transition = _ExpectedEndTransitionProbe(callback)
+    runtime = _expected_end_runtime(hard, transition)
+
+    result = DeclarativeCampaignMapRuntime._expected_end(runtime, "no_searching")  # ruff:ignore[private-member-access]
+
+    assert result is callback
+    assert hard.calls == [(RuntimeOperation.EXPECTED_END, "no_searching")]
+    assert transition.calls == 1
+
+
+def test_expected_end_delegates_to_campaign_engine_after_typed_transition_miss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hard = _ExpectedEndHardFacet()
+    transition = _ExpectedEndTransitionProbe(None)
+    runtime = _expected_end_runtime(hard, transition)
+    baseline_calls: list[str] = []
+
+    def baseline(_runtime: object, expected: str) -> str:
+        baseline_calls.append(expected)
+        return "with_searching"
+
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "_expected_end", baseline)
+
+    result = DeclarativeCampaignMapRuntime._expected_end(runtime, "no_searching")  # ruff:ignore[private-member-access]
+
+    assert result == "with_searching"
+    assert baseline_calls == ["no_searching"]
+    assert transition.calls == 1
 
 
 def _definition() -> CampaignStageDefinition:

@@ -1,10 +1,18 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from module.handler import enemy_searching as enemy_searching_module
 from module.handler.enemy_searching import EnemySearchingHandler
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import pytest
+
+    from module.handler.map_transition_ui import (
+        MapTransitionCombatRuntime,
+        MapTransitionRuntime,
+        MapTransitionUi,
+    )
 
 
 class _Timer:
@@ -46,8 +54,7 @@ class _EnemySearching(EnemySearchingHandler):
     def __init__(self) -> None:
         self.device = _Device()
         self.in_map_results = []
-        self.event_animation_results = []
-        self.in_stage_results = []
+        self.stage_page_results = []
         self.combat_loading_results = []
         self.auto_search_exit_results = []
         self.vote_results = []
@@ -68,11 +75,24 @@ class _EnemySearching(EnemySearchingHandler):
     def is_in_map(self) -> bool:
         return self._next(self.in_map_results)
 
+    @override
     def is_event_animation(self) -> bool:
-        return self._next(self.event_animation_results)
+        raise AssertionError
 
+    @override
     def handle_in_stage(self) -> bool:
-        return self._next(self.in_stage_results)
+        raise AssertionError
+
+    @override
+    def is_stage_page_has_entrance(self) -> bool:
+        raise AssertionError
+
+    @override
+    def is_in_stage_page(self) -> bool:
+        return self._next(self.stage_page_results)
+
+    def install_map_transition_ui(self, transition: MapTransitionUi) -> None:
+        self._map_transition_ui = transition
 
     def is_combat_loading(self) -> bool:
         return self._next(self.combat_loading_results)
@@ -105,6 +125,39 @@ class _EnemySearching(EnemySearchingHandler):
         self.flashing_count += 1
 
 
+class _MapTransitionProbe:
+    def __init__(
+        self,
+        *,
+        stage_return_results: tuple[bool, ...] = (),
+        stage_page_results: tuple[bool, ...] = (),
+        animation_results: tuple[bool, ...] = (),
+    ) -> None:
+        self.stage_return_results = list(stage_return_results)
+        self.stage_page_results = list(stage_page_results)
+        self.animation_results = list(animation_results)
+        self.stage_return_calls: list[MapTransitionRuntime] = []
+        self.stage_page_calls: list[MapTransitionRuntime] = []
+        self.animation_calls: list[MapTransitionRuntime] = []
+
+    def handle_stage_return(self, runtime: MapTransitionRuntime) -> bool:
+        self.stage_return_calls.append(runtime)
+        return self.stage_return_results.pop(0)
+
+    def stage_page_ready(self, runtime: MapTransitionRuntime) -> bool:
+        self.stage_page_calls.append(runtime)
+        return self.stage_page_results.pop(0)
+
+    def event_animation_visible(self, runtime: MapTransitionRuntime) -> bool:
+        self.animation_calls.append(runtime)
+        return self.animation_results.pop(0)
+
+    @staticmethod
+    def combat_end_override(runtime: MapTransitionCombatRuntime) -> Callable[[], bool] | None:
+        del runtime
+        raise AssertionError
+
+
 def test_enemy_searching_returns_false_outside_map() -> None:
     handler = _EnemySearching()
     handler.in_map_results = [False]
@@ -118,6 +171,11 @@ def test_enemy_searching_waits_for_overlay_to_disappear(monkeypatch: pytest.Monk
     handler = _EnemySearching()
     handler.in_map_results = [True, True, True]
     handler.enemy_appear_results = [True, False]
+    transition = _MapTransitionProbe(
+        stage_return_results=(False, False),
+        animation_results=(False, False),
+    )
+    handler.install_map_transition_ui(transition)
     monkeypatch.setattr(enemy_searching_module, "Timer", lambda *_args, **_kwargs: _Timer([False]))
 
     assert handler.handle_in_map_with_enemy_searching() is True
@@ -132,9 +190,51 @@ def test_enemy_searching_story_skip_keeps_fallthrough_to_timeout(monkeypatch: py
     handler = _EnemySearching()
     handler.in_map_results = [True, True]
     handler.story_results = [True]
+    transition = _MapTransitionProbe(stage_return_results=(False,))
+    handler.install_map_transition_ui(transition)
     monkeypatch.setattr(enemy_searching_module, "Timer", lambda *_args, **_kwargs: _Timer([True]))
 
     assert handler.handle_in_map_no_enemy_searching() is True
 
     assert handler.ensure_no_story_count == 1
     assert handler.device.screenshot_count == 1
+
+
+def test_stage_page_readiness_uses_injected_map_transition() -> None:
+    handler = _EnemySearching()
+    handler.stage_page_results = [True]
+    transition = _MapTransitionProbe(stage_page_results=(True,))
+    handler.install_map_transition_ui(transition)
+
+    assert handler.is_in_stage()
+    assert transition.stage_page_calls == [handler]
+
+
+def test_enemy_searching_animation_and_stage_return_use_injected_map_transition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    handler = _EnemySearching()
+    handler.in_map_results = [True, True]
+    transition = _MapTransitionProbe(
+        stage_return_results=(True,),
+        animation_results=(True, False),
+    )
+    handler.install_map_transition_ui(transition)
+    monkeypatch.setattr(enemy_searching_module, "Timer", lambda *_args, **_kwargs: _Timer([True]))
+
+    assert handler.handle_in_map_with_enemy_searching()
+    assert transition.animation_calls == [handler, handler]
+    assert transition.stage_return_calls == [handler]
+
+
+def test_no_enemy_searching_stage_return_uses_injected_map_transition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    handler = _EnemySearching()
+    handler.in_map_results = [True, True]
+    transition = _MapTransitionProbe(stage_return_results=(True,))
+    handler.install_map_transition_ui(transition)
+    monkeypatch.setattr(enemy_searching_module, "Timer", lambda *_args, **_kwargs: _Timer([True]))
+
+    assert handler.handle_in_map_no_enemy_searching()
+    assert transition.stage_return_calls == [handler]

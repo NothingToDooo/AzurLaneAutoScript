@@ -3,6 +3,7 @@ from module.base.timer import Timer
 from module.exception import CampaignEnd
 from module.handler.assets import IN_MAP, MAP_ENEMY_SEARCHING
 from module.handler.info_handler import InfoHandler
+from module.handler.map_transition_ui import STANDARD_MAP_TRANSITION_UI, MapTransitionUi
 from module.logger import logger
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION, MAP_PREPARATION_CANCEL
 from module.ui.assets import CAMPAIGN_CHECK, EVENT_CHECK, SP_CHECK
@@ -11,6 +12,7 @@ IN_STAGE_MESSAGE = "In stage."
 
 
 class EnemySearchingHandler(InfoHandler):
+    _map_transition_ui: MapTransitionUi = STANDARD_MAP_TRANSITION_UI
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.5  # 实测通常为 0.70～0.80。
     MAP_ENEMY_SEARCHING_TIMEOUT_SECOND = 5
     in_stage_timer = Timer(0.5, count=2)
@@ -63,7 +65,7 @@ class EnemySearchingHandler(InfoHandler):
     def is_in_stage(self) -> bool:
         if not self.is_in_stage_page():
             return False
-        return self.is_stage_page_has_entrance()
+        return self._map_transition_ui.stage_page_ready(self)
 
     def is_in_map(self) -> bool:
         return self.appear(IN_MAP)
@@ -122,7 +124,7 @@ class EnemySearchingHandler(InfoHandler):
         appeared = False
         while 1:
             self.device.screenshot()
-            if self.is_event_animation():
+            if self._map_transition_ui.event_animation_visible(self):
                 continue
             if self.is_in_map():
                 timeout.start()
@@ -130,7 +132,7 @@ class EnemySearchingHandler(InfoHandler):
                 timeout.reset()
 
             # 等待寻敌动画时，关卡也可能已经结束。
-            if self.handle_in_stage():
+            if self._map_transition_ui.handle_stage_return(self):
                 return True
             # 第 16 章可能直接进入潜艇战斗。
             is_combat_loading = getattr(self, "is_combat_loading", None)
@@ -161,7 +163,7 @@ class EnemySearchingHandler(InfoHandler):
                 timeout.reset()
 
             # 即使不等待寻敌动画，关卡也可能已经结束。
-            if self.handle_in_stage():
+            if self._map_transition_ui.handle_stage_return(self):
                 return True
             if self._handle_enemy_searching_interrupts(timeout, extend_timeout=False):
                 continue

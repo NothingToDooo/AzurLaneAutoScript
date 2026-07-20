@@ -2,7 +2,11 @@ from typing import TYPE_CHECKING, override
 
 import pytest
 
-from module.adapters.campaign_event_ui import build_campaign_event_ui_services
+from module.adapters.campaign_event_ui import (
+    CampaignEventUiContributor,
+    CampaignMapTransitionContributor,
+    build_campaign_event_ui_services,
+)
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
@@ -26,6 +30,7 @@ if TYPE_CHECKING:
 
     from module.combat.combat_result_ui import CombatResultUi
     from module.config.config_generated import ConfigOverrides
+    from module.handler.map_transition_ui import MapTransitionRuntime
 
 
 class _Config(AzurLaneConfig):
@@ -42,7 +47,6 @@ class _Runtime:
         self.manager = manager
         self.config = _Config()
         self.battle_count = 0
-        self.event_animation_end = object()
         self.page_visible = False
         self.confirm_visible = False
         self.confirm_calls: list[tuple[object, tuple[int, int], float]] = []
@@ -75,6 +79,43 @@ class _Runtime:
     def handle_exp_info(self) -> bool:
         self.exp_info_calls += 1
         return self.exp_info_result
+
+    @staticmethod
+    def handle_in_stage() -> bool:
+        return False
+
+    @staticmethod
+    def is_stage_page_has_entrance() -> bool:
+        return False
+
+    @staticmethod
+    def is_event_animation() -> bool:
+        return False
+
+
+class _WaitableAnimation:
+    def __init__(self) -> None:
+        self.waited: list[object] = []
+
+    @staticmethod
+    def is_visible(runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        return False
+
+    def wait_until_closed(self, runtime: MapTransitionRuntime) -> bool:
+        self.waited.append(runtime)
+        return True
+
+
+class _AnimationSource:
+    def __init__(self, animation: _WaitableAnimation) -> None:
+        self._contributor = CampaignEventUiContributor(
+            map_transition=CampaignMapTransitionContributor(animation=animation)
+        )
+
+    @property
+    def event_ui_contributor(self) -> CampaignEventUiContributor:
+        return self._contributor
 
 
 def _manager(
@@ -190,29 +231,25 @@ def test_clear_mode_overlay_is_session_ephemeral(
 
 def test_event_animation_expected_end_delegates_outside_configured_battle() -> None:
     manager = _manager(
-        "engine/event_animation_expected_end",
-        RuntimeExecutorKind.ENGINE_EXTENSION,
-        {"operations": ["_expected_end"], "event_animation_end_battle": 3},
+        "event_ui/event_animation_expected_end",
+        RuntimeExecutorKind.EVENT_UI,
+        {"event_animation_end_battle": 3},
     )
     runtime = _Runtime(manager)
+    animation = _WaitableAnimation()
+    transition = build_campaign_event_ui_services(
+        (_AnimationSource(animation), *manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
+    ).map_transition
 
     runtime.battle_count = 3
-    special = manager.engine.invoke(
-        RuntimeOperation.EXPECTED_END,
-        runtime,
-        lambda expected: expected,
-        "no_searching",
-    )
+    special = transition.combat_end_override(runtime)
+    assert special is not None
+    assert special()
     runtime.battle_count = 2
-    delegated = manager.engine.invoke(
-        RuntimeOperation.EXPECTED_END,
-        runtime,
-        lambda expected: expected,
-        "no_searching",
-    )
+    delegated = transition.combat_end_override(runtime)
 
-    assert special is runtime.event_animation_end
-    assert delegated == "no_searching"
+    assert animation.waited == [runtime]
+    assert delegated is None
 
 
 def test_runtime_config_overlay_runs_after_map_data_initialization() -> None:

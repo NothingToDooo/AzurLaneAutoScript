@@ -355,9 +355,6 @@
                   "count": 10000
                 }
               }
-            ],
-            "operations": [
-              "is_event_animation"
             ]
           }
         }
@@ -438,11 +435,7 @@
                 20
               ]
             },
-            "menu_page": "campaign_menu",
-            "operations": [
-              "is_event_animation"
-            ],
-            "wait_until_animation_end": false
+            "menu_page": "campaign_menu"
           }
         }
       ],
@@ -643,9 +636,6 @@
               {
                 "asset": "ANIMATION_BLUE"
               }
-            ],
-            "operations": [
-              "is_event_animation"
             ]
           }
         }
@@ -1065,11 +1055,7 @@
         {
           "implementation": "event_20230817_cn/campaign_base/campaign_base",
           "kind": "event_ui",
-          "options": {
-            "operations": [
-              "is_stage_page_has_entrance"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "event_20230817_cn/campaign_base/campaign_base"
@@ -1315,9 +1301,6 @@
                   "count": 500
                 }
               }
-            ],
-            "operations": [
-              "is_event_animation"
             ]
           }
         }
@@ -1347,9 +1330,6 @@
                   "count": 500
                 }
               }
-            ],
-            "operations": [
-              "is_event_animation"
             ]
           }
         }
@@ -1526,9 +1506,6 @@
           "kind": "event_ui",
           "options": {
             "exp_info_blocked_page": "event",
-            "operations": [
-              "handle_in_stage"
-            ],
             "state": [
               "entrance_timer"
             ]
@@ -1990,12 +1967,7 @@
                 20
               ]
             },
-            "menu_page": "campaign_menu",
-            "operations": [
-              "event_animation_end",
-              "is_event_animation"
-            ],
-            "wait_until_animation_end": true
+            "menu_page": "campaign_menu"
           }
         }
       ],
@@ -2004,13 +1976,10 @@
     {
       "executors": [
         {
-          "implementation": "engine/event_animation_expected_end",
-          "kind": "engine_extension",
+          "implementation": "event_ui/event_animation_expected_end",
+          "kind": "event_ui",
           "options": {
-            "event_animation_end_battle": 3,
-            "operations": [
-              "_expected_end"
-            ]
+            "event_animation_end_battle": 3
           }
         }
       ],
@@ -2019,13 +1988,10 @@
     {
       "executors": [
         {
-          "implementation": "engine/event_animation_expected_end",
-          "kind": "engine_extension",
+          "implementation": "event_ui/event_animation_expected_end",
+          "kind": "event_ui",
           "options": {
-            "event_animation_end_battle": 3,
-            "operations": [
-              "_expected_end"
-            ]
+            "event_animation_end_battle": 3
           }
         }
       ],

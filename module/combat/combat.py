@@ -423,7 +423,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
     def _combat_status_expected_end_reached(self, expected_end: CombatEnd | None) -> bool:
         if expected_end == "in_stage":
-            return self.handle_in_stage()
+            return self._map_transition_ui.handle_stage_return(self)
         if expected_end == "with_searching":
             return self.handle_in_map_with_enemy_searching()
         if expected_end == "no_searching":
@@ -490,7 +490,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             if self.handle_combat_mis_click():
                 continue
 
-            if self.handle_in_stage():
+            if self._map_transition_ui.handle_stage_return(self):
                 break
             if expected_end is None and self.handle_in_map_with_enemy_searching():
                 break

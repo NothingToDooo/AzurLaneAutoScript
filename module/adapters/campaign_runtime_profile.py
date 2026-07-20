@@ -39,19 +39,15 @@ class RuntimeOperation(StrEnum):
     CLEAR_BOSS = "clear_boss"
     ENEMY_SEARCHING_APPEAR = "enemy_searching_appear"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
-    EVENT_ANIMATION_END = "event_animation_end"
     FIND_CURRENT_FLEET = "find_current_fleet"
     FLEET_PREPARATION = "fleet_preparation"
     FULL_SCAN = "full_scan"
     FULL_SCAN_MOVABLE = "full_scan_movable"
     GET_MAP_CLEAR_PERCENTAGE = "get_map_clear_percentage"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
-    HANDLE_IN_STAGE = "handle_in_stage"
     HANDLE_MYSTERY_ITEMS = "handle_mystery_items"
     HANDLE_SUBMARINE_SUPPORT_POPUP = "handle_submarine_support_popup"
     IN_SIGHT = "in_sight"
-    IS_EVENT_ANIMATION = "is_event_animation"
-    IS_STAGE_PAGE_HAS_ENTRANCE = "is_stage_page_has_entrance"
     MAP_DATA_INIT = "map_data_init"
     MAP_GET_INFO = "map_get_info"
     MAP_INIT = "map_init"
@@ -728,10 +724,6 @@ class CampaignRuntimeProfileManager:
             message = "runtime facet requires a RuntimeExecutorKind"
             raise TypeError(message)
         return RuntimeFacetComposite(self, kind)
-
-    @property
-    def event_ui(self) -> RuntimeFacetComposite:
-        return self.facet(RuntimeExecutorKind.EVENT_UI)
 
     @property
     def observation(self) -> RuntimeFacetComposite:

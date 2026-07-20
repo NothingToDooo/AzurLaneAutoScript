@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Protocol, override, runtime_checkable
 
 from module.campaign.campaign_engine import CampaignEngine
@@ -10,8 +11,22 @@ from module.combat.combat_result_ui import (
 )
 from module.content.errors import ContentValidationError
 from module.content.runtime_profile import RuntimeExecutorKind
+from module.handler.map_transition_ui import (
+    STANDARD_MAP_TRANSITION_ANIMATION,
+    STANDARD_MAP_TRANSITION_UI,
+    MapTransitionAnimation,
+    MapTransitionCombatRuntime,
+    MapTransitionRuntime,
+    MapTransitionUi,
+    WaitableMapTransitionAnimation,
+)
 
-from .campaign_runtime_profile import RuntimeExecutorInstance, RuntimeMethod, RuntimeOperation
+from .campaign_runtime_profile import (
+    CampaignRuntimeProfileError,
+    RuntimeExecutorInstance,
+    RuntimeMethod,
+    RuntimeOperation,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping
@@ -31,6 +46,8 @@ type EventStageRecoveryNext = Callable[[CampaignEngine], bool]
 type EventStageRecoveryHandler = Callable[[CampaignEngine, EventStageRecoveryNext], bool]
 type EventCombatResultNext = Callable[[CombatResultRuntime], bool]
 type EventCombatResultHandler = Callable[[CombatResultRuntime, EventCombatResultNext], bool]
+type MapTransitionNext = Callable[[MapTransitionRuntime], bool]
+type MapTransitionHandler = Callable[[MapTransitionRuntime, MapTransitionNext], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,12 +63,21 @@ class CampaignEventCombatResultContributor:
 
 
 @dataclass(frozen=True, slots=True)
+class CampaignMapTransitionContributor:
+    handle_stage_return: MapTransitionHandler | None = None
+    stage_page_ready: MapTransitionHandler | None = None
+    animation: MapTransitionAnimation | None = None
+    event_animation_end_battle: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class CampaignEventUiContributor:
     """一个 runtime executor 对活动 UI typed services 的贡献。"""
 
     destination: EventDestination | None = None
     stage_recovery: CampaignEventStageRecoveryContributor | None = None
     combat_result: CampaignEventCombatResultContributor | None = None
+    map_transition: CampaignMapTransitionContributor | None = None
 
 
 @runtime_checkable
@@ -61,7 +87,7 @@ class CampaignEventUiContributorSource(Protocol):
 
 
 class CampaignEventUiExecutor(RuntimeExecutorInstance):
-    """同时提供 operation facet 与 typed event UI 能力的专用 executor。"""
+    """提供 typed event UI，并允许同一 owner 暴露非 EVENT_UI facet。"""
 
     __slots__ = ("_event_ui_contributor",)
 
@@ -70,7 +96,7 @@ class CampaignEventUiExecutor(RuntimeExecutorInstance):
         supported_kinds: Iterable[RuntimeExecutorKind],
         contributor: CampaignEventUiContributor,
         *,
-        methods: Mapping[RuntimeExecutorKind, Mapping[RuntimeOperation, RuntimeMethod]] | None = None,
+        other_methods: Mapping[RuntimeExecutorKind, Mapping[RuntimeOperation, RuntimeMethod]] | None = None,
     ) -> None:
         kinds = frozenset(supported_kinds)
         if RuntimeExecutorKind.EVENT_UI not in kinds:
@@ -79,7 +105,10 @@ class CampaignEventUiExecutor(RuntimeExecutorInstance):
         if not isinstance(contributor, CampaignEventUiContributor):
             message = "campaign event UI executor requires a typed contributor"
             raise TypeError(message)
-        super().__init__(kinds, methods=methods)
+        if other_methods is not None and RuntimeExecutorKind.EVENT_UI in other_methods:
+            message = "campaign event UI executor forbids string-dispatched event_ui methods"
+            raise ContentValidationError(message)
+        super().__init__(kinds, methods=other_methods)
         self._event_ui_contributor = contributor
 
     @property
@@ -94,6 +123,7 @@ class CampaignEventUiServices:
     destination: EventDestination
     stage_recovery: EventStageRecovery
     combat_result: CombatResultUi
+    map_transition: MapTransitionUi
 
 
 class _StandardEventStageRecovery(EventStageRecovery):
@@ -139,6 +169,34 @@ class _ComposedCombatResultUi(CombatResultUi):
         return self.handle_experience_result_handler(runtime)
 
 
+@dataclass(frozen=True, slots=True)
+class _ComposedMapTransitionUi(MapTransitionUi):
+    handle_stage_return_handler: MapTransitionNext
+    stage_page_ready_handler: MapTransitionNext
+    animation: MapTransitionAnimation
+    event_animation_end_battle: int | None
+    combat_end_waiter: WaitableMapTransitionAnimation | None
+
+    @override
+    def handle_stage_return(self, runtime: MapTransitionRuntime) -> bool:
+        return self.handle_stage_return_handler(runtime)
+
+    @override
+    def stage_page_ready(self, runtime: MapTransitionRuntime) -> bool:
+        return self.stage_page_ready_handler(runtime)
+
+    @override
+    def event_animation_visible(self, runtime: MapTransitionRuntime) -> bool:
+        return self.animation.is_visible(runtime)
+
+    @override
+    def combat_end_override(self, runtime: MapTransitionCombatRuntime) -> Callable[[], bool] | None:
+        waiter = self.combat_end_waiter
+        if self.event_animation_end_battle != runtime.battle_count or waiter is None:
+            return None
+        return partial(waiter.wait_until_closed, runtime)
+
+
 def _overlay_recovery(
     handler: EventStageRecoveryHandler,
     next_handler: EventStageRecoveryNext,
@@ -159,6 +217,66 @@ def _overlay_combat_result(
     return execute
 
 
+def _overlay_transition(
+    handler: MapTransitionHandler,
+    next_handler: MapTransitionNext,
+) -> MapTransitionNext:
+    def execute(runtime: MapTransitionRuntime) -> bool:
+        return handler(runtime, next_handler)
+
+    return execute
+
+
+class _MapTransitionComposition:
+    __slots__ = (
+        "_animation",
+        "_event_animation_end_battle",
+        "_handle_stage_return",
+        "_stage_page_ready",
+    )
+
+    def __init__(self) -> None:
+        self._handle_stage_return = STANDARD_MAP_TRANSITION_UI.handle_stage_return
+        self._stage_page_ready = STANDARD_MAP_TRANSITION_UI.stage_page_ready
+        self._animation = STANDARD_MAP_TRANSITION_ANIMATION
+        self._event_animation_end_battle: int | None = None
+
+    def add(self, contributor: CampaignMapTransitionContributor | None) -> None:
+        if contributor is None:
+            return
+        if contributor.handle_stage_return is not None:
+            self._handle_stage_return = _overlay_transition(
+                contributor.handle_stage_return,
+                self._handle_stage_return,
+            )
+        if contributor.stage_page_ready is not None:
+            self._stage_page_ready = _overlay_transition(
+                contributor.stage_page_ready,
+                self._stage_page_ready,
+            )
+        if contributor.animation is not None:
+            self._animation = contributor.animation
+        if contributor.event_animation_end_battle is not None:
+            self._event_animation_end_battle = contributor.event_animation_end_battle
+
+    def build(self) -> MapTransitionUi:
+        waiter = None
+        battle = self._event_animation_end_battle
+        if battle is not None:
+            animation = self._animation
+            if not isinstance(animation, WaitableMapTransitionAnimation):
+                message = "event animation expected-end policy requires a typed animation wait provider"
+                raise CampaignRuntimeProfileError(message)
+            waiter = animation
+        return _ComposedMapTransitionUi(
+            handle_stage_return_handler=self._handle_stage_return,
+            stage_page_ready_handler=self._stage_page_ready,
+            animation=self._animation,
+            event_animation_end_battle=battle,
+            combat_end_waiter=waiter,
+        )
+
+
 def build_campaign_event_ui_services(
     instances: Iterable[object],
 ) -> CampaignEventUiServices:
@@ -170,6 +288,7 @@ def build_campaign_event_ui_services(
     recover_chapter_selection = standard_recovery.recover_chapter_selection
     recover_stage_page = standard_recovery.recover_stage_page
     handle_experience_result = STANDARD_COMBAT_RESULT_UI.handle_experience_result
+    map_transition = _MapTransitionComposition()
     for instance in instances:
         if not isinstance(instance, CampaignEventUiContributorSource):
             continue
@@ -182,6 +301,7 @@ def build_campaign_event_ui_services(
                 combat_result.handle_experience_result,
                 handle_experience_result,
             )
+        map_transition.add(contributor.map_transition)
         recovery = contributor.stage_recovery
         if recovery is None:
             continue
@@ -210,4 +330,5 @@ def build_campaign_event_ui_services(
         combat_result=_ComposedCombatResultUi(
             handle_experience_result_handler=handle_experience_result,
         ),
+        map_transition=map_transition.build(),
     )

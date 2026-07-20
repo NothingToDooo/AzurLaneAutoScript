@@ -9,6 +9,7 @@ from .campaign_event_ui import (
     CampaignEventCombatResultContributor,
     CampaignEventUiContributor,
     CampaignEventUiExecutor,
+    CampaignMapTransitionContributor,
 )
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
@@ -29,8 +30,6 @@ if TYPE_CHECKING:
 
 class _SemanticRuntimeHost(Protocol):
     config: AzurLaneConfig
-    battle_count: int
-    event_animation_end: object
 
     def runtime_super(
         self,
@@ -216,26 +215,19 @@ def _build_clear_mode_config_overlay(context: RuntimeExecutorBuildContext) -> Ru
 
 
 def _build_event_animation_expected_end(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = _required_options(context, RuntimeExecutorKind.ENGINE_EXTENSION)
-    _require_operations(options, frozenset({"_expected_end"}))
+    options = _required_options(context, RuntimeExecutorKind.EVENT_UI)
     battle = _integer_option(options, "event_animation_end_battle")
     if battle < 0:
         message = "event-animation end battle must be non-negative"
         raise CampaignRuntimeProfileError(message)
 
-    def expected_end(runtime: object, expected: object) -> object:
-        host = _host(runtime)
-        if host.battle_count == battle:
-            return host.event_animation_end
-        return host.runtime_super(RuntimeOperation.EXPECTED_END, expected)
-
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.ENGINE_EXTENSION},
-        methods={
-            RuntimeExecutorKind.ENGINE_EXTENSION: {
-                RuntimeOperation.EXPECTED_END: expected_end,
-            }
-        },
+    return CampaignEventUiExecutor(
+        {RuntimeExecutorKind.EVENT_UI},
+        CampaignEventUiContributor(
+            map_transition=CampaignMapTransitionContributor(
+                event_animation_end_battle=battle,
+            ),
+        ),
     )
 
 
@@ -303,10 +295,10 @@ def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             _build_clear_mode_config_overlay,
         ),
         RuntimeExecutorFactoryDescriptor(
-            RuntimeImplementationId("engine/event_animation_expected_end"),
+            RuntimeImplementationId("event_ui/event_animation_expected_end"),
             {
-                RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "event_animation_end_battle"}),
+                RuntimeExecutorKind.EVENT_UI: RuntimeExecutorOptionsSchema(
+                    required=frozenset({"event_animation_end_battle"}),
                 )
             },
             _build_event_animation_expected_end,

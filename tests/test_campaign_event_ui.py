@@ -7,11 +7,17 @@ from module.adapters.campaign_event_ui import (
     CampaignEventCombatResultContributor,
     CampaignEventStageRecoveryContributor,
     CampaignEventUiContributor,
+    CampaignEventUiExecutor,
+    CampaignMapTransitionContributor,
     EventCombatResultNext,
     EventStageRecoveryNext,
+    MapTransitionNext,
     build_campaign_event_ui_services,
 )
+from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileError, RuntimeOperation
 from module.campaign.event_navigation import EventCampaignNavigation
+from module.content.errors import ContentValidationError
+from module.content.runtime_profile import RuntimeExecutorKind
 from module.exception import CampaignNameError
 from module.map.assets import WITHDRAW
 from module.ui.page import page_campaign_menu, page_event, page_main
@@ -22,6 +28,7 @@ if TYPE_CHECKING:
     from module.campaign.campaign_engine import CampaignEngine
     from module.campaign.event_destination import EventDestinationHost
     from module.combat.combat_result_ui import CombatResultRuntime
+    from module.handler.map_transition_ui import MapTransitionRuntime
     from module.ui.page import Page
 
 
@@ -163,6 +170,59 @@ class _VirtualCombatResultHost:
     def handle_exp_info(self) -> bool:
         self.calls.append("standard")
         return True
+
+
+class _TransitionRuntime:
+    def __init__(self) -> None:
+        self.battle_count = 0
+        self.calls: list[str] = []
+
+    def handle_in_stage(self) -> bool:
+        self.calls.append("standard-stage-return")
+        return True
+
+    def is_stage_page_has_entrance(self) -> bool:
+        self.calls.append("standard-stage-page")
+        return True
+
+    def is_event_animation(self) -> bool:
+        self.calls.append("standard-animation")
+        return True
+
+
+@dataclass(slots=True)
+class _TransitionLayer:
+    name: str
+    calls: list[str]
+    handled: bool = False
+
+    def handle(self, runtime: MapTransitionRuntime, next_handler: MapTransitionNext) -> bool:
+        self.calls.append(self.name)
+        if self.handled:
+            return True
+        return next_handler(runtime)
+
+
+@dataclass(slots=True)
+class _Animation:
+    name: str
+    visible: bool
+    calls: list[str]
+
+    def is_visible(self, runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        self.calls.append(self.name)
+        return self.visible
+
+
+@dataclass(slots=True)
+class _WaitableAnimation(_Animation):
+    wait_result: bool = True
+
+    def wait_until_closed(self, runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        self.calls.append(f"wait-{self.name}")
+        return self.wait_result
 
 
 def test_standard_destination_short_circuits_on_the_open_event_page() -> None:
@@ -329,3 +389,129 @@ def test_combat_result_composes_later_contributors_and_short_circuits() -> None:
     derived.blocked = True
     assert not services.combat_result.handle_experience_result(runtime)
     assert calls == ["derived"]
+
+
+def test_standard_map_transition_preserves_all_virtual_hooks() -> None:
+    runtime = _TransitionRuntime()
+    transition = build_campaign_event_ui_services(()).map_transition
+
+    assert transition.handle_stage_return(runtime)
+    assert transition.stage_page_ready(runtime)
+    assert transition.event_animation_visible(runtime)
+    assert transition.combat_end_override(runtime) is None
+    assert runtime.calls == [
+        "standard-stage-return",
+        "standard-stage-page",
+        "standard-animation",
+    ]
+
+
+@pytest.mark.parametrize("field", ["handle_stage_return", "stage_page_ready"])
+def test_map_transition_handlers_compose_later_first_and_short_circuit(
+    field: str,
+) -> None:
+    calls: list[str] = []
+    base = _TransitionLayer("base", calls)
+    derived = _TransitionLayer("derived", calls)
+    if field == "handle_stage_return":
+        base_contributor = CampaignMapTransitionContributor(handle_stage_return=base.handle)
+        derived_contributor = CampaignMapTransitionContributor(handle_stage_return=derived.handle)
+    else:
+        base_contributor = CampaignMapTransitionContributor(stage_page_ready=base.handle)
+        derived_contributor = CampaignMapTransitionContributor(stage_page_ready=derived.handle)
+    transition = build_campaign_event_ui_services(
+        (
+            _ContributorSource(CampaignEventUiContributor(map_transition=base_contributor)),
+            _ContributorSource(CampaignEventUiContributor(map_transition=derived_contributor)),
+        )
+    ).map_transition
+    runtime = _TransitionRuntime()
+
+    invoke = transition.handle_stage_return if field == "handle_stage_return" else transition.stage_page_ready
+    assert invoke(runtime)
+    assert calls == ["derived", "base"]
+    assert len(runtime.calls) == 1
+
+    calls.clear()
+    runtime.calls.clear()
+    derived.handled = True
+    assert invoke(runtime)
+    assert calls == ["derived"]
+    assert runtime.calls == []
+
+
+def test_later_animation_replaces_the_entire_owner_without_or_fallback() -> None:
+    calls: list[str] = []
+    earlier = _Animation("earlier", visible=True, calls=calls)
+    later = _Animation("later", visible=False, calls=calls)
+    transition = build_campaign_event_ui_services(
+        (
+            _ContributorSource(
+                CampaignEventUiContributor(map_transition=CampaignMapTransitionContributor(animation=earlier))
+            ),
+            _ContributorSource(
+                CampaignEventUiContributor(map_transition=CampaignMapTransitionContributor(animation=later))
+            ),
+        )
+    ).map_transition
+
+    assert not transition.event_animation_visible(_TransitionRuntime())
+    assert calls == ["later"]
+
+
+def test_combat_end_override_binds_the_final_waitable_animation_owner() -> None:
+    calls: list[str] = []
+    earlier = _WaitableAnimation("earlier", visible=True, calls=calls)
+    final = _WaitableAnimation("final", visible=False, calls=calls)
+    transition = build_campaign_event_ui_services(
+        (
+            _ContributorSource(
+                CampaignEventUiContributor(map_transition=CampaignMapTransitionContributor(animation=earlier))
+            ),
+            _ContributorSource(
+                CampaignEventUiContributor(
+                    map_transition=CampaignMapTransitionContributor(
+                        animation=final,
+                        event_animation_end_battle=3,
+                    )
+                )
+            ),
+        )
+    ).map_transition
+    runtime = _TransitionRuntime()
+    runtime.battle_count = 3
+
+    callback = transition.combat_end_override(runtime)
+    assert callback is not None
+    assert callback()
+    assert calls == ["wait-final"]
+
+    runtime.battle_count = 2
+    assert transition.combat_end_override(runtime) is None
+
+
+def test_combat_end_policy_requires_a_waitable_final_animation_owner() -> None:
+    source = _ContributorSource(
+        CampaignEventUiContributor(
+            map_transition=CampaignMapTransitionContributor(
+                animation=_Animation("visible-only", visible=True, calls=[]),
+                event_animation_end_battle=3,
+            )
+        )
+    )
+
+    with pytest.raises(CampaignRuntimeProfileError, match="typed animation wait provider"):
+        build_campaign_event_ui_services((source,))
+
+
+def test_event_ui_executor_rejects_string_dispatched_event_ui_methods() -> None:
+    with pytest.raises(ContentValidationError, match="forbids string-dispatched event_ui"):
+        CampaignEventUiExecutor(
+            {RuntimeExecutorKind.EVENT_UI},
+            CampaignEventUiContributor(),
+            other_methods={
+                RuntimeExecutorKind.EVENT_UI: {
+                    RuntimeOperation.MAP_DATA_INIT: lambda runtime, map_: (runtime, map_),
+                }
+            },
+        )

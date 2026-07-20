@@ -39,6 +39,7 @@ from module.content.runtime_profile import (
 )
 from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
 from module.exception import CampaignNameError
+from module.handler.map_transition_ui import STANDARD_MAP_TRANSITION_UI
 
 _ROUTE_PLAN = "navigation/chapter_route_plan"
 _BALL_ROUTE = "navigation/ball_chapter_route"
@@ -211,6 +212,7 @@ def test_stage_navigator_calls_typed_recovery_services_directly(
         destination=STANDARD_EVENT_DESTINATION,
         stage_recovery=recovery,
         combat_result=STANDARD_COMBAT_RESULT_UI,
+        map_transition=STANDARD_MAP_TRANSITION_UI,
     )
     runtime = cast("CampaignEngine", _Runtime())
     navigator = _DirectRecoveryNavigator(runtime, services, None, None)

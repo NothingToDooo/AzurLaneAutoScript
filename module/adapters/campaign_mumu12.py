@@ -450,7 +450,7 @@ def compose_campaign_attempt_definition(
     return replace(definition, runtime_profile=effective_profile)
 
 
-class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-public-methods] - CampaignEngine 框架回调仍集中在内部运行宿主；BattleProgram 已改走能力端口，其余消费者待迁移。
+class DeclarativeCampaignMapRuntime(CampaignEngine):
     """固定运行类型；关卡差异只来自已编译 definition，不生成 Campaign 子类。"""
 
     definition: CampaignStageDefinition
@@ -499,6 +499,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
             self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
         )
         self._combat_result_ui = self._event_ui_services.combat_result
+        self._map_transition_ui = self._event_ui_services.map_transition
         self.stage_navigator = build_campaign_stage_navigator(
             self,
             self._runtime_profile,
@@ -524,16 +525,17 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         message = f"runtime operation has no fixed base implementation: {operation.value}"
         raise CampaignRuntimeProfileError(message)
 
+    def _map_transition_expected_end(self, expected: str) -> CombatEnd | None:
+        transition_override = self._map_transition_ui.combat_end_override(self)
+        if transition_override is not None:
+            return transition_override
+        return CampaignEngine._expected_end(self, expected)  # ruff:ignore[private-member-access] - 固定调用引擎基线。
+
     def _expected_end(self, expected: str) -> CombatEnd | None:
         result = self._runtime_profile.hard.invoke(
             RuntimeOperation.EXPECTED_END,
             self,
-            lambda value: self._runtime_profile.engine.invoke(
-                RuntimeOperation.EXPECTED_END,
-                self,
-                lambda inner: CampaignEngine._expected_end(self, inner),  # ruff:ignore[private-member-access] - 固定调用引擎基线。
-                value,
-            ),
+            lambda value: self._map_transition_expected_end(cast("str", value)),
             expected,
         )
         return cast("CombatEnd | None", result)
@@ -768,38 +770,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
                 CampaignEngine.combat_status(self, expected_end=expected_end)
             return
         CampaignEngine.combat_status(self, expected_end=expected_end)
-
-    def event_animation_end(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.EVENT_ANIMATION_END,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.EVENT_ANIMATION_END),
-        )
-        return bool(result)
-
-    def handle_in_stage(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_IN_STAGE,
-            self,
-            lambda: CampaignEngine.handle_in_stage(self),
-        )
-        return bool(result)
-
-    def is_event_animation(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.IS_EVENT_ANIMATION,
-            self,
-            CampaignEngine.is_event_animation,
-        )
-        return bool(result)
-
-    def is_stage_page_has_entrance(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.IS_STAGE_PAGE_HAS_ENTRANCE,
-            self,
-            lambda: CampaignEngine.is_stage_page_has_entrance(self),
-        )
-        return bool(result)
 
     def configure_gems_behavior(self, behavior: Mumu12GemsRuntimeBehavior) -> None:
         if not isinstance(behavior, Mumu12GemsRuntimeBehavior):

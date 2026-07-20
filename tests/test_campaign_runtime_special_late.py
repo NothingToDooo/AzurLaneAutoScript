@@ -73,8 +73,7 @@ class _Device:
 
 
 class _EventRuntime:
-    def __init__(self, manager: CampaignRuntimeProfileManager) -> None:
-        self.manager = manager
+    def __init__(self) -> None:
         self.device = _Device()
         self.story_visible = False
         self.page_visible = False
@@ -83,15 +82,7 @@ class _EventRuntime:
         self.stage_ocr_results: list[bool] = []
         self.stage_ocr_images: list[object] = []
         self.exp_info_calls = 0
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        return self.manager.invoke_super(operation, self, *args, **kwargs)
+        self.transition_calls: list[str] = []
 
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool:
         del button, offset
@@ -134,23 +125,36 @@ class _EventRuntime:
         self.exp_info_calls += 1
         return True
 
+    def handle_in_stage(self) -> bool:
+        self.transition_calls.append("handle-stage-return")
+        return False
+
+    def is_stage_page_has_entrance(self) -> bool:
+        self.transition_calls.append("stage-page-ready")
+        return False
+
+    def is_event_animation(self) -> bool:
+        self.transition_calls.append("event-animation")
+        return False
+
 
 def test_event_20230817_story_button_replaces_stage_entrance() -> None:
     manager = _manager(
         "event_20230817_cn/campaign_base/campaign_base",
         RuntimeExecutorKind.EVENT_UI,
-        {"operations": ["is_stage_page_has_entrance"]},
+        {},
     )
-    runtime = _EventRuntime(manager)
+    runtime = _EventRuntime()
     runtime.story_visible = True
 
-    result = manager.event_ui.invoke(
-        RuntimeOperation.IS_STAGE_PAGE_HAS_ENTRANCE,
-        runtime,
-        lambda: False,
-    )
+    services = build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
+    result = services.map_transition.stage_page_ready(runtime)
 
     assert result is True
+
+    runtime.story_visible = False
+    assert not services.map_transition.stage_page_ready(runtime)
+    assert runtime.transition_calls == ["stage-page-ready"]
 
 
 def test_event_20230817_stage_recovery_handles_story_and_continues_on_miss(
@@ -159,12 +163,12 @@ def test_event_20230817_stage_recovery_handles_story_and_continues_on_miss(
     manager = _manager(
         "event_20230817_cn/campaign_base/campaign_base",
         RuntimeExecutorKind.EVENT_UI,
-        {"operations": ["is_stage_page_has_entrance"]},
+        {},
     )
     instance = manager.executor_instance(RuntimeExecutorKind.EVENT_UI)
     assert isinstance(instance, Event20230817UiExecutor)
     services = build_campaign_event_ui_services((instance,))
-    runtime = _EventRuntime(manager)
+    runtime = _EventRuntime()
     stories: list[object] = []
 
     def record_story(
@@ -195,12 +199,11 @@ def test_event_20240815_exp_guard_and_story_entrance_detection() -> None:
         "event_20240815_cn/campaign_base/campaign_base",
         RuntimeExecutorKind.EVENT_UI,
         {
-            "operations": ["handle_in_stage"],
             "exp_info_blocked_page": "event",
             "state": ["entrance_timer"],
         },
     )
-    runtime = _EventRuntime(manager)
+    runtime = _EventRuntime()
     runtime.story_entrance = Button(
         area=(100, 300, 140, 340),
         color=(0, 0, 0),
@@ -224,12 +227,11 @@ def test_event_20240815_recovery_continues_to_standard_on_miss(
         "event_20240815_cn/campaign_base/campaign_base",
         RuntimeExecutorKind.EVENT_UI,
         {
-            "operations": ["handle_in_stage"],
             "exp_info_blocked_page": "event",
             "state": ["entrance_timer"],
         },
     )
-    runtime = _EventRuntime(manager)
+    runtime = _EventRuntime()
 
     def campaign_fallback(_runtime: CampaignEngine) -> bool:
         return True
@@ -252,12 +254,11 @@ def test_event_20240815_story_entrance_falls_back_after_stage_ocr_failure() -> N
         "event_20240815_cn/campaign_base/campaign_base",
         RuntimeExecutorKind.EVENT_UI,
         {
-            "operations": ["handle_in_stage"],
             "exp_info_blocked_page": "event",
             "state": ["entrance_timer"],
         },
     )
-    runtime = _EventRuntime(manager)
+    runtime = _EventRuntime()
     runtime.stage_page_visible = True
     runtime.stage_ocr_results = [False, True]
     runtime.story_entrance = Button(
@@ -278,17 +279,22 @@ def test_event_20240815_story_entrance_falls_back_after_stage_ocr_failure() -> N
     assert runtime.device.clicks == [runtime.story_entrance]
     assert runtime.stage_ocr_images == [runtime.device.image, runtime.device.image]
 
-    # Typed recovery 与保留的 operation facet 共享同一 executor/timer；刚 reset 的 timer 会抑制重复点击。
-    assert manager.event_ui.invoke(RuntimeOperation.HANDLE_IN_STAGE, runtime, lambda: False) is False
+    # Typed recovery 与 transition 共享同一 executor/timer；刚 reset 的 timer 会抑制重复点击。
+    assert services.map_transition.handle_stage_return(runtime) is False
     assert runtime.device.clicks == [runtime.story_entrance]
 
     # Executor reset 会 clear 同一个 timer，下一次 in-stage 检查可立即处理入口。
     instance.reset()
-    assert manager.event_ui.invoke(RuntimeOperation.HANDLE_IN_STAGE, runtime, lambda: False) is False
+    assert services.map_transition.handle_stage_return(runtime) is False
     assert runtime.device.clicks == [runtime.story_entrance, runtime.story_entrance]
 
+    runtime.story_entrance = None
+    runtime.transition_calls.clear()
+    assert services.map_transition.handle_stage_return(runtime) is False
+    assert runtime.transition_calls == ["handle-stage-return"]
 
-def test_event_ui_operations_leave_only_transition_facades() -> None:
+
+def test_event_ui_operations_and_declarative_transition_facades_are_removed() -> None:
     removed = {
         "ENSURE_NO_STAGE_ENTRANCE": "ensure_no_stage_entrance",
         "EVENT_20230817_STORY": "event_20230817_story",
@@ -299,8 +305,6 @@ def test_event_ui_operations_leave_only_transition_facades() -> None:
         "HANDLE_EXP_INFO": "handle_exp_info",
         "HANDLE_GET_CHAPTER_ADDITIONAL": "handle_get_chapter_additional",
         "HANDLE_STORY_ENTRANCE": "handle_story_entrance",
-    }
-    kept = {
         "EVENT_ANIMATION_END": "event_animation_end",
         "HANDLE_IN_STAGE": "handle_in_stage",
         "IS_EVENT_ANIMATION": "is_event_animation",
@@ -309,31 +313,35 @@ def test_event_ui_operations_leave_only_transition_facades() -> None:
 
     assert all(not hasattr(RuntimeOperation, enum_name) for enum_name in removed)
     assert all(method_name not in vars(DeclarativeCampaignMapRuntime) for method_name in removed.values())
-    assert all(hasattr(RuntimeOperation, enum_name) for enum_name in kept)
-    assert all(method_name in vars(DeclarativeCampaignMapRuntime) for method_name in kept.values())
+    assert not hasattr(CampaignRuntimeProfileManager, "event_ui")
+    public_methods = {
+        name
+        for name, value in vars(DeclarativeCampaignMapRuntime).items()
+        if callable(value) and not name.startswith("_")
+    }
+    assert len(public_methods) <= 30
 
 
-def test_event_ui_profile_options_keep_only_transition_operations() -> None:
+def test_event_ui_profile_options_have_no_string_dispatched_operations() -> None:
     registry = load_default_campaign_runtime_profile_registry()
-
-    def operations(extension_id: str) -> object:
-        extension = registry.extensions[CampaignRuntimeExtensionId(extension_id)]
-        binding = next(binding for binding in extension.executors if binding.kind is RuntimeExecutorKind.EVENT_UI)
-        return binding.options["operations"]
-
-    assert operations("event_20230817_cn/campaign_base/campaign_base") == ("is_stage_page_has_entrance",)
-    assert operations("event_20240815_cn/campaign_base/campaign_base") == ("handle_in_stage",)
+    event_20230817 = registry.extensions[CampaignRuntimeExtensionId("event_20230817_cn/campaign_base/campaign_base")]
+    event_20240815 = registry.extensions[CampaignRuntimeExtensionId("event_20240815_cn/campaign_base/campaign_base")]
+    binding_20230817 = next(
+        binding for binding in event_20230817.executors if binding.kind is RuntimeExecutorKind.EVENT_UI
+    )
+    binding_20240815 = next(
+        binding for binding in event_20240815.executors if binding.kind is RuntimeExecutorKind.EVENT_UI
+    )
+    assert binding_20230817.options == {}
+    assert binding_20240815.options == {
+        "exp_info_blocked_page": "event",
+        "state": ("entrance_timer",),
+    }
 
     for extension in registry.extensions.values():
         for binding in extension.executors:
-            if binding.kind is not RuntimeExecutorKind.EVENT_UI:
-                continue
-            declared_operations = binding.options.get("operations")
-            if declared_operations is None:
-                continue
-            assert isinstance(declared_operations, tuple)
-            assert declared_operations
-            assert "handle_exp_info" not in declared_operations
+            if binding.kind is RuntimeExecutorKind.EVENT_UI:
+                assert "operations" not in binding.options
 
 
 class _Config:

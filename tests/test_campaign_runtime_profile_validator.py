@@ -104,6 +104,40 @@ def test_production_validator_rejects_unselected_profile_with_unknown_executor()
         validate_mumu12_campaign_runtime_profiles(stages, profiles)
 
 
+def test_production_validator_rejects_expected_end_policy_without_waitable_animation() -> None:
+    extension = CampaignRuntimeExtension(
+        CampaignRuntimeExtensionId("event_test/t1/expected_end"),
+        (
+            RuntimeExecutorBinding(
+                RuntimeExecutorKind.EVENT_UI,
+                RuntimeImplementationId("event_ui/event_animation_expected_end"),
+                {"event_animation_end_battle": 3},
+            ),
+        ),
+    )
+    profiles = CampaignRuntimeProfileRegistry(
+        (extension,),
+        (
+            CampaignRuntimeProfile.core(),
+            CampaignRuntimeProfile(
+                CampaignRuntimeProfileId("invalid_event_animation_policy"),
+                (extension,),
+            ),
+        ),
+    )
+    stages = (
+        StageSpec(StageRef("campaign_main", "1-1"), "stages/1-1.yaml"),
+        StageSpec(
+            StageRef("event_test", "t1"),
+            "stages/t1.yaml",
+            runtime_profile_id=CampaignRuntimeProfileId("invalid_event_animation_policy"),
+        ),
+    )
+
+    with pytest.raises(ContentValidationError, match=r"not executable.*typed animation wait provider"):
+        validate_mumu12_campaign_runtime_profiles(stages, profiles)
+
+
 def test_representative_special_gameplay_is_bound_by_typed_profiles(
     packs_by_id: Mapping[str, EventPack],
     profile_registry: CampaignRuntimeProfileRegistry,

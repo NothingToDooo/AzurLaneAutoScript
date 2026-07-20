@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from module.adapters.campaign_event_ui import build_campaign_event_ui_services
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
@@ -10,7 +11,7 @@ from module.adapters.campaign_runtime_profile import (
 )
 from module.content.errors import ContentValidationError
 from module.content.models import StageSpec
-from module.content.runtime_profile import CampaignRuntimeProfileRegistry
+from module.content.runtime_profile import CampaignRuntimeProfileRegistry, RuntimeExecutorKind
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -48,7 +49,8 @@ def _validate_executor_contracts(
     bound_contracts = set()
     for profile in profiles.profiles.values():
         try:
-            CampaignRuntimeProfileManager(profile, executors)
+            manager = CampaignRuntimeProfileManager(profile, executors)
+            build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
         except CampaignRuntimeProfileError as error:
             message = f"runtime profile {profile.profile_id.value} is not executable: {error}"
             raise ContentValidationError(message) from error

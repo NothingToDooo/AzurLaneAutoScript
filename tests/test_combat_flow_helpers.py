@@ -8,13 +8,18 @@ from module.combat.auto_search_combat import AutoSearchCombat
 from module.combat.combat_result_ui import STANDARD_COMBAT_RESULT_UI
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from module.base.button import Button, MatchOffset
     from module.base.timer import Timer
     from module.base.type_alias import ImageArray
     from module.combat.combat import CombatEnd
     from module.combat.combat_result_ui import CombatResultRuntime, CombatResultUi
+    from module.handler.map_transition_ui import (
+        MapTransitionCombatRuntime,
+        MapTransitionRuntime,
+        MapTransitionUi,
+    )
 
 
 class _FakeDevice:
@@ -202,7 +207,6 @@ class _CombatStatusContext(_CombatLoopContext):
         self.popup_results: list[bool] = []
         self.battle_status_results: list[bool] = []
         self.exp_info_results: list[bool] = []
-        self.in_stage_results: list[bool] = []
         self.enemy_searching_results: list[bool] = []
         self.auto_search_exit_results: list[bool] = []
         self.mis_click_results: list[bool] = []
@@ -262,8 +266,9 @@ class _CombatStatusContext(_CombatLoopContext):
     def handle_combat_mis_click(self) -> bool:
         return self._next(self.mis_click_results)
 
+    @override
     def handle_in_stage(self) -> bool:
-        return self._next(self.in_stage_results)
+        raise AssertionError
 
     def handle_in_map_with_enemy_searching(self) -> bool:
         return self._next(self.enemy_searching_results)
@@ -287,6 +292,9 @@ class _CombatStatusContext(_CombatLoopContext):
     def install_combat_result_ui(self, result_ui: CombatResultUi) -> None:
         self._combat_result_ui = result_ui
 
+    def install_map_transition_ui(self, transition: MapTransitionUi) -> None:
+        self._map_transition_ui = transition
+
     def handle_status_progress(
         self,
         *,
@@ -307,6 +315,31 @@ class _CombatResultProbe:
     def handle_experience_result(self, runtime: CombatResultRuntime) -> bool:
         self.calls.append(runtime)
         return self.results.pop(0)
+
+
+class _MapTransitionProbe:
+    def __init__(self, *, stage_return_results: tuple[bool, ...]) -> None:
+        self.stage_return_results = list(stage_return_results)
+        self.stage_return_calls: list[MapTransitionRuntime] = []
+
+    def handle_stage_return(self, runtime: MapTransitionRuntime) -> bool:
+        self.stage_return_calls.append(runtime)
+        return self.stage_return_results.pop(0)
+
+    @staticmethod
+    def stage_page_ready(runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        raise AssertionError
+
+    @staticmethod
+    def event_animation_visible(runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        raise AssertionError
+
+    @staticmethod
+    def combat_end_override(runtime: MapTransitionCombatRuntime) -> Callable[[], bool] | None:
+        del runtime
+        raise AssertionError
 
 
 class _AutoSearchResultContext(AutoSearchCombat):
@@ -446,6 +479,27 @@ def test_combat_status_expected_end_uses_named_handlers() -> None:
 
     assert handler.enemy_searching_results == []
     assert handler.battle_status_calls == 0
+
+
+def test_combat_expected_in_stage_uses_injected_map_transition() -> None:
+    handler = _CombatStatusContext()
+    transition = _MapTransitionProbe(stage_return_results=(True,))
+    handler.install_map_transition_ui(transition)
+
+    handler.combat_status(expected_end="in_stage")
+
+    assert transition.stage_return_calls == [handler]
+    assert handler.battle_status_calls == 0
+
+
+def test_combat_status_fallback_uses_injected_map_transition() -> None:
+    handler = _CombatStatusContext()
+    transition = _MapTransitionProbe(stage_return_results=(True,))
+    handler.install_map_transition_ui(transition)
+
+    handler.combat_status()
+
+    assert transition.stage_return_calls == [handler]
 
 
 def test_combat_status_expected_end_supports_in_ui() -> None:

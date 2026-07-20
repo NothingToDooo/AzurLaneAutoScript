@@ -25,6 +25,7 @@ from .campaign_event_ui import (
     CampaignEventCombatResultContributor,
     CampaignEventUiContributor,
     CampaignEventUiExecutor,
+    CampaignMapTransitionContributor,
 )
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
@@ -32,7 +33,6 @@ from .campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
 )
 
 if TYPE_CHECKING:
@@ -187,14 +187,6 @@ def _page(name: str) -> object:
         raise CampaignRuntimeProfileError(message) from None
 
 
-def _operations(options: Mapping[str, RuntimeTuningValue]) -> frozenset[str]:
-    value = options["operations"]
-    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
-        message = "event UI operations must contain strings"
-        raise CampaignRuntimeProfileError(message)
-    return frozenset(cast("tuple[str, ...]", value))
-
-
 class _Detector(Protocol):
     def detected(self, runtime: _EventUiRuntimeHost) -> bool: ...
 
@@ -258,23 +250,22 @@ def _is_detected(runtime: _EventUiRuntimeHost, detectors: tuple[_Detector, ...])
     return False
 
 
+@dataclass(frozen=True, slots=True)
+class _AnimationDetector:
+    detectors: tuple[_Detector, ...]
+
+    def is_visible(self, runtime: object) -> bool:
+        return _is_detected(_host(runtime), self.detectors)
+
+
 def _build_animation_detector(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = context.options(RuntimeExecutorKind.EVENT_UI)
-    if _operations(options) != {"is_event_animation"}:
-        message = "animation detector must expose only is_event_animation"
-        raise CampaignRuntimeProfileError(message)
-    detectors = _detectors(options["detectors"])
-
-    def is_event_animation(runtime: object) -> object:
-        return _is_detected(_host(runtime), detectors)
-
-    return RuntimeExecutorInstance(
+    animation = _AnimationDetector(_detectors(options["detectors"]))
+    return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
-        methods={
-            RuntimeExecutorKind.EVENT_UI: {
-                RuntimeOperation.IS_EVENT_ANIMATION: is_event_animation,
-            }
-        },
+        CampaignEventUiContributor(
+            map_transition=CampaignMapTransitionContributor(animation=animation),
+        ),
     )
 
 
@@ -359,10 +350,10 @@ class _DetailEventEntryExecutor:
         )
         return True
 
-    def is_event_animation(self, runtime: object) -> object:
+    def is_visible(self, runtime: object) -> bool:
         return _is_detected(_host(runtime), self.detectors)
 
-    def event_animation_end(self, runtime: object) -> object:
+    def wait_until_closed(self, runtime: object) -> bool:
         host = _host(runtime)
         if not _is_detected(host, self.detectors):
             return False
@@ -373,22 +364,8 @@ class _DetailEventEntryExecutor:
         return True
 
 
-def _validate_detail_operations(operations: frozenset[str], *, wait_until_end: bool) -> None:
-    expected = {"is_event_animation"}
-    if wait_until_end:
-        expected.add("event_animation_end")
-    if operations != expected:
-        message = f"detail event entry operations mismatch: expected={sorted(expected)}, actual={sorted(operations)}"
-        raise CampaignRuntimeProfileError(message)
-
-
 def _build_detail_event_entry(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = context.options(RuntimeExecutorKind.EVENT_UI)
-    wait_until_end = options["wait_until_animation_end"]
-    if type(wait_until_end) is not bool:
-        message = "detail event entry wait option must be a boolean"
-        raise CampaignRuntimeProfileError(message)
-    _validate_detail_operations(_operations(options), wait_until_end=wait_until_end)
     executor = _DetailEventEntryExecutor(
         already=_AlreadyAtEvent.from_options(options["already"]),
         menu_page=_page(_string(options, "menu_page")),
@@ -396,14 +373,13 @@ def _build_detail_event_entry(context: RuntimeExecutorBuildContext) -> RuntimeEx
         entrance=_EventEntrance.from_options(options["entrance"]),
         detectors=_detectors(options["animation_detectors"]),
     )
-    methods = {RuntimeOperation.IS_EVENT_ANIMATION: executor.is_event_animation}
-    if wait_until_end:
-        methods[RuntimeOperation.EVENT_ANIMATION_END] = executor.event_animation_end
 
     return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
-        CampaignEventUiContributor(destination=executor),
-        methods={RuntimeExecutorKind.EVENT_UI: methods},
+        CampaignEventUiContributor(
+            destination=executor,
+            map_transition=CampaignMapTransitionContributor(animation=executor),
+        ),
     )
 
 
@@ -466,7 +442,7 @@ def event_ui_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("event_ui/animation_detector"),
             {
                 event_ui: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "detectors"}),
+                    required=frozenset({"detectors"}),
                 )
             },
             _build_animation_detector,
@@ -477,13 +453,11 @@ def event_ui_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
                 event_ui: RuntimeExecutorOptionsSchema(
                     required=frozenset(
                         {
-                            "operations",
                             "already",
                             "menu_page",
                             "detail",
                             "entrance",
                             "animation_detectors",
-                            "wait_until_animation_end",
                         }
                     ),
                 )

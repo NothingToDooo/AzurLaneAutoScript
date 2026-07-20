@@ -178,7 +178,7 @@ def _build_ryza_campaign(context: RuntimeExecutorBuildContext) -> RuntimeExecuto
     return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI, RuntimeExecutorKind.MAP_MECHANIC},
         CampaignEventUiContributor(destination=_RyzaEventDestination()),
-        methods={
+        other_methods={
             RuntimeExecutorKind.MAP_MECHANIC: {
                 RuntimeOperation.HANDLE_MYSTERY_ITEMS: handle_mystery_items,
             },

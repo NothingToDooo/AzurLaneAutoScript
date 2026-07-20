@@ -8,7 +8,7 @@ from module.campaign.assets import (
     TEMPLATE_EVENT_20230817_STORY_E2,
 )
 from module.combat.assets import GET_ITEMS_1
-from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
+from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId
 from module.exception import CampaignNameError
 from module.logger import logger
 from module.ui.page import page_event
@@ -18,6 +18,7 @@ from .campaign_event_ui import (
     CampaignEventStageRecoveryContributor,
     CampaignEventUiContributor,
     CampaignEventUiExecutor,
+    CampaignMapTransitionContributor,
 )
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
@@ -25,18 +26,16 @@ from .campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from module.base.button import Button
     from module.base.type_alias import ImageArray
     from module.campaign.campaign_engine import CampaignEngine
     from module.combat.combat_result_ui import CombatResultRuntime
+    from module.handler.map_transition_ui import MapTransitionRuntime
 
-    from .campaign_event_ui import EventCombatResultNext, EventStageRecoveryNext
+    from .campaign_event_ui import EventCombatResultNext, EventStageRecoveryNext, MapTransitionNext
 
 
 class _DevicePort(Protocol):
@@ -49,14 +48,6 @@ class _DevicePort(Protocol):
 
 class _SpecialEventUiHost(Protocol):
     device: _DevicePort
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
 
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool: ...
 
@@ -95,37 +86,23 @@ def _host(runtime: object) -> _SpecialEventUiHost:
     return cast("_SpecialEventUiHost", runtime)
 
 
-def _operations(options: Mapping[str, RuntimeTuningValue]) -> frozenset[str]:
-    value = options["operations"]
-    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
-        message = "dedicated event UI operations must contain strings"
-        raise CampaignRuntimeProfileError(message)
-    return frozenset(cast("tuple[str, ...]", value))
-
-
 class Event20230817UiExecutor(CampaignEventUiExecutor):
     """处理以剧情按钮代替关卡入口的活动页面。"""
 
     __slots__ = ()
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
-        options = context.options(RuntimeExecutorKind.EVENT_UI)
-        expected = {"is_stage_page_has_entrance"}
-        if _operations(options) != expected:
-            message = "event 20230817 UI operations mismatch"
-            raise CampaignRuntimeProfileError(message)
+        context.options(RuntimeExecutorKind.EVENT_UI)
         super().__init__(
             {RuntimeExecutorKind.EVENT_UI},
             CampaignEventUiContributor(
                 stage_recovery=CampaignEventStageRecoveryContributor(
                     recover_chapter_selection=self._recover_chapter_selection,
-                )
+                ),
+                map_transition=CampaignMapTransitionContributor(
+                    stage_page_ready=self._stage_page_ready,
+                ),
             ),
-            methods={
-                RuntimeExecutorKind.EVENT_UI: {
-                    RuntimeOperation.IS_STAGE_PAGE_HAS_ENTRANCE: self._is_stage_page_has_entrance,
-                }
-            },
         )
 
     @staticmethod
@@ -172,10 +149,10 @@ class Event20230817UiExecutor(CampaignEventUiExecutor):
             if button is not None:
                 host.device.click(button)
 
-    def _is_stage_page_has_entrance(self, runtime: object) -> object:
+    def _stage_page_ready(self, runtime: MapTransitionRuntime, next_handler: MapTransitionNext) -> bool:
         if self._get_story_button(runtime) is not None:
             return True
-        return _host(runtime).runtime_super(RuntimeOperation.IS_STAGE_PAGE_HAS_ENTRANCE)
+        return next_handler(runtime)
 
 
 class Event20240815UiExecutor(CampaignEventUiExecutor):
@@ -185,10 +162,6 @@ class Event20240815UiExecutor(CampaignEventUiExecutor):
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.EVENT_UI)
-        expected = {"handle_in_stage"}
-        if _operations(options) != expected:
-            message = "event 20240815 UI operations mismatch"
-            raise CampaignRuntimeProfileError(message)
         if options["exp_info_blocked_page"] != "event":
             message = "event 20240815 EXP-info guard must target event page"
             raise CampaignRuntimeProfileError(message)
@@ -207,12 +180,10 @@ class Event20240815UiExecutor(CampaignEventUiExecutor):
                 combat_result=CampaignEventCombatResultContributor(
                     handle_experience_result=self._handle_experience_result,
                 ),
+                map_transition=CampaignMapTransitionContributor(
+                    handle_stage_return=self._handle_stage_return,
+                ),
             ),
-            methods={
-                RuntimeExecutorKind.EVENT_UI: {
-                    RuntimeOperation.HANDLE_IN_STAGE: self._handle_in_stage,
-                }
-            },
         )
 
     @staticmethod
@@ -261,11 +232,11 @@ class Event20240815UiExecutor(CampaignEventUiExecutor):
             if host.appear_then_click(GET_ITEMS_1, offset=(20, 20), interval=3):
                 self._entrance_timer.clear()
 
-    def _handle_in_stage(self, runtime: object) -> object:
+    def _handle_stage_return(self, runtime: MapTransitionRuntime, next_handler: MapTransitionNext) -> bool:
         host = _host(runtime)
         if host.is_in_stage_page() and self._handle_story_entrance(runtime):
             return False
-        return host.runtime_super(RuntimeOperation.HANDLE_IN_STAGE)
+        return next_handler(runtime)
 
     def _recover_stage_page(
         self,
@@ -315,18 +286,14 @@ def special_event_ui_runtime_executor_descriptors() -> tuple[RuntimeExecutorFact
     return (
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("event_20230817_cn/campaign_base/campaign_base"),
-            {
-                event_ui: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations"}),
-                )
-            },
+            {event_ui: RuntimeExecutorOptionsSchema()},
             _build_event_20230817_ui,
         ),
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("event_20240815_cn/campaign_base/campaign_base"),
             {
                 event_ui: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"exp_info_blocked_page", "operations", "state"}),
+                    required=frozenset({"exp_info_blocked_page", "state"}),
                 )
             },
             _build_event_20240815_ui,
