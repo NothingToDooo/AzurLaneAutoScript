@@ -3,6 +3,10 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from module.adapters.campaign_program_capabilities import (
+    CampaignProgramCapabilities,
+    CampaignProgramCapabilityReader,
+)
 from module.adapters.campaign_program_mumu12 import (
     Mumu12CampaignBattleProgramExecutor,
     Mumu12CommittedBattleProgramUnit,
@@ -29,6 +33,7 @@ from module.content.stage_definition import (
     SpawnWave,
 )
 from module.content.stage_rules import MapFeatures, RepeatableCompletion, StageRules, StarRequirements
+from module.gameplay.battle_program import BattleProgramReducer
 
 if TYPE_CHECKING:
     from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
@@ -56,14 +61,8 @@ class _Runtime:
     fleet_2_location = ()
 
     def __init__(self) -> None:
-        self.map_state_reads = 0
         self.single_fleet_state_reads = 0
         self.support_state_reads = 0
-
-    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
-        cancellation.raise_if_requested()
-        self.map_state_reads += 1
-        return True
 
     def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
@@ -76,12 +75,38 @@ class _Runtime:
         return None
 
 
+class _MobMoveOverride:
+    def __init__(self, *, value: bool | None) -> None:
+        self.value = value
+        self.reads = 0
+
+    def map_has_mob_move_override(
+        self,
+        cancellation: CancellationSource,
+    ) -> bool | None:
+        cancellation.raise_if_requested()
+        self.reads += 1
+        return self.value
+
+
 class _Units:
-    def __init__(self, runtime: _Runtime, *, request_after_commit: bool = False) -> None:
+    def __init__(
+        self,
+        runtime: _Runtime,
+        *,
+        mob_move: bool | None = True,
+        static_mob_move: bool = False,
+        request_after_commit: bool = False,
+    ) -> None:
         self.runtime = runtime
         self.request_after_commit = request_after_commit
         self.calls = 0
         self.active_calls = 0
+        self.mob_move_override = _MobMoveOverride(value=mob_move)
+        self.program_capabilities = CampaignProgramCapabilityReader(
+            CampaignProgramCapabilities(map_has_mob_move=static_mob_move),
+            self.mob_move_override,
+        )
 
     def battle_program_mode(
         self,
@@ -91,7 +116,12 @@ class _Units:
         del session
         self.active_calls += 1
         runtime = cast("DeclarativeCampaignMapRuntime", self.runtime)
-        return read_mumu12_battle_program_mode(runtime, self.runtime, cancellation)
+        return read_mumu12_battle_program_mode(
+            runtime,
+            self.runtime,
+            self.program_capabilities,
+            cancellation,
+        )
 
     def commit_battle_program_unit(
         self,
@@ -106,7 +136,11 @@ class _Units:
             cast("AbortToken", cancellation).request("defer until program checkpoint")
         runtime = cast("DeclarativeCampaignMapRuntime", self.runtime)
         return Mumu12CommittedBattleProgramUnit(
-            build_mumu12_battle_program_port(runtime, self.runtime),
+            build_mumu12_battle_program_port(
+                runtime,
+                self.runtime,
+                self.program_capabilities,
+            ),
             gate,
         )
 
@@ -167,13 +201,13 @@ def test_executor_initializes_dynamic_flags_inside_committed_unit() -> None:
             ProgramFlag.MOVABLE_ENEMY,
         }
     )
-    assert runtime.map_state_reads == 1
+    assert units.mob_move_override.reads == 1
     assert runtime.single_fleet_state_reads == 1
     assert runtime.support_state_reads == 1
     assert cancellation.is_requested
 
 
-def test_executor_uses_persisted_flags_without_reinferring_runtime_state() -> None:
+def test_executor_keeps_explicit_empty_persisted_flags_without_querying_static_capability() -> None:
     program = BattleProgram(
         0,
         frozenset({BattleProgramMode.NORMAL}),
@@ -184,20 +218,54 @@ def test_executor_uses_persisted_flags_without_reinferring_runtime_state() -> No
     state = replace(
         session.initial_state(),
         program_state_initialized=True,
-        program_flags=frozenset({ProgramFlag.MAP_HAS_MOB_MOVE}),
+        program_flags=frozenset(),
     )
+    units = _Units(runtime, static_mob_move=True)
 
-    execution = Mumu12CampaignBattleProgramExecutor(_Units(runtime)).execute(
+    execution = Mumu12CampaignBattleProgramExecutor(units).execute(
         program,
         session,
         state,
         AbortToken(),
     )
 
-    assert execution.true_flags == frozenset({ProgramFlag.MAP_HAS_MOB_MOVE})
-    assert runtime.map_state_reads == 0
+    assert execution.true_flags == frozenset()
+    assert units.mob_move_override.reads == 0
     assert runtime.single_fleet_state_reads == 0
     assert runtime.support_state_reads == 0
+
+
+@pytest.mark.parametrize(
+    ("initial_override", "changed_override"),
+    [(False, True), (True, False)],
+)
+def test_first_capability_sample_is_persisted_and_live_changes_do_not_rewrite_flags(
+    *,
+    initial_override: bool,
+    changed_override: bool,
+) -> None:
+    program = BattleProgram(
+        0,
+        frozenset({BattleProgramMode.NORMAL}),
+        (ReturnProgramContinue(),),
+    )
+    session = _session(program)
+    runtime = _Runtime()
+    units = _Units(runtime, mob_move=initial_override)
+    executor = Mumu12CampaignBattleProgramExecutor(units)
+    initial_state = session.initial_state()
+
+    first = executor.execute(program, session, initial_state, AbortToken())
+    persisted = BattleProgramReducer.reduce(session, initial_state, first)
+    units.mob_move_override.value = changed_override
+    second = executor.execute(program, session, persisted, AbortToken())
+
+    assert persisted.program_state_initialized
+    assert (ProgramFlag.MAP_HAS_MOB_MOVE in first.true_flags) is initial_override
+    assert second.true_flags == first.true_flags
+    assert units.mob_move_override.reads == 1
+    assert runtime.single_fleet_state_reads == 1
+    assert runtime.support_state_reads == 1
 
 
 def test_executor_rejects_program_from_another_battle_before_commit() -> None:

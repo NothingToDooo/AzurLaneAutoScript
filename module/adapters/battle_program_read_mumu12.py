@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, assert_never, cast
 
 from module.adapters.battle_program_mumu12_contracts import BattleProgramMumu12AdapterError, FleetIndex
+from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
 from module.content import battle_program as program_model
 from module.content.battle_policy import EnemyFilterEntry, parse_enemy_filter
 from module.content.cell import CellId
@@ -17,8 +18,6 @@ if TYPE_CHECKING:
 
 class RuntimeProgramState(Protocol):
     """不能从静态 profile 推断的当前地图运行事实。"""
-
-    def map_has_mob_move(self, cancellation: CancellationSource) -> bool: ...
 
     def use_single_fleet_override(self, cancellation: CancellationSource) -> bool | None: ...
 
@@ -316,11 +315,20 @@ class ProgramBattlefieldView:
 class Mumu12BattleProgramReadModel:
     """每次查询都从当前单运行实例投影新的不可变事实。"""
 
-    __slots__ = ("_program_state", "_source")
+    __slots__ = ("_program_capabilities", "_program_state", "_source")
 
-    def __init__(self, source: Mumu12ProgramReadSource, program_state: RuntimeProgramState) -> None:
+    def __init__(
+        self,
+        source: Mumu12ProgramReadSource,
+        program_state: RuntimeProgramState,
+        program_capabilities: CampaignProgramCapabilityReader,
+    ) -> None:
+        if not isinstance(program_capabilities, CampaignProgramCapabilityReader):
+            message = "MuMu12 battle program read model requires a program capability reader"
+            raise TypeError(message)
         self._source = source
         self._program_state = program_state
+        self._program_capabilities = program_capabilities
 
     @staticmethod
     def _integer(value: object, field: str) -> int:
@@ -388,11 +396,7 @@ class Mumu12BattleProgramReadModel:
             if enabled
         }
         cancellation.raise_if_requested()
-        map_has_mob_move = self._program_state.map_has_mob_move(cancellation)
-        if type(map_has_mob_move) is not bool:
-            message = "runtime program state map_has_mob_move() must return bool"
-            raise BattleProgramMumu12AdapterError(message)
-        if map_has_mob_move:
+        if self._program_capabilities.map_has_mob_move(cancellation):
             flags.add(program_model.ProgramFlag.MAP_HAS_MOB_MOVE)
         cancellation.raise_if_requested()
         use_support_fleet = self._program_state.use_support_fleet(cancellation)

@@ -32,16 +32,9 @@
     {
       "executors": [
         {
-          "implementation": "map_mechanic/mob_move_strategy_state",
+          "implementation": "map_mechanic/mob_move_feature",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "strategy_set_execute"
-            ],
-            "state": [
-              "map_has_mob_move"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "campaign_main/campaign_15_base/campaign_base"
@@ -85,7 +78,6 @@
               }
             ],
             "state": [
-              "map_has_mob_move",
               "use_single_fleet"
             ]
           }
@@ -116,7 +108,6 @@
               }
             ],
             "state": [
-              "map_has_mob_move",
               "use_single_fleet"
             ]
           }

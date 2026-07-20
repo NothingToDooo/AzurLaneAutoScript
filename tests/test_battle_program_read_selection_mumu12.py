@@ -6,6 +6,7 @@ from module.adapters.battle_program_read_mumu12 import (
     Mumu12ProgramReadSource,
     RuntimeProgramState,
 )
+from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
 from module.gameplay.campaign import EnemyPriorityMode
 
 if TYPE_CHECKING:
@@ -19,10 +20,6 @@ class _Cancellation:
 
 
 class _ProgramState:
-    @staticmethod
-    def map_has_mob_move(_cancellation: _Cancellation) -> bool:
-        return False
-
     @staticmethod
     def use_single_fleet_override(_cancellation: _Cancellation) -> bool | None:
         return None
@@ -73,6 +70,7 @@ def _read_model(grid: _Grid) -> Mumu12BattleProgramReadModel:
     return Mumu12BattleProgramReadModel(
         cast("Mumu12ProgramReadSource", source),
         cast("RuntimeProgramState", _ProgramState()),
+        CampaignProgramCapabilityReader(),
     )
 
 

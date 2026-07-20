@@ -4,6 +4,11 @@ from module.combat.assets import GET_ITEMS_1
 from module.exception import GameStuckError
 from module.handler import assets as handler_assets
 from module.handler.info_handler import InfoHandler
+from module.handler.strategy_set import (
+    STANDARD_STRATEGY_SET_SERVICE,
+    StrategySetRequest,
+    StrategySetService,
+)
 from module.logger import logger
 from module.template.assets import TEMPLATE_FORMATION_1, TEMPLATE_FORMATION_2, TEMPLATE_FORMATION_3
 from module.ui.switch import Switch
@@ -30,6 +35,7 @@ STRATEGY_TRANSITION_BUDGET = 30.0
 class StrategyHandler(InfoHandler):
     fleet_1_formation_fixed = False
     fleet_2_formation_fixed = False
+    _strategy_set_service: StrategySetService = STANDARD_STRATEGY_SET_SERVICE
 
     def strategy_open(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Strategy open")
@@ -68,18 +74,31 @@ class StrategyHandler(InfoHandler):
         sub_hunt: bool | None = None,
     ) -> None:
         """在 STRATEGY_OPENED 中设置阵型；formation 接受 line_ahead、double_line、diamond 或 None。"""
-        logger.info(f"Strategy set: formation={formation}, submarine_view={sub_view}, submarine_hunt={sub_hunt}")
+        self._strategy_set_service.execute(
+            self,
+            StrategySetRequest(
+                formation=formation,
+                sub_view=sub_view,
+                sub_hunt=sub_hunt,
+            ),
+        )
 
-        if formation is not None:
-            FORMATION.set(formation, main=self)
-        if sub_view is not None:
+    def _standard_strategy_set_execute(self, request: StrategySetRequest) -> None:
+        logger.info(
+            f"Strategy set: formation={request.formation}, "
+            f"submarine_view={request.sub_view}, submarine_hunt={request.sub_hunt}"
+        )
+
+        if request.formation is not None:
+            FORMATION.set(request.formation, main=self)
+        if request.sub_view is not None:
             if SUBMARINE_VIEW.appear(main=self):
-                SUBMARINE_VIEW.set("on" if sub_view else "off", main=self)
+                SUBMARINE_VIEW.set("on" if request.sub_view else "off", main=self)
             else:
                 logger.warning("Setting up submarine_view but no icon appears")
-        if sub_hunt is not None:
+        if request.sub_hunt is not None:
             if SUBMARINE_HUNT.appear(main=self):
-                SUBMARINE_HUNT.set("on" if sub_hunt else "off", main=self)
+                SUBMARINE_HUNT.set("on" if request.sub_hunt else "off", main=self)
             else:
                 logger.warning("Setting up submarine_hunt but no icon appears")
 

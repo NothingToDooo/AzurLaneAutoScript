@@ -164,7 +164,13 @@ def test_representative_special_gameplay_is_bound_by_typed_profiles(
 
     mob_move = _executors(profile_registry, "campaign_main/campaign_16_3/campaign")[RuntimeExecutorKind.MAP_MECHANIC]
     assert mob_move.implementation_id.value == "map_mechanic/session_state_policy"
-    assert mob_move.options["state"] == ("map_has_mob_move", "use_single_fleet")
+    assert mob_move.options["state"] == ("use_single_fleet",)
+
+    mob_move_feature = _executors(profile_registry, "campaign_main/campaign_15_base/campaign_base")[
+        RuntimeExecutorKind.MAP_MECHANIC
+    ]
+    assert mob_move_feature.implementation_id.value == "map_mechanic/mob_move_feature"
+    assert dict(mob_move_feature.options) == {}
 
     refocus = {
         tuning.key: tuning.value for tuning in _profile(profile_registry, packs_by_id, "campaign_main", "11-2").tunings

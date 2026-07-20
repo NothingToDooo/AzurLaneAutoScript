@@ -8,6 +8,9 @@ from module.map.assets import FLEET_SUPPORT_EMPTY
 from module.map.map_swipe import MapSwipePolicy
 from module.map_detection.utils_assets import ASSETS
 
+from .campaign_program_capabilities import (
+    CampaignProgramCapabilityContribution,
+)
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
@@ -20,9 +23,12 @@ from .campaign_runtime_profile import (
     RuntimeSessionOutcome,
     RuntimeStateSeed,
 )
+from .campaign_strategy_set import CampaignStrategySetObserverContributor
 
 if TYPE_CHECKING:
+    from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
+    from module.handler.strategy_set import StrategySetRequest, StrategySetRuntime
 
 _SUPPORT_SWIPE_POLICY = MapSwipePolicy(default_box=(239, 159, 1175, 628))
 _UI_MASK_CACHE_KEYS = ("ui_mask", "ui_mask_stroke", "ui_mask_in_map")
@@ -222,43 +228,54 @@ class SubmarineFreshEntryExecutor(RuntimeExecutorInstance):
         return self.current_use_support_fleet() and _host(runtime).handle_popup_confirm("SUBMARINE_SUPPORT")
 
 
-class MobMoveStrategyStateExecutor(RuntimeExecutorInstance):
-    """把十五图的可移动敌舰策略状态投影到 typed session state。"""
+class MobMoveFeatureExecutor(RuntimeExecutorInstance):
+    """声明十五图敌舰移动能力，并在策略设置成功后记录 UI 事实。"""
+
+    __slots__ = (
+        "_program_capability_contribution",
+        "_strategy_set_observer_contributor",
+    )
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
-        options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
-        _require_operations(options, frozenset({"strategy_set_execute"}))
-        if _strings(options, "state") != ("map_has_mob_move",):
-            message = "mob-move strategy executor must own map_has_mob_move state"
-            raise CampaignRuntimeProfileError(message)
-        super().__init__(
-            {RuntimeExecutorKind.MAP_MECHANIC},
-            methods={
-                RuntimeExecutorKind.MAP_MECHANIC: {
-                    RuntimeOperation.STRATEGY_SET_EXECUTE: self._strategy_set_execute,
-                }
-            },
-            state_seed=RuntimeStateSeed(map_has_mob_move=True),
+        _ = context.options(RuntimeExecutorKind.MAP_MECHANIC)
+        super().__init__({RuntimeExecutorKind.MAP_MECHANIC})
+        self._strategy_set_observer_contributor = CampaignStrategySetObserverContributor(
+            self._observe_strategy_set,
+        )
+        self._program_capability_contribution = CampaignProgramCapabilityContribution(
+            map_has_mob_move=True,
         )
 
     @staticmethod
-    def _strategy_set_execute(runtime: object, *args: object, **kwargs: object) -> object:
-        host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.STRATEGY_SET_EXECUTE, *args, **kwargs)
-        logger.attr("Map has mob move", host.strategy_has_mob_move())
-        return result
+    def _observe_strategy_set(
+        runtime: StrategySetRuntime,
+        request: StrategySetRequest,
+    ) -> None:
+        del request
+        logger.attr("Map has mob move", _host(runtime).strategy_has_mob_move())
+
+    @property
+    def strategy_set_observer_contributor(self) -> CampaignStrategySetObserverContributor:
+        return self._strategy_set_observer_contributor
+
+    @property
+    def program_capability_contribution(self) -> CampaignProgramCapabilityContribution:
+        return self._program_capability_contribution
 
 
 class SessionStatePolicyExecutor(RuntimeExecutorInstance):
     """在 MAP_INIT 后从本次地图运行事实计算十六图的 typed session state。"""
 
+    __slots__ = ("_map_has_mob_move_override",)
+
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
         _require_operations(options, frozenset({"map_init"}))
-        if frozenset(_strings(options, "state")) != {"map_has_mob_move", "use_single_fleet"}:
-            message = "session-state policy must own map_has_mob_move and use_single_fleet"
+        if _strings(options, "state") != ("use_single_fleet",):
+            message = "session-state policy must own use_single_fleet state"
             raise CampaignRuntimeProfileError(message)
         self._validate_rules(options["rules"])
+        self._map_has_mob_move_override = False
         super().__init__(
             {RuntimeExecutorKind.MAP_MECHANIC},
             methods={
@@ -267,7 +284,6 @@ class SessionStatePolicyExecutor(RuntimeExecutorInstance):
                 }
             },
             state_seed=RuntimeStateSeed(
-                map_has_mob_move=False,
                 use_single_fleet_override=False,
             ),
         )
@@ -294,13 +310,23 @@ class SessionStatePolicyExecutor(RuntimeExecutorInstance):
     def _map_init(self, runtime: object, map_: object) -> object:
         host = _host(runtime)
         result = host.runtime_super(RuntimeOperation.MAP_INIT, map_)
-        self.set_map_has_mob_move(
-            enabled=self.current_use_support_fleet() and host.map_is_clear_mode,
-        )
+        self._map_has_mob_move_override = self.current_use_support_fleet() and host.map_is_clear_mode
         self.set_use_single_fleet_override(
             enabled="standby" in host.config.Fleet_FleetOrder,
         )
         return result
+
+    def map_has_mob_move_override(
+        self,
+        cancellation: CancellationSource,
+    ) -> bool:
+        cancellation.raise_if_requested()
+        return self._map_has_mob_move_override
+
+    @override
+    def reset(self) -> None:
+        self._map_has_mob_move_override = False
+        super().reset()
 
 
 def _build_support_fleet(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
@@ -315,8 +341,8 @@ def _build_submarine_fresh_entry(context: RuntimeExecutorBuildContext) -> Runtim
     return SubmarineFreshEntryExecutor(context)
 
 
-def _build_mob_move_strategy_state(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    return MobMoveStrategyStateExecutor(context)
+def _build_mob_move_feature(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+    return MobMoveFeatureExecutor(context)
 
 
 def _build_session_state_policy(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
@@ -352,9 +378,9 @@ def mechanic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             _build_submarine_fresh_entry,
         ),
         RuntimeExecutorFactoryDescriptor(
-            RuntimeImplementationId("map_mechanic/mob_move_strategy_state"),
-            {RuntimeExecutorKind.MAP_MECHANIC: mechanic_schema},
-            _build_mob_move_strategy_state,
+            RuntimeImplementationId("map_mechanic/mob_move_feature"),
+            {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()},
+            _build_mob_move_feature,
         ),
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("map_mechanic/session_state_policy"),

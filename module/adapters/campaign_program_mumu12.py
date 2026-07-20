@@ -24,6 +24,7 @@ from module.gameplay.battle_program import BattleProgramExecution, BattleProgram
 
 if TYPE_CHECKING:
     from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
+    from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
     from module.application import CancellationSource
 
 
@@ -50,8 +51,9 @@ class Mumu12BattleProgramUnitSource(Protocol):
 def build_mumu12_battle_program_port(
     runtime: DeclarativeCampaignMapRuntime,
     program_state: RuntimeProgramState,
+    program_capabilities: CampaignProgramCapabilityReader,
 ) -> Mumu12BattleProgramPort:
-    reads = Mumu12BattleProgramReadModel(runtime, program_state)
+    reads = Mumu12BattleProgramReadModel(runtime, program_state, program_capabilities)
     fleet_actions = Mumu12FleetActionDriver(runtime)
     fleet_coordination = Mumu12FleetCoordinationDriver(runtime)
     strategy_actions = Mumu12StrategyActionDriver(runtime)
@@ -86,9 +88,10 @@ def build_mumu12_battle_program_port(
 def read_mumu12_battle_program_mode(
     runtime: DeclarativeCampaignMapRuntime,
     program_state: RuntimeProgramState,
+    program_capabilities: CampaignProgramCapabilityReader,
     cancellation: CancellationSource,
 ) -> BattleProgramMode:
-    return Mumu12BattleProgramReadModel(runtime, program_state).mode(cancellation)
+    return Mumu12BattleProgramReadModel(runtime, program_state, program_capabilities).mode(cancellation)
 
 
 class Mumu12CampaignBattleProgramExecutor:

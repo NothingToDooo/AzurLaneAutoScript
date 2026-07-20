@@ -176,17 +176,17 @@ class _CleanupFailingLifecycleExecutor(_LifecycleExecutor):
         raise self._reset_error
 
 
-class _DependentStateExecutor(RuntimeExecutorInstance):
+class _SupportDependentSingleFleetExecutor(RuntimeExecutorInstance):
     def __init__(self) -> None:
         super().__init__(
             {RuntimeExecutorKind.MAP_MECHANIC},
-            state_seed=RuntimeStateSeed(map_has_mob_move=False),
+            state_seed=RuntimeStateSeed(use_single_fleet_override=False),
         )
 
     @override
     def begin_session(self, context: RuntimeSessionContext) -> None:
         super().begin_session(context)
-        self.set_map_has_mob_move(enabled=self.current_use_support_fleet())
+        self.set_use_single_fleet_override(enabled=self.current_use_support_fleet())
 
 
 def _binding(
@@ -242,7 +242,7 @@ def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
         builds.append(context)
         return RuntimeExecutorInstance(
             {RuntimeExecutorKind.MAP_MECHANIC, RuntimeExecutorKind.ENGINE_EXTENSION},
-            state_seed=RuntimeStateSeed(map_has_mob_move=True),
+            state_seed=RuntimeStateSeed(use_support_fleet=True),
         )
 
     registry = CampaignRuntimeExecutorRegistry(
@@ -272,9 +272,9 @@ def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
         RuntimeExecutorKind.MAP_MECHANIC,
         RuntimeExecutorKind.ENGINE_EXTENSION,
     }
-    assert manager.map_has_mob_move(AbortToken())
-    manager.disable_mob_move()
-    assert not manager.map_has_mob_move(AbortToken())
+    assert manager.use_support_fleet(AbortToken())
+    manager.disable_support_fleet()
+    assert not manager.use_support_fleet(AbortToken())
 
 
 def test_distinct_implementations_see_prepared_attempt_state_when_session_begins() -> None:
@@ -287,7 +287,7 @@ def test_distinct_implementations_see_prepared_attempt_state_when_session_begins
 
     def dependent_factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
         del context
-        return _DependentStateExecutor()
+        return _SupportDependentSingleFleetExecutor()
 
     schema = {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()}
     manager = CampaignRuntimeProfileManager(
@@ -313,8 +313,7 @@ def test_distinct_implementations_see_prepared_attempt_state_when_session_begins
     manager.begin_session(context)
 
     assert not manager.use_support_fleet(AbortToken())
-    assert not manager.map_has_mob_move(AbortToken())
-    assert manager.use_single_fleet_override(AbortToken()) is None
+    assert manager.use_single_fleet_override(AbortToken()) is False
 
 
 def test_same_kind_composes_base_to_derived_as_an_around_chain() -> None:

@@ -1,12 +1,18 @@
+import pytest
+
+import module.adapters.campaign_runtime_mechanics as mechanics_module
+from module.adapters.campaign_program_capabilities import build_campaign_program_capability_reader
 from module.adapters.campaign_runtime_mechanics import mechanic_runtime_executor_descriptors
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
+    CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeOperation,
     RuntimeSessionContext,
     RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
+from module.adapters.campaign_strategy_set import build_campaign_strategy_set_service
 from module.application import AbortToken
 from module.content.campaign_session import CampaignRunVariant
 from module.content.runtime_profile import (
@@ -18,6 +24,7 @@ from module.content.runtime_profile import (
     RuntimeExecutorKind,
     RuntimeImplementationId,
 )
+from module.handler.strategy_set import StrategySetRequest
 from module.map.map_base import CampaignMap
 from module.map_detection.utils_assets import ASSETS
 
@@ -32,6 +39,9 @@ class _Runtime:
         self.support_empty = False
         self.popup = False
         self.combat_calls = 0
+        self.mob_move_checks = 0
+        self.mob_move_visible = True
+        self.strategy_requests: list[StrategySetRequest] = []
         self.super_calls: list[tuple[RuntimeOperation, tuple[object, ...], dict[str, object]]] = []
 
     def runtime_super(
@@ -51,9 +61,12 @@ class _Runtime:
         del button, offset
         return self.support_empty
 
-    @staticmethod
-    def strategy_has_mob_move() -> bool:
-        return True
+    def strategy_has_mob_move(self) -> bool:
+        self.mob_move_checks += 1
+        return self.mob_move_visible
+
+    def _standard_strategy_set_execute(self, request: StrategySetRequest) -> None:
+        self.strategy_requests.append(request)
 
     def handle_popup_confirm(self, name: str) -> bool:
         assert name == "SUBMARINE_SUPPORT"
@@ -246,28 +259,60 @@ def test_runtime_ui_mask_restores_all_derived_caches() -> None:
     assert {key: cache[key] for key in original} == original
 
 
-def test_mob_move_strategy_executor_owns_session_state() -> None:
+@pytest.mark.parametrize("visible", [False, True])
+def test_mob_move_feature_logs_strategy_fact_without_mutating_capability(
+    *,
+    visible: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     manager = _manager(
         _binding(
-            "map_mechanic/mob_move_strategy_state",
+            "map_mechanic/mob_move_feature",
             RuntimeExecutorKind.MAP_MECHANIC,
-            {
-                "operations": ["strategy_set_execute"],
-                "state": ["map_has_mob_move"],
-            },
+            {},
         )
     )
     runtime = _Runtime()
-    _start(manager, runtime, RuntimeSessionEntryKind.FRESH)
+    runtime.mob_move_visible = visible
+    instances = manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
+    service = build_campaign_strategy_set_service(instances)
+    capabilities = build_campaign_program_capability_reader(instances)
+    logged: list[tuple[str, object]] = []
+    monkeypatch.setattr(mechanics_module.logger, "attr", lambda name, value: logged.append((name, value)))
+    request = StrategySetRequest(sub_hunt=False)
 
-    result = manager.mechanic.invoke(
-        RuntimeOperation.STRATEGY_SET_EXECUTE,
-        runtime,
-        lambda: "configured",
-    )
+    assert capabilities.map_has_mob_move(AbortToken()) is True
+    service.execute(runtime, request)
 
-    assert result == "configured"
-    assert manager.map_has_mob_move(AbortToken())
+    assert runtime.strategy_requests == [request]
+    assert runtime.mob_move_checks == 1
+    assert logged == [("Map has mob move", visible)]
+    assert capabilities.map_has_mob_move(AbortToken()) is True
+
+
+def test_removed_mob_move_strategy_state_implementation_is_rejected() -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match="unregistered runtime executor"):
+        _manager(
+            _binding(
+                "map_mechanic/mob_move_strategy_state",
+                RuntimeExecutorKind.MAP_MECHANIC,
+                {},
+            )
+        )
+
+
+@pytest.mark.parametrize("obsolete_option", ["operations", "state"])
+def test_mob_move_feature_rejects_obsolete_operation_and_state_options(
+    obsolete_option: str,
+) -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match=rf"unknown option: {obsolete_option}"):
+        _manager(
+            _binding(
+                "map_mechanic/mob_move_feature",
+                RuntimeExecutorKind.MAP_MECHANIC,
+                {obsolete_option: []},
+            )
+        )
 
 
 def test_session_state_policy_projects_stage_specific_fleet_order() -> None:
@@ -278,7 +323,7 @@ def test_session_state_policy_projects_stage_specific_fleet_order() -> None:
             RuntimeExecutorKind.MAP_MECHANIC,
             {
                 "operations": ["map_init"],
-                "state": ["map_has_mob_move", "use_single_fleet"],
+                "state": ["use_single_fleet"],
                 "rules": [
                     {
                         "target": "map_has_mob_move",
@@ -294,10 +339,14 @@ def test_session_state_policy_projects_stage_specific_fleet_order() -> None:
     )
     runtime = _Runtime()
     runtime.config.Fleet_FleetOrder = "fleet1_all_fleet2_standby"
+    capabilities = build_campaign_program_capability_reader(
+        manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
+    )
+    assert capabilities.map_has_mob_move(AbortToken()) is False
     _start(manager, runtime, RuntimeSessionEntryKind.FRESH)
 
     assert manager.use_single_fleet_override(AbortToken()) is False
     manager.mechanic.invoke(RuntimeOperation.MAP_INIT, runtime, lambda map_: map_, None)
 
-    assert manager.map_has_mob_move(AbortToken())
+    assert capabilities.map_has_mob_move(AbortToken())
     assert manager.use_single_fleet_override(AbortToken()) is True

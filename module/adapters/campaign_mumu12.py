@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass, replace
 from functools import partial
-from typing import TYPE_CHECKING, Final, Literal, cast
+from typing import TYPE_CHECKING, Final, cast
 
 from module.adapters.campaign_auto_search_mumu12 import (
     Mumu12AutoSearchRuntime,
@@ -21,6 +21,10 @@ from module.adapters.campaign_map_session_mumu12 import (
 )
 from module.adapters.campaign_map_swipe import build_campaign_map_swipe_service
 from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
+from module.adapters.campaign_program_capabilities import (
+    CampaignProgramCapabilityReader,
+    build_campaign_program_capability_reader,
+)
 from module.adapters.campaign_program_mumu12 import (
     Mumu12CampaignBattleProgramExecutor,
     Mumu12CommittedBattleProgramUnit,
@@ -41,6 +45,7 @@ from module.adapters.campaign_runtime_profile import (
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
 from module.adapters.campaign_stage_navigator import build_campaign_stage_navigator
+from module.adapters.campaign_strategy_set import build_campaign_strategy_set_service
 from module.adapters.gems_mumu12 import (
     GemsHardPreparationError,
     Mumu12GemsFleetReplacementExecutor,
@@ -455,6 +460,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     session_variant: CampaignRunVariant
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
     _event_ui_services: CampaignEventUiServices
+    _program_capabilities: CampaignProgramCapabilityReader
     _runtime_profile: CampaignRuntimeProfileManager
     _runtime_profile_lease: RuntimeProfileLease
     grid_class: type[Grid]
@@ -491,16 +497,15 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         self._runtime_profile.apply_runtime_tunings(self)
         self._runtime_profile.bind(self, self.MAP)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
+        mechanic_instances = self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
+        self._strategy_set_service = build_campaign_strategy_set_service(mechanic_instances)
+        self._program_capabilities = build_campaign_program_capability_reader(mechanic_instances)
         self._map_observer = build_campaign_map_observer(
             self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
             map_clear_percentage_multiplier=self._runtime_profile.map_clear_percentage_multiplier,
         )
-        self._map_swipe_service = build_campaign_map_swipe_service(
-            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
-        )
-        self._mystery_item_service = build_campaign_mystery_item_service(
-            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
-        )
+        self._map_swipe_service = build_campaign_map_swipe_service(mechanic_instances)
+        self._mystery_item_service = build_campaign_mystery_item_service(mechanic_instances)
         self._event_ui_services = build_campaign_event_ui_services(
             self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
         )
@@ -626,27 +631,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             self,
             lambda value: CampaignEngine.map_init(self, value),
             map_,
-        )
-
-    def strategy_set_execute(
-        self,
-        formation: Literal["line_ahead", "double_line", "diamond"] | None = None,
-        *,
-        sub_view: bool | None = None,
-        sub_hunt: bool | None = None,
-    ) -> None:
-        self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.STRATEGY_SET_EXECUTE,
-            self,
-            lambda value=None, *, sub_view=None, sub_hunt=None: CampaignEngine.strategy_set_execute(
-                self,
-                formation=value,
-                sub_view=sub_view,
-                sub_hunt=sub_hunt,
-            ),
-            formation,
-            sub_view=sub_view,
-            sub_hunt=sub_hunt,
         )
 
     def handle_boss_appear_refocus(self, preset: GridLocation | None = None) -> None:
@@ -1312,7 +1296,8 @@ class Mumu12CampaignRuntimeProvider:
         runtime = self._active_runtime_for(session, cancellation)
         return read_mumu12_battle_program_mode(
             runtime,
-            runtime._runtime_profile,  # ruff:ignore[private-member-access] - provider owns runtime capability composition.
+            runtime._runtime_profile,  # ruff:ignore[private-member-access] - provider owns runtime program state.
+            runtime._program_capabilities,  # ruff:ignore[private-member-access] - provider owns runtime capabilities.
             cancellation,
         )
 
@@ -1341,7 +1326,8 @@ class Mumu12CampaignRuntimeProvider:
         runtime, unit_cancellation = self._commit_active_runtime(session, cancellation)
         port = build_mumu12_battle_program_port(
             runtime,
-            runtime._runtime_profile,  # ruff:ignore[private-member-access] - provider owns runtime capability composition.
+            runtime._runtime_profile,  # ruff:ignore[private-member-access] - provider owns runtime program state.
+            runtime._program_capabilities,  # ruff:ignore[private-member-access] - provider owns runtime capabilities.
         )
         return Mumu12CommittedBattleProgramUnit(port, unit_cancellation)
 

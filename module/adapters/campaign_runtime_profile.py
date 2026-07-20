@@ -41,7 +41,6 @@ class RuntimeOperation(StrEnum):
     HANDLE_SUBMARINE_SUPPORT_POPUP = "handle_submarine_support_popup"
     MAP_DATA_INIT = "map_data_init"
     MAP_INIT = "map_init"
-    STRATEGY_SET_EXECUTE = "strategy_set_execute"
     RUNTIME_CREATED = "runtime_created"
 
 
@@ -89,7 +88,6 @@ class RuntimeProfileHost(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class RuntimeStateSeed:
-    map_has_mob_move: bool | None = None
     use_support_fleet: bool | None = None
     use_single_fleet_override: bool | None = None
 
@@ -98,7 +96,6 @@ class RuntimeStateSeed:
 class RuntimeSharedState:
     """同一 runtime profile 内跨 implementation 共享的显式 attempt 状态。"""
 
-    map_has_mob_move: bool = False
     use_support_fleet: bool = False
     use_single_fleet_override: bool | None = None
 
@@ -156,7 +153,6 @@ class RuntimeExecutorInstance:
     __slots__ = (
         "_camera_grid_class",
         "_map_grid_class",
-        "_map_has_mob_move",
         "_methods",
         "_runtime",
         "_seed",
@@ -206,7 +202,6 @@ class RuntimeExecutorInstance:
         self._camera_grid_class = camera_grid_class
         self._runtime: object | None = None
         self._shared_state: RuntimeSharedState | None = None
-        self._map_has_mob_move = state_seed.map_has_mob_move
         self._use_support_fleet = state_seed.use_support_fleet
         self._use_single_fleet_override = state_seed.use_single_fleet_override
 
@@ -263,14 +258,8 @@ class RuntimeExecutorInstance:
 
     def reset(self) -> None:
         self._runtime = None
-        self._map_has_mob_move = self._seed.map_has_mob_move
         self._use_support_fleet = self._seed.use_support_fleet
         self._use_single_fleet_override = self._seed.use_single_fleet_override
-
-    def map_has_mob_move(self) -> bool | None:
-        if self._map_has_mob_move is not None and self._shared_state is not None:
-            return self._shared_state.map_has_mob_move
-        return self._map_has_mob_move
 
     def use_support_fleet(self) -> bool | None:
         if self._use_support_fleet is not None and self._shared_state is not None:
@@ -281,13 +270,6 @@ class RuntimeExecutorInstance:
         if self._use_single_fleet_override is not None and self._shared_state is not None:
             return self._shared_state.use_single_fleet_override
         return self._use_single_fleet_override
-
-    def current_map_has_mob_move(self) -> bool:
-        state = self._shared_state
-        if state is None:
-            message = "runtime executor shared state is not attached"
-            raise CampaignRuntimeProfileError(message)
-        return state.map_has_mob_move
 
     def current_use_support_fleet(self) -> bool:
         state = self._shared_state
@@ -302,17 +284,6 @@ class RuntimeExecutorInstance:
             message = "runtime executor shared state is not attached"
             raise CampaignRuntimeProfileError(message)
         return state.use_single_fleet_override
-
-    def set_map_has_mob_move(self, *, enabled: bool) -> None:
-        if type(enabled) is not bool:
-            message = "map_has_mob_move state must be a boolean"
-            raise TypeError(message)
-        if self._map_has_mob_move is None:
-            message = "runtime executor does not own map_has_mob_move state"
-            raise CampaignRuntimeProfileError(message)
-        self._map_has_mob_move = enabled
-        if self._shared_state is not None:
-            self._shared_state.map_has_mob_move = enabled
 
     def set_use_support_fleet(self, *, enabled: bool) -> None:
         if type(enabled) is not bool:
@@ -335,10 +306,6 @@ class RuntimeExecutorInstance:
         self._use_single_fleet_override = enabled
         if self._shared_state is not None:
             self._shared_state.use_single_fleet_override = enabled
-
-    def disable_mob_move(self) -> None:
-        if self._map_has_mob_move is not None:
-            self.set_map_has_mob_move(enabled=False)
 
     def disable_support_fleet(self) -> None:
         if self._use_support_fleet is not None:
@@ -903,10 +870,6 @@ class CampaignRuntimeProfileManager:
             RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE,
         )
 
-    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
-        cancellation.raise_if_requested()
-        return self._shared_state.map_has_mob_move
-
     def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         return self._shared_state.use_support_fleet
@@ -915,27 +878,19 @@ class CampaignRuntimeProfileManager:
         cancellation.raise_if_requested()
         return self._shared_state.use_single_fleet_override
 
-    def disable_mob_move(self) -> None:
-        for instance in self._instances:
-            instance.disable_mob_move()
-
     def disable_support_fleet(self) -> None:
         for instance in self._instances:
             instance.disable_support_fleet()
 
     def _seed_attempt_state(self) -> None:
-        map_has_mob_move = False
         use_support_fleet = False
         use_single_fleet_override: bool | None = None
         for instance in self._instances:
             seed = instance.state_seed
-            if seed.map_has_mob_move is not None:
-                map_has_mob_move = seed.map_has_mob_move
             if seed.use_support_fleet is not None:
                 use_support_fleet = seed.use_support_fleet
             if seed.use_single_fleet_override is not None:
                 use_single_fleet_override = seed.use_single_fleet_override
-        self._shared_state.map_has_mob_move = map_has_mob_move
         self._shared_state.use_support_fleet = use_support_fleet
         self._shared_state.use_single_fleet_override = use_single_fleet_override
 

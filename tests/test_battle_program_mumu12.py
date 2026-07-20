@@ -10,6 +10,10 @@ from module.adapters.battle_program_read_mumu12 import (
     RuntimeProgramState,
 )
 from module.adapters.battle_program_strategy_mumu12 import Mumu12StrategyActionDriver
+from module.adapters.campaign_program_capabilities import (
+    CampaignProgramCapabilities,
+    CampaignProgramCapabilityReader,
+)
 from module.adapters.campaign_program_mumu12 import build_mumu12_battle_program_port
 from module.content import battle_program as program_model
 from module.content.battle_policy import (
@@ -110,15 +114,9 @@ class _Cancellation:
 
 @dataclass(slots=True)
 class _ProgramState:
-    mob_move: bool = False
     single_fleet_override: bool | None = None
     support_fleet: bool = False
     dynamic_queries: list[str] = field(default_factory=list)
-
-    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
-        cancellation.raise_if_requested()
-        self.dynamic_queries.append("map_has_mob_move")
-        return self.mob_move
 
     def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
@@ -529,11 +527,17 @@ def _enemy_grid(cell: CellId, *, genre: str) -> GridInfo:
 def _port(
     runtime: _Runtime,
     state: RuntimeProgramState | None = None,
+    *,
+    mob_move: bool = False,
 ) -> Mumu12BattleProgramPort:
     if state is None:
         state = _ProgramState()
     action_runtime = cast("DeclarativeCampaignMapRuntime", runtime)
-    return build_mumu12_battle_program_port(action_runtime, state)
+    return build_mumu12_battle_program_port(
+        action_runtime,
+        state,
+        CampaignProgramCapabilityReader(CampaignProgramCapabilities(map_has_mob_move=mob_move)),
+    )
 
 
 def _cancel() -> CancellationSource:
@@ -554,8 +558,8 @@ def test_initial_flags_queries_and_map_state_are_explicit() -> None:
     runtime.map_is_clear_mode = True
     runtime.config.fleet_2 = 0
     runtime.config.MAP_HAS_MOVABLE_ENEMY = True
-    state = _ProgramState(mob_move=True, support_fleet=True)
-    port = _port(runtime, state)
+    state = _ProgramState(support_fleet=True)
+    port = _port(runtime, state, mob_move=True)
     cancellation = _cancel()
 
     assert port.initial_flags(cancellation) == frozenset(
@@ -608,8 +612,12 @@ def test_program_read_model_projects_typed_runtime_facts_and_refreshes_each_quer
     runtime = _Runtime([_grid(A1), _grid(B1, siren=True), _grid(C1, boss=True), target])
     runtime.map_is_clear_mode = True
     runtime.config.MAP_HAS_MOVABLE_NORMAL_ENEMY = True
-    state = _ProgramState(mob_move=True, support_fleet=True)
-    reads = Mumu12BattleProgramReadModel(runtime, state)
+    state = _ProgramState(support_fleet=True)
+    reads = Mumu12BattleProgramReadModel(
+        runtime,
+        state,
+        CampaignProgramCapabilityReader(CampaignProgramCapabilities(map_has_mob_move=True)),
+    )
 
     status = reads.status(_cancel())
     battlefield = reads.battlefield(_cancel())
@@ -643,8 +651,12 @@ def test_program_read_model_projects_typed_runtime_facts_and_refreshes_each_quer
 def test_battle_count_read_does_not_query_dynamic_program_state() -> None:
     runtime = _Runtime([_grid(A1)])
     runtime.battle_count = 7
-    state = _ProgramState(mob_move=True, single_fleet_override=True, support_fleet=True)
-    reads = Mumu12BattleProgramReadModel(runtime, state)
+    state = _ProgramState(single_fleet_override=True, support_fleet=True)
+    reads = Mumu12BattleProgramReadModel(
+        runtime,
+        state,
+        CampaignProgramCapabilityReader(CampaignProgramCapabilities(map_has_mob_move=True)),
+    )
     cancellation = _Cancellation()
 
     assert reads.battle_count(cast("CancellationSource", cancellation)) == 7
