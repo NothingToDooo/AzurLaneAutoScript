@@ -388,7 +388,7 @@ def test_same_kind_composes_base_to_derived_as_an_around_chain() -> None:
 
 
 def test_derived_executor_can_short_circuit_without_calling_next() -> None:
-    operation = RuntimeOperation.MAP_GET_INFO
+    operation = RuntimeOperation.HANDLE_MYSTERY_ITEMS
     called: list[str] = []
 
     def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
@@ -400,17 +400,17 @@ def test_derived_executor_can_short_circuit_without_calling_next() -> None:
             return None
 
         return RuntimeExecutorInstance(
-            {RuntimeExecutorKind.MAP_OBSERVATION},
-            methods={RuntimeExecutorKind.MAP_OBSERVATION: {operation: method}},
+            {RuntimeExecutorKind.MAP_MECHANIC},
+            methods={RuntimeExecutorKind.MAP_MECHANIC: {operation: method}},
         )
 
-    schemas = {RuntimeExecutorKind.MAP_OBSERVATION: RuntimeExecutorOptionsSchema()}
+    schemas = {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()}
     manager = CampaignRuntimeProfileManager(
         _profile(
-            _extension("base", _binding("base", RuntimeExecutorKind.MAP_OBSERVATION)),
+            _extension("base", _binding("base", RuntimeExecutorKind.MAP_MECHANIC)),
             _extension(
                 "derived",
-                _binding("derived", RuntimeExecutorKind.MAP_OBSERVATION),
+                _binding("derived", RuntimeExecutorKind.MAP_MECHANIC),
             ),
         ),
         CampaignRuntimeExecutorRegistry(
@@ -421,7 +421,7 @@ def test_derived_executor_can_short_circuit_without_calling_next() -> None:
         ),
     )
 
-    manager.observation.invoke(operation, object(), lambda: called.append("fallback"))
+    manager.mechanic.invoke(operation, object(), lambda: called.append("fallback"))
 
     assert called == ["derived"]
 

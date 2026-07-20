@@ -117,6 +117,22 @@ class CampaignFleetLocator(Protocol):
     def find_current_fleet(self, runtime: FleetLocatorRuntime) -> FleetLocation: ...
 
 
+class MapPreparationRuntime(Protocol):
+    """地图准备页状态读取所需的最小运行时原语。"""
+
+    def _standard_map_get_info(self) -> None: ...
+
+    def _standard_get_map_clear_percentage(self) -> float: ...
+
+
+class CampaignMapPreparation(Protocol):
+    """读取地图准备页状态，不暴露旧 string operation。"""
+
+    def map_get_info(self, runtime: MapPreparationRuntime) -> None: ...
+
+    def get_map_clear_percentage(self, runtime: MapPreparationRuntime) -> float: ...
+
+
 @dataclass(frozen=True, slots=True)
 class CampaignMapObserver:
     combat: CombatMapObserver
@@ -124,6 +140,7 @@ class CampaignMapObserver:
     enemy_searching: EnemySearchingObserver
     viewport: CampaignMapViewport
     fleet_locator: CampaignFleetLocator
+    preparation: CampaignMapPreparation
 
 
 class _StandardCombatMapObserver(CombatMapObserver):
@@ -196,10 +213,21 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
         return runtime._standard_find_current_fleet()  # ruff:ignore[private-member-access] - 标准 locator 只负责调用 Fleet 私有算法原语。
 
 
+class _StandardCampaignMapPreparation(CampaignMapPreparation):
+    @override
+    def map_get_info(self, runtime: MapPreparationRuntime) -> None:
+        runtime._standard_map_get_info()  # ruff:ignore[private-member-access] - 标准 preparation 只负责调用 FastForward 私有算法原语。
+
+    @override
+    def get_map_clear_percentage(self, runtime: MapPreparationRuntime) -> float:
+        return runtime._standard_get_map_clear_percentage()  # ruff:ignore[private-member-access] - 标准 preparation 只负责调用 FastForward 私有算法原语。
+
+
 STANDARD_CAMPAIGN_MAP_OBSERVER = CampaignMapObserver(
     combat=_StandardCombatMapObserver(),
     scanner=_StandardCampaignMapScanner(),
     enemy_searching=_StandardEnemySearchingObserver(),
     viewport=_StandardCampaignMapViewport(),
     fleet_locator=_StandardCampaignFleetLocator(),
+    preparation=_StandardCampaignMapPreparation(),
 )

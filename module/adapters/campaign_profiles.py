@@ -52,7 +52,10 @@ def _validate_executor_contracts(
         try:
             manager = CampaignRuntimeProfileManager(profile, executors)
             build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
-            build_campaign_map_observer(manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION))
+            build_campaign_map_observer(
+                manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
+                map_clear_percentage_multiplier=manager.map_clear_percentage_multiplier,
+            )
         except CampaignRuntimeProfileError as error:
             message = f"runtime profile {profile.profile_id.value} is not executable: {error}"
             raise ContentValidationError(message) from error

@@ -924,9 +924,6 @@
               "th",
               "ht"
             ],
-            "operations": [
-              "map_get_info"
-            ],
             "override_map_clear_percentage": false
           }
         },
@@ -1762,10 +1759,6 @@
           "options": {
             "campaign_name_prefixes": [
               "*"
-            ],
-            "operations": [
-              "get_map_clear_percentage",
-              "map_get_info"
             ],
             "override_map_clear_percentage": true
           }

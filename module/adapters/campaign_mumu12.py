@@ -491,7 +491,8 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         self._runtime_profile.bind(self, self.MAP)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
         self._map_observer = build_campaign_map_observer(
-            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION)
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
+            map_clear_percentage_multiplier=self._runtime_profile.map_clear_percentage_multiplier,
         )
         self._event_ui_services = build_campaign_event_ui_services(
             self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
@@ -666,24 +667,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             formation,
             sub_view=sub_view,
             sub_hunt=sub_hunt,
-        )
-
-    def get_map_clear_percentage(self) -> float:
-        result = self._runtime_profile.observation.invoke(
-            RuntimeOperation.GET_MAP_CLEAR_PERCENTAGE,
-            self,
-            lambda: CampaignEngine.get_map_clear_percentage(self),
-        )
-        if not isinstance(result, int | float):
-            message = "map clear percentage executor must return a number"
-            raise CampaignRuntimeProfileError(message)
-        return float(result) * self._runtime_profile.map_clear_percentage_multiplier
-
-    def map_get_info(self) -> None:
-        self._runtime_profile.observation.invoke(
-            RuntimeOperation.MAP_GET_INFO,
-            self,
-            lambda: CampaignEngine.map_get_info(self),
         )
 
     def handle_boss_appear_refocus(self, preset: GridLocation | None = None) -> None:

@@ -114,6 +114,9 @@ class FastForwardHandler(AutoSearchHandler):
     map_fleet_checked = False
 
     def map_get_info(self) -> None:
+        self._map_observer.preparation.map_get_info(self)
+
+    def _standard_map_get_info(self) -> None:
         self.map_clear_percentage = self.get_map_clear_percentage()
         self.map_achieved_star_1 = self._is_map_star_active(handler_assets.MAP_STAR_1)
         self.map_achieved_star_2 = self._is_map_star_active(handler_assets.MAP_STAR_2)
@@ -286,6 +289,9 @@ class FastForwardHandler(AutoSearchHandler):
         return False
 
     def get_map_clear_percentage(self) -> float:
+        return self._map_observer.preparation.get_map_clear_percentage(self)
+
+    def _standard_get_map_clear_percentage(self) -> float:
         """在 MAP_PREPARATION 返回 0～1 的地图清理比例。"""
         percent = color_bar_percentage(
             self.device.image, area=handler_assets.MAP_CLEAR_PERCENTAGE.area, prev_color=(231, 170, 82)

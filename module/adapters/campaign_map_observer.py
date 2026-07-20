@@ -6,6 +6,7 @@ from module.map.map_observer import (
     STANDARD_CAMPAIGN_MAP_OBSERVER,
     CampaignFleetLocator,
     CampaignMapObserver,
+    CampaignMapPreparation,
     CampaignMapScanner,
     CampaignMapViewport,
     CombatMapObserver,
@@ -13,11 +14,12 @@ from module.map.map_observer import (
     FleetLocatorRuntime,
     InSightRequest,
     MapObserverRuntime,
+    MapPreparationRuntime,
     MapScannerRuntime,
     MapViewportRuntime,
 )
 
-from .campaign_runtime_profile import RuntimeExecutorInstance
+from .campaign_runtime_profile import CampaignRuntimeProfileError, RuntimeExecutorInstance
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -53,6 +55,14 @@ type FindCurrentFleetNext = Callable[[FleetLocatorRuntime], FleetLocation]
 type FindCurrentFleetHandler = Callable[
     [FleetLocatorRuntime, FindCurrentFleetNext],
     FleetLocation,
+]
+
+type MapGetInfoNext = Callable[[MapPreparationRuntime], None]
+type MapGetInfoHandler = Callable[[MapPreparationRuntime, MapGetInfoNext], None]
+type MapClearPercentageNext = Callable[[MapPreparationRuntime], float]
+type MapClearPercentageHandler = Callable[
+    [MapPreparationRuntime, MapClearPercentageNext],
+    float,
 ]
 
 
@@ -104,6 +114,8 @@ class CampaignMapObserverContributor:
     enemy_searching: EnemySearchingHandler | None = None
     in_sight: InSightHandler | None = None
     find_current_fleet: FindCurrentFleetHandler | None = None
+    map_get_info: MapGetInfoHandler | None = None
+    map_clear_percentage: MapClearPercentageHandler | None = None
 
 
 @runtime_checkable
@@ -211,6 +223,25 @@ class _ComposedCampaignFleetLocator(CampaignFleetLocator):
         return self.handler(runtime)
 
 
+@dataclass(frozen=True, slots=True)
+class _ComposedCampaignMapPreparation(CampaignMapPreparation):
+    map_get_info_handler: MapGetInfoNext
+    map_clear_percentage_handler: MapClearPercentageNext
+    map_clear_percentage_multiplier: float
+
+    @override
+    def map_get_info(self, runtime: MapPreparationRuntime) -> None:
+        self.map_get_info_handler(runtime)
+
+    @override
+    def get_map_clear_percentage(self, runtime: MapPreparationRuntime) -> float:
+        result = self.map_clear_percentage_handler(runtime)
+        if not isinstance(result, int | float):
+            message = "map clear percentage executor must return a number"
+            raise CampaignRuntimeProfileError(message)
+        return float(result) * self.map_clear_percentage_multiplier
+
+
 def _overlay_camera_repositioning(
     handler: CameraRepositioningHandler,
     next_handler: CameraRepositioningNext,
@@ -283,6 +314,41 @@ def _overlay_find_current_fleet(
     return execute
 
 
+def _overlay_map_get_info(
+    handler: MapGetInfoHandler,
+    next_handler: MapGetInfoNext,
+) -> MapGetInfoNext:
+    def execute(runtime: MapPreparationRuntime) -> None:
+        handler(runtime, next_handler)
+
+    return execute
+
+
+def _overlay_map_clear_percentage(
+    handler: MapClearPercentageHandler,
+    next_handler: MapClearPercentageNext,
+) -> MapClearPercentageNext:
+    def execute(runtime: MapPreparationRuntime) -> float:
+        return handler(runtime, next_handler)
+
+    return execute
+
+
+def _overlay_preparation(
+    contributor: CampaignMapObserverContributor,
+    map_get_info: MapGetInfoNext,
+    map_clear_percentage: MapClearPercentageNext,
+) -> tuple[MapGetInfoNext, MapClearPercentageNext]:
+    if contributor.map_get_info is not None:
+        map_get_info = _overlay_map_get_info(contributor.map_get_info, map_get_info)
+    if contributor.map_clear_percentage is not None:
+        map_clear_percentage = _overlay_map_clear_percentage(
+            contributor.map_clear_percentage,
+            map_clear_percentage,
+        )
+    return map_get_info, map_clear_percentage
+
+
 def _standard_full_scan(runtime: MapScannerRuntime, request: FullScanRequest) -> None:
     STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan(
         runtime,
@@ -293,7 +359,11 @@ def _standard_full_scan(runtime: MapScannerRuntime, request: FullScanRequest) ->
     )
 
 
-def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObserver:
+def build_campaign_map_observer(
+    instances: Iterable[object],
+    *,
+    map_clear_percentage_multiplier: float = 1.0,
+) -> CampaignMapObserver:
     """按 profile 顺序组合地图观察规则；后声明的 contributor 先获得处理权。"""
 
     camera_repositioning = STANDARD_CAMPAIGN_MAP_OBSERVER.combat.camera_repositioned_after_combat
@@ -302,6 +372,8 @@ def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObser
     enemy_searching = STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching.appears
     in_sight = STANDARD_CAMPAIGN_MAP_OBSERVER.viewport.in_sight
     find_current_fleet = STANDARD_CAMPAIGN_MAP_OBSERVER.fleet_locator.find_current_fleet
+    map_get_info = STANDARD_CAMPAIGN_MAP_OBSERVER.preparation.map_get_info
+    map_clear_percentage = STANDARD_CAMPAIGN_MAP_OBSERVER.preparation.get_map_clear_percentage
     for instance in instances:
         if not isinstance(instance, CampaignMapObserverContributorSource):
             continue
@@ -330,10 +402,20 @@ def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObser
                 contributor.find_current_fleet,
                 find_current_fleet,
             )
+        map_get_info, map_clear_percentage = _overlay_preparation(
+            contributor,
+            map_get_info,
+            map_clear_percentage,
+        )
     return CampaignMapObserver(
         combat=_ComposedCombatMapObserver(camera_repositioning),
         scanner=_ComposedCampaignMapScanner(full_scan, full_scan_movable),
         enemy_searching=_ComposedEnemySearchingObserver(enemy_searching),
         viewport=_ComposedCampaignMapViewport(in_sight),
         fleet_locator=_ComposedCampaignFleetLocator(find_current_fleet),
+        preparation=_ComposedCampaignMapPreparation(
+            map_get_info,
+            map_clear_percentage,
+            map_clear_percentage_multiplier,
+        ),
     )

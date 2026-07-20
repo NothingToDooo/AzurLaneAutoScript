@@ -38,12 +38,10 @@ class RuntimeOperation(StrEnum):
     CLEAR_BOSS = "clear_boss"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
     FLEET_PREPARATION = "fleet_preparation"
-    GET_MAP_CLEAR_PERCENTAGE = "get_map_clear_percentage"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
     HANDLE_MYSTERY_ITEMS = "handle_mystery_items"
     HANDLE_SUBMARINE_SUPPORT_POPUP = "handle_submarine_support_popup"
     MAP_DATA_INIT = "map_data_init"
-    MAP_GET_INFO = "map_get_info"
     MAP_INIT = "map_init"
     STRATEGY_SET_EXECUTE = "strategy_set_execute"
     RUNTIME_CREATED = "runtime_created"
@@ -718,10 +716,6 @@ class CampaignRuntimeProfileManager:
             message = "runtime facet requires a RuntimeExecutorKind"
             raise TypeError(message)
         return RuntimeFacetComposite(self, kind)
-
-    @property
-    def observation(self) -> RuntimeFacetComposite:
-        return self.facet(RuntimeExecutorKind.MAP_OBSERVATION)
 
     @property
     def mechanic(self) -> RuntimeFacetComposite:

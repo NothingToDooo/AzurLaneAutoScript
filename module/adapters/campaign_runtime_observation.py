@@ -17,6 +17,8 @@ from .campaign_map_observer import (
     FullScanNext,
     FullScanRequest,
     InSightNext,
+    MapClearPercentageNext,
+    MapGetInfoNext,
 )
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
@@ -24,7 +26,6 @@ from .campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
 )
 
 if TYPE_CHECKING:
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
     from module.map.map_observer import (
         FleetLocatorRuntime,
         InSightRequest,
+        MapPreparationRuntime,
         MapScannerRuntime,
         MapViewportRuntime,
     )
@@ -42,45 +44,14 @@ if TYPE_CHECKING:
     from module.map_detection.grid_info import GridInfo
 
 
-class _ObservationRuntimeHost(Protocol):
+class _AutoSearchClearStatusRuntime(Protocol):
     config: AzurLaneConfig
-    map: object
     map_is_100_percent_clear: bool
     map_is_3_stars: bool
     map_is_threat_safe: bool
     map_has_clear_mode: bool
 
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
-
     def map_show_info(self) -> None: ...
-
-
-def _host(runtime: object) -> _ObservationRuntimeHost:
-    return cast("_ObservationRuntimeHost", runtime)
-
-
-def _operations(options: Mapping[str, RuntimeTuningValue]) -> frozenset[str]:
-    value = options["operations"]
-    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
-        message = "runtime observation operations must contain strings"
-        raise CampaignRuntimeProfileError(message)
-    return frozenset(cast("tuple[str, ...]", value))
-
-
-def _require_operations(
-    options: Mapping[str, RuntimeTuningValue],
-    expected: frozenset[str],
-) -> None:
-    actual = _operations(options)
-    if actual != expected:
-        message = f"runtime observation operations mismatch: expected={sorted(expected)}, actual={sorted(actual)}"
-        raise CampaignRuntimeProfileError(message)
 
 
 def _string(options: Mapping[str, RuntimeTuningValue], name: str) -> str:
@@ -296,7 +267,6 @@ def _build_focus_rules(context: RuntimeExecutorBuildContext) -> RuntimeExecutorI
 def _auto_search_options(
     options: Mapping[str, RuntimeTuningValue],
 ) -> tuple[tuple[str, ...], bool]:
-    operations = _operations(options)
     prefixes_value = options["campaign_name_prefixes"]
     if (
         not isinstance(prefixes_value, tuple)
@@ -310,14 +280,6 @@ def _auto_search_options(
     if type(override_percentage) is not bool:
         message = "auto-search clear-status percentage option must be a boolean"
         raise CampaignRuntimeProfileError(message)
-    expected = {"map_get_info"}
-    if override_percentage:
-        expected.add("get_map_clear_percentage")
-    if operations != expected:
-        message = (
-            f"auto-search clear-status operations mismatch: expected={sorted(expected)}, actual={sorted(operations)}"
-        )
-        raise CampaignRuntimeProfileError(message)
     return prefixes, override_percentage
 
 
@@ -325,38 +287,41 @@ def _build_auto_search_clear_status(context: RuntimeExecutorBuildContext) -> Run
     options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
     prefixes, override_percentage = _auto_search_options(options)
 
-    def applies(host: _ObservationRuntimeHost) -> bool:
+    def applies(host: _AutoSearchClearStatusRuntime) -> bool:
         name = str(host.config.Campaign_Name).lower()
         return "*" in prefixes or name.startswith(prefixes)
 
-    def appears(runtime: object) -> bool:
+    def appears(runtime: MapPreparationRuntime) -> bool:
         return bool(AUTO_SEARCH.appear(main=cast("CampaignEngine", runtime)))
 
-    def map_get_info(runtime: object) -> object:
-        host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.MAP_GET_INFO)
-        if applies(host):
-            visible = appears(runtime)
-            host.map_is_100_percent_clear = visible
-            host.map_is_3_stars = visible
-            host.map_is_threat_safe = visible
-            host.map_has_clear_mode = visible
-            host.map_show_info()
-        return result
+    def map_get_info(
+        runtime: MapPreparationRuntime,
+        next_handler: MapGetInfoNext,
+    ) -> None:
+        next_handler(runtime)
+        host = cast("_AutoSearchClearStatusRuntime", runtime)
+        if not applies(host):
+            return
+        visible = appears(runtime)
+        host.map_is_100_percent_clear = visible
+        host.map_is_3_stars = visible
+        host.map_is_threat_safe = visible
+        host.map_has_clear_mode = visible
+        host.map_show_info()
 
-    methods = {RuntimeOperation.MAP_GET_INFO: map_get_info}
-    if override_percentage:
+    def get_map_clear_percentage(
+        runtime: MapPreparationRuntime,
+        next_handler: MapClearPercentageNext,
+    ) -> float:
+        if appears(runtime):
+            return 1.0
+        return next_handler(runtime)
 
-        def get_map_clear_percentage(runtime: object) -> object:
-            if appears(runtime):
-                return 1.0
-            return _host(runtime).runtime_super(RuntimeOperation.GET_MAP_CLEAR_PERCENTAGE)
-
-        methods[RuntimeOperation.GET_MAP_CLEAR_PERCENTAGE] = get_map_clear_percentage
-
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={RuntimeExecutorKind.MAP_OBSERVATION: methods},
+    return CampaignMapObserverExecutor(
+        CampaignMapObserverContributor(
+            map_get_info=map_get_info,
+            map_clear_percentage=(get_map_clear_percentage if override_percentage else None),
+        )
     )
 
 
@@ -401,7 +366,6 @@ def observation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDe
                 observation: RuntimeExecutorOptionsSchema(
                     required=frozenset(
                         {
-                            "operations",
                             "campaign_name_prefixes",
                             "override_map_clear_percentage",
                         }
