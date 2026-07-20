@@ -68,6 +68,7 @@ class _DispatchCamera(Camera):
             scanner=STANDARD_CAMPAIGN_MAP_OBSERVER.scanner,
             enemy_searching=STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching,
             viewport=viewport,
+            fleet_locator=STANDARD_CAMPAIGN_MAP_OBSERVER.fleet_locator,
         )
 
 

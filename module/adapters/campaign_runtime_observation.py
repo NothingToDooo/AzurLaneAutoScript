@@ -12,6 +12,7 @@ from .campaign_map_observer import (
     CampaignMapObserverContributor,
     CampaignMapObserverExecutor,
     EnemySearchingNext,
+    FindCurrentFleetNext,
     FullScanMovableNext,
     FullScanNext,
     FullScanRequest,
@@ -31,16 +32,19 @@ if TYPE_CHECKING:
     from module.campaign.campaign_engine import CampaignEngine
     from module.config.config import AzurLaneConfig
     from module.map.map_grids import SelectedGrids
-    from module.map.map_observer import InSightRequest, MapScannerRuntime, MapViewportRuntime
+    from module.map.map_observer import (
+        FleetLocatorRuntime,
+        InSightRequest,
+        MapScannerRuntime,
+        MapViewportRuntime,
+    )
+    from module.map.type_alias import FleetLocation
     from module.map_detection.grid_info import GridInfo
 
 
 class _ObservationRuntimeHost(Protocol):
     config: AzurLaneConfig
     map: object
-    fleet_1: object
-    fleet_2: object
-    fleet_current: object
     map_is_100_percent_clear: bool
     map_is_3_stars: bool
     map_is_threat_safe: bool
@@ -167,28 +171,29 @@ def _build_red_overlay_enemy_search(context: RuntimeExecutorBuildContext) -> Run
 
 def _build_fixed_fleet_locations(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-    _require_operations(options, frozenset({"find_current_fleet"}))
     fleet_1 = node2location(_string(options, "fleet_1"))
     fleet_2 = node2location(_string(options, "fleet_2"))
 
-    def find_current_fleet(runtime: object) -> object:
-        host = _host(runtime)
+    def find_current_fleet(
+        runtime: FleetLocatorRuntime,
+        next_handler: FindCurrentFleetNext,
+    ) -> FleetLocation:
+        del next_handler
         logger.hr("Find current fleet")
         logger.info(f"No fleet scan, assume fleet_1 at {location2node(fleet_1)}")
-        host.fleet_1 = fleet_1
-        if host.config.fleet_2:
+        runtime._set_fleet_location(  # ruff:ignore[private-member-access] - fixed locator 只能通过显式 port 原语更新舰队位置。
+            1,
+            fleet_1,
+        )
+        if runtime._fleet_2_enabled:  # ruff:ignore[private-member-access] - fixed locator 只读取显式 port 开关。
             logger.info(f"No fleet scan, assume fleet_2 at {location2node(fleet_2)}")
-            host.fleet_2 = fleet_2
-        return host.fleet_current
+            runtime._set_fleet_location(  # ruff:ignore[private-member-access] - fixed locator 只能通过显式 port 原语更新舰队位置。
+                2,
+                fleet_2,
+            )
+        return runtime.fleet_current
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={
-            RuntimeExecutorKind.MAP_OBSERVATION: {
-                RuntimeOperation.FIND_CURRENT_FLEET: find_current_fleet,
-            }
-        },
-    )
+    return CampaignMapObserverExecutor(CampaignMapObserverContributor(find_current_fleet=find_current_fleet))
 
 
 @dataclass(frozen=True, slots=True)
@@ -376,7 +381,7 @@ def observation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDe
             RuntimeImplementationId("observation/fixed_fleet_locations"),
             {
                 observation: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "fleet_1", "fleet_2"}),
+                    required=frozenset({"fleet_1", "fleet_2"}),
                 )
             },
             _build_fixed_fleet_locations,

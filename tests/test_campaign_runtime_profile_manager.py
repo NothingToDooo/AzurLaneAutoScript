@@ -388,7 +388,7 @@ def test_same_kind_composes_base_to_derived_as_an_around_chain() -> None:
 
 
 def test_derived_executor_can_short_circuit_without_calling_next() -> None:
-    operation = RuntimeOperation.FIND_CURRENT_FLEET
+    operation = RuntimeOperation.MAP_GET_INFO
     called: list[str] = []
 
     def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:

@@ -117,7 +117,6 @@ if TYPE_CHECKING:
     from module.content.models import StageRef
     from module.content.stage_rules import MapCalibration, StageNavigation
     from module.gameplay.campaign_factories import CampaignSessionSource
-    from module.map.fleet import FleetLocation
     from module.map.type_alias import GridLocation
     from module.map_detection.grid import Grid
 
@@ -668,14 +667,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             sub_view=sub_view,
             sub_hunt=sub_hunt,
         )
-
-    def find_current_fleet(self) -> FleetLocation:
-        result = self._runtime_profile.observation.invoke(
-            RuntimeOperation.FIND_CURRENT_FLEET,
-            self,
-            lambda: CampaignEngine.find_current_fleet(self),
-        )
-        return cast("FleetLocation", result)
 
     def get_map_clear_percentage(self) -> float:
         result = self._runtime_profile.observation.invoke(

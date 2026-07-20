@@ -1,11 +1,18 @@
 from typing import TYPE_CHECKING, override
 
+from module.adapters.campaign_map_observer import (
+    CampaignMapObserverContributor,
+    CampaignMapObserverExecutor,
+    InSightNext,
+    build_campaign_map_observer,
+)
 from module.map.fleet import Fleet
 from module.map_detection.grid import Grid
 from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
     from module.base.type_alias import Point
+    from module.map.map_observer import InSightRequest, MapViewportRuntime
 
 _Location = tuple[int, int]
 _MaybeLocation = _Location | tuple[()]
@@ -33,11 +40,20 @@ class _Grid(GridInfo):
 
 
 class _LocalGrid(Grid):
-    def __init__(self, *, current: bool) -> None:
+    def __init__(
+        self,
+        location: _Location,
+        calls: list[tuple[object, ...]],
+        *,
+        current: bool,
+    ) -> None:
+        self.location = location
+        self.calls = calls
         self.current = current
 
     @override
     def predict_current_fleet(self) -> bool:
+        self.calls.append(("predict_current_fleet", self.location))
         return self.current
 
 
@@ -86,6 +102,19 @@ class _Fleet(Fleet):
         self.calls: list[tuple[object, ...]] = []
         self.local_current_results: dict[_Location, bool] = {}
 
+        def in_sight(
+            runtime: MapViewportRuntime,
+            request: InSightRequest,
+            next_handler: InSightNext,
+        ) -> None:
+            del next_handler
+            assert runtime is self
+            self.calls.append(("in_sight", request.location, request.sight))
+
+        self._map_observer = build_campaign_map_observer(
+            (CampaignMapObserverExecutor(CampaignMapObserverContributor(in_sight=in_sight)),)
+        )
+
     def find_all_fleets(self) -> None:
         self.calls.append(("find_all_fleets",))
 
@@ -93,19 +122,16 @@ class _Fleet(Fleet):
         self.calls.append(("show_fleet", self.fleet_1_location, self.fleet_2_location))
 
     @override
-    def in_sight(
-        self,
-        location: GridInfo | str | Point,
-        sight: tuple[int, int, int, int] | None = None,
-    ) -> None:
-        assert isinstance(location, _Grid)
-        self.calls.append(("in_sight", location.location, sight))
-
-    @override
     def convert_global_to_local(self, location: GridInfo | str | Point) -> _LocalGrid:
         assert isinstance(location, _Grid)
-        self.calls.append(("convert_global_to_local", location.location))
-        return _LocalGrid(current=self.local_current_results.get(location.location, False))
+        grid_location = location.location
+        assert grid_location is not None
+        self.calls.append(("convert_global_to_local", grid_location))
+        return _LocalGrid(
+            grid_location,
+            self.calls,
+            current=self.local_current_results.get(grid_location, False),
+        )
 
 
 def test_find_current_fleet_uses_single_detected_fleet_without_second_fleet() -> None:
@@ -162,6 +188,15 @@ def test_find_current_fleet_predicts_current_when_marker_missing() -> None:
     assert result == (2, 2)
     assert fleet.fleet_1_location == (2, 2)
     assert fleet.fleet_2_location == (1, 1)
+    assert fleet.calls == [
+        ("in_sight", (1, 1), (-1, 0, 1, 2)),
+        ("convert_global_to_local", (1, 1)),
+        ("predict_current_fleet", (1, 1)),
+        ("in_sight", (2, 2), (-1, 0, 1, 2)),
+        ("convert_global_to_local", (2, 2)),
+        ("predict_current_fleet", (2, 2)),
+        ("show_fleet", (2, 2), (1, 1)),
+    ]
 
 
 def test_find_current_fleet_falls_back_to_full_scan_when_no_fleet_detected() -> None:

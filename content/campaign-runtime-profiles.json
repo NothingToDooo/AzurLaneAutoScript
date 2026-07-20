@@ -1328,10 +1328,7 @@
           "kind": "map_observation",
           "options": {
             "fleet_1": "D5",
-            "fleet_2": "F5",
-            "operations": [
-              "find_current_fleet"
-            ]
+            "fleet_2": "F5"
           }
         }
       ],
@@ -1371,10 +1368,7 @@
           "kind": "map_observation",
           "options": {
             "fleet_1": "D5",
-            "fleet_2": "F5",
-            "operations": [
-              "find_current_fleet"
-            ]
+            "fleet_2": "F5"
           }
         }
       ],

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, override
+from typing import TYPE_CHECKING, Literal, Protocol, override
 
 from module.handler.assets import MAP_ENEMY_SEARCHING
 from module.logger import logger
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from module.map.camera import FullScanOptions
     from module.map.map_base import CampaignMap
     from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import GridLocation, GridMode
+    from module.map.type_alias import FleetLocation, GridLocation, GridMode
     from module.map_detection.grid_info import GridInfo
 
 
@@ -95,12 +95,35 @@ class CampaignMapViewport(Protocol):
     def in_sight(self, runtime: MapViewportRuntime, request: InSightRequest) -> None: ...
 
 
+class FleetLocatorRuntime(Protocol):
+    @property
+    def _fleet_2_enabled(self) -> bool: ...
+
+    @property
+    def fleet_current(self) -> FleetLocation: ...
+
+    def _set_fleet_location(
+        self,
+        index: Literal[1, 2],
+        location: GridLocation,
+    ) -> None: ...
+
+    def _standard_find_current_fleet(self) -> FleetLocation: ...
+
+
+class CampaignFleetLocator(Protocol):
+    """定位当前舰队，不暴露旧 runtime string operation。"""
+
+    def find_current_fleet(self, runtime: FleetLocatorRuntime) -> FleetLocation: ...
+
+
 @dataclass(frozen=True, slots=True)
 class CampaignMapObserver:
     combat: CombatMapObserver
     scanner: CampaignMapScanner
     enemy_searching: EnemySearchingObserver
     viewport: CampaignMapViewport
+    fleet_locator: CampaignFleetLocator
 
 
 class _StandardCombatMapObserver(CombatMapObserver):
@@ -167,9 +190,16 @@ class _StandardCampaignMapViewport(CampaignMapViewport):
         )
 
 
+class _StandardCampaignFleetLocator(CampaignFleetLocator):
+    @override
+    def find_current_fleet(self, runtime: FleetLocatorRuntime) -> FleetLocation:
+        return runtime._standard_find_current_fleet()  # ruff:ignore[private-member-access] - 标准 locator 只负责调用 Fleet 私有算法原语。
+
+
 STANDARD_CAMPAIGN_MAP_OBSERVER = CampaignMapObserver(
     combat=_StandardCombatMapObserver(),
     scanner=_StandardCampaignMapScanner(),
     enemy_searching=_StandardEnemySearchingObserver(),
     viewport=_StandardCampaignMapViewport(),
+    fleet_locator=_StandardCampaignFleetLocator(),
 )

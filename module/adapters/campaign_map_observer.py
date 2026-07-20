@@ -4,11 +4,13 @@ from typing import TYPE_CHECKING, Protocol, override, runtime_checkable
 from module.content.runtime_profile import RuntimeExecutorKind
 from module.map.map_observer import (
     STANDARD_CAMPAIGN_MAP_OBSERVER,
+    CampaignFleetLocator,
     CampaignMapObserver,
     CampaignMapScanner,
     CampaignMapViewport,
     CombatMapObserver,
     EnemySearchingObserver,
+    FleetLocatorRuntime,
     InSightRequest,
     MapObserverRuntime,
     MapScannerRuntime,
@@ -23,7 +25,7 @@ if TYPE_CHECKING:
     from module.base.type_alias import ImageArray
     from module.map.camera import FullScanOptions
     from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import GridMode
+    from module.map.type_alias import FleetLocation, GridMode
     from module.map_detection.grid_info import GridInfo
 
 type CameraRepositioningNext = Callable[[MapObserverRuntime, GridInfo], bool]
@@ -46,6 +48,12 @@ type FullScanHandler = Callable[[MapScannerRuntime, FullScanRequest, FullScanNex
 
 type InSightNext = Callable[[MapViewportRuntime, InSightRequest], None]
 type InSightHandler = Callable[[MapViewportRuntime, InSightRequest, InSightNext], None]
+
+type FindCurrentFleetNext = Callable[[FleetLocatorRuntime], FleetLocation]
+type FindCurrentFleetHandler = Callable[
+    [FleetLocatorRuntime, FindCurrentFleetNext],
+    FleetLocation,
+]
 
 
 class FullScanMovableNext(Protocol):
@@ -95,6 +103,7 @@ class CampaignMapObserverContributor:
     full_scan_movable: FullScanMovableHandler | None = None
     enemy_searching: EnemySearchingHandler | None = None
     in_sight: InSightHandler | None = None
+    find_current_fleet: FindCurrentFleetHandler | None = None
 
 
 @runtime_checkable
@@ -193,6 +202,15 @@ class _ComposedCampaignMapViewport(CampaignMapViewport):
         self.handler(runtime, request)
 
 
+@dataclass(frozen=True, slots=True)
+class _ComposedCampaignFleetLocator(CampaignFleetLocator):
+    handler: FindCurrentFleetNext
+
+    @override
+    def find_current_fleet(self, runtime: FleetLocatorRuntime) -> FleetLocation:
+        return self.handler(runtime)
+
+
 def _overlay_camera_repositioning(
     handler: CameraRepositioningHandler,
     next_handler: CameraRepositioningNext,
@@ -255,6 +273,16 @@ def _overlay_in_sight(
     return execute
 
 
+def _overlay_find_current_fleet(
+    handler: FindCurrentFleetHandler,
+    next_handler: FindCurrentFleetNext,
+) -> FindCurrentFleetNext:
+    def execute(runtime: FleetLocatorRuntime) -> FleetLocation:
+        return handler(runtime, next_handler)
+
+    return execute
+
+
 def _standard_full_scan(runtime: MapScannerRuntime, request: FullScanRequest) -> None:
     STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan(
         runtime,
@@ -273,6 +301,7 @@ def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObser
     full_scan_movable = STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan_movable
     enemy_searching = STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching.appears
     in_sight = STANDARD_CAMPAIGN_MAP_OBSERVER.viewport.in_sight
+    find_current_fleet = STANDARD_CAMPAIGN_MAP_OBSERVER.fleet_locator.find_current_fleet
     for instance in instances:
         if not isinstance(instance, CampaignMapObserverContributorSource):
             continue
@@ -296,9 +325,15 @@ def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObser
             )
         if contributor.in_sight is not None:
             in_sight = _overlay_in_sight(contributor.in_sight, in_sight)
+        if contributor.find_current_fleet is not None:
+            find_current_fleet = _overlay_find_current_fleet(
+                contributor.find_current_fleet,
+                find_current_fleet,
+            )
     return CampaignMapObserver(
         combat=_ComposedCombatMapObserver(camera_repositioning),
         scanner=_ComposedCampaignMapScanner(full_scan, full_scan_movable),
         enemy_searching=_ComposedEnemySearchingObserver(enemy_searching),
         viewport=_ComposedCampaignMapViewport(in_sight),
+        fleet_locator=_ComposedCampaignFleetLocator(find_current_fleet),
     )

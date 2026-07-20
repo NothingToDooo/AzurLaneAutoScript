@@ -33,9 +33,8 @@ if TYPE_CHECKING:
     from module.base.type_alias import ImageArray, NumericArray, Point
     from module.config.config import AzurLaneConfig
     from module.device.device import Device
-    from module.map.fleet import FleetLocation
     from module.map.map_base import CampaignMap
-    from module.map.type_alias import GridLocation
+    from module.map.type_alias import FleetLocation, GridLocation
     from module.map_detection.grid import Grid
     from module.map_detection.grid_info import GridInfo
     from module.os.radar import RadarGrid, RadarSelection

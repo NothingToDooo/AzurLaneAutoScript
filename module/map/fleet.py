@@ -19,11 +19,9 @@ if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
     from module.device.device import Device
     from module.map.map_base import CampaignMap
-    from module.map.type_alias import GridLocation, GridMode
+    from module.map.type_alias import FleetLocation, GridLocation, GridMode
     from module.map_detection.grid import Grid
     from module.map_detection.grid_info import GridInfo
-
-type FleetLocation = GridLocation | tuple[()]
 
 WALK_OUT_OF_STEP_MESSAGE = "walk_out_of_step"
 
@@ -106,6 +104,16 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - å¾
             self.fleet_2_location = value
         else:
             self.fleet_1_location = value
+
+    @property
+    def _fleet_2_enabled(self) -> bool:
+        return bool(self.config.fleet_2)
+
+    def _set_fleet_location(self, index: Literal[1, 2], location: GridLocation) -> None:
+        if index == 1:
+            self.fleet_1 = location
+        else:
+            self.fleet_2 = location
 
     @property
     def fleet_boss(self) -> Self:
@@ -850,6 +858,9 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - å¾
             queue = queue[1:]
 
     def find_current_fleet(self) -> FleetLocation:
+        return self._map_observer.fleet_locator.find_current_fleet(self)
+
+    def _standard_find_current_fleet(self) -> FleetLocation:
         logger.hr("Find current fleet")
         fleets = self._find_current_fleet_candidates()
         logger.info(f"Fleets: {fleets}")

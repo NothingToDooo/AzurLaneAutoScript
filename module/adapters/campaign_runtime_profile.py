@@ -37,7 +37,6 @@ class RuntimeOperation(StrEnum):
     MAP_SWIPE = "map_swipe"
     CLEAR_BOSS = "clear_boss"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
-    FIND_CURRENT_FLEET = "find_current_fleet"
     FLEET_PREPARATION = "fleet_preparation"
     GET_MAP_CLEAR_PERCENTAGE = "get_map_clear_percentage"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
