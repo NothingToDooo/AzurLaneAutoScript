@@ -111,7 +111,7 @@ def _support_binding() -> RuntimeExecutorBinding:
         "map_mechanic/support_fleet",
         RuntimeExecutorKind.MAP_MECHANIC,
         {
-            "operations": ["_map_swipe", "fleet_preparation"],
+            "operations": ["fleet_preparation"],
             "state": ["use_support_fleet"],
         },
     )

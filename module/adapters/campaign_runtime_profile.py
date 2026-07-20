@@ -34,7 +34,6 @@ class RuntimeOperation(StrEnum):
     """旧地图引擎允许扩展的封闭调用面；值不是可反射的 Python 路径。"""
 
     EXPECTED_END = "expected_end"
-    MAP_SWIPE = "map_swipe"
     CLEAR_BOSS = "clear_boss"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
     FLEET_PREPARATION = "fleet_preparation"

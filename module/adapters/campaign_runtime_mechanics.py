@@ -5,6 +5,7 @@ from module.base.mask import Mask
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
 from module.logger import logger
 from module.map.assets import FLEET_SUPPORT_EMPTY
+from module.map.map_swipe import MapSwipePolicy
 from module.map_detection.utils_assets import ASSETS
 
 from .campaign_runtime_profile import (
@@ -23,7 +24,7 @@ from .campaign_runtime_profile import (
 if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
 
-_SUPPORT_SWIPE_BOX = (239, 159, 1175, 628)
+_SUPPORT_SWIPE_POLICY = MapSwipePolicy(default_box=(239, 159, 1175, 628))
 _UI_MASK_CACHE_KEYS = ("ui_mask", "ui_mask_stroke", "ui_mask_in_map")
 _MASKS = {
     "support_fleet": Mask(file="./assets/mask/MASK_MAP_UI_SUPPORT.png"),
@@ -86,7 +87,7 @@ class SupportFleetExecutor(RuntimeExecutorInstance):
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
-        _require_operations(options, frozenset({"_map_swipe", "fleet_preparation"}))
+        _require_operations(options, frozenset({"fleet_preparation"}))
         if _strings(options, "state") != ("use_support_fleet",):
             message = "support-fleet executor must own use_support_fleet state"
             raise CampaignRuntimeProfileError(message)
@@ -95,7 +96,6 @@ class SupportFleetExecutor(RuntimeExecutorInstance):
             methods={
                 RuntimeExecutorKind.MAP_MECHANIC: {
                     RuntimeOperation.FLEET_PREPARATION: self._fleet_preparation,
-                    RuntimeOperation.MAP_SWIPE: self._map_swipe,
                 }
             },
             state_seed=RuntimeStateSeed(use_support_fleet=True),
@@ -109,13 +109,9 @@ class SupportFleetExecutor(RuntimeExecutorInstance):
         logger.attr("use_support_fleet", self.current_use_support_fleet())
         return host.runtime_super(RuntimeOperation.FLEET_PREPARATION)
 
-    @staticmethod
-    def _map_swipe(
-        runtime: object,
-        vector: object,
-        box: object = _SUPPORT_SWIPE_BOX,
-    ) -> object:
-        return _host(runtime).runtime_super(RuntimeOperation.MAP_SWIPE, vector, box=box)
+    @property
+    def map_swipe_policy(self) -> MapSwipePolicy:
+        return _SUPPORT_SWIPE_POLICY
 
 
 class RuntimeUiMaskExecutor(RuntimeExecutorInstance):

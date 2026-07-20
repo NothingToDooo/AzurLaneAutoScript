@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from module.adapters.campaign_event_ui import build_campaign_event_ui_services
 from module.adapters.campaign_map_observer import build_campaign_map_observer
+from module.adapters.campaign_map_swipe import build_campaign_map_swipe_service
 from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
@@ -57,6 +58,7 @@ def _validate_executor_contracts(
                 manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
                 map_clear_percentage_multiplier=manager.map_clear_percentage_multiplier,
             )
+            build_campaign_map_swipe_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
             build_campaign_mystery_item_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
         except CampaignRuntimeProfileError as error:
             message = f"runtime profile {profile.profile_id.value} is not executable: {error}"

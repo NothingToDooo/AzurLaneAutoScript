@@ -15,6 +15,7 @@ from module.map.assets import MAP_PREPARATION
 from module.map.map_base import CampaignMap, location2node
 from module.map.map_observer import InSightRequest
 from module.map.map_operation import MapOperation
+from module.map.map_swipe import STANDARD_MAP_SWIPE_SERVICE, MapSwipeRequest, MapSwipeService
 from module.map.utils import location_ensure, random_direction
 from module.map_detection.grid import Grid
 from module.map_detection.utils import area2corner, trapezoid2area
@@ -70,8 +71,9 @@ class Camera(MapOperation):
     grid_class = Grid
     _prev_view: View | None = None
     _prev_swipe: Point | None = None
+    _map_swipe_service: MapSwipeService = STANDARD_MAP_SWIPE_SERVICE
 
-    def _map_swipe(self, vector: Point, box: Area = (123, 159, 1175, 628)) -> bool:
+    def _standard_map_swipe(self, vector: Point, *, box: Area) -> bool:
         """按浮点格子向量在 box 坐标区域内滑动，返回相机是否移动。"""
         vector = np.array(vector)
         name = "MAP_SWIPE_" + "_".join([str(round(x)) for x in vector])
@@ -93,6 +95,12 @@ class Camera(MapOperation):
             self.update(wait_swipe=True)
             return True
         return False
+
+    def _map_swipe(self, vector: Point, box: Area | None = None) -> bool:
+        return self._map_swipe_service.swipe(
+            self,
+            MapSwipeRequest(vector=vector, explicit_box=box),
+        )
 
     def map_swipe(self, vector: Point) -> bool:
         """按整数相对格子向量滑动；调用前必须已更新视图。"""

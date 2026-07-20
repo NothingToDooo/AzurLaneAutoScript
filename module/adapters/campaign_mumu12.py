@@ -19,6 +19,7 @@ from module.adapters.campaign_map_session_mumu12 import (
     Mumu12CampaignMapSessionOwner,
     apply_campaign_map_mutations,
 )
+from module.adapters.campaign_map_swipe import build_campaign_map_swipe_service
 from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
 from module.adapters.campaign_program_mumu12 import (
     Mumu12CampaignBattleProgramExecutor,
@@ -110,7 +111,6 @@ if TYPE_CHECKING:
 
     from module.application import CancellationSource
     from module.base.button import Button
-    from module.base.type_alias import Area, Point
     from module.combat.combat import CombatEnd
     from module.config.config_generated import ConfigOverrides
     from module.content.battle_program import BattleProgramMode
@@ -495,6 +495,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
             map_clear_percentage_multiplier=self._runtime_profile.map_clear_percentage_multiplier,
         )
+        self._map_swipe_service = build_campaign_map_swipe_service(
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
+        )
         self._mystery_item_service = build_campaign_mystery_item_service(
             self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
         )
@@ -598,24 +601,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
                 self._missing_runtime_base,
                 RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
             ),
-        )
-        return bool(result)
-
-    def _map_swipe(
-        self,
-        vector: Point,
-        box: Area = (123, 159, 1175, 628),
-    ) -> bool:
-        result = self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.MAP_SWIPE,
-            self,
-            lambda value, *, box: CampaignEngine._map_swipe(  # ruff:ignore[private-member-access] - 固定调用引擎基线。
-                self,
-                value,
-                box=box,
-            ),
-            vector,
-            box=box,
         )
         return bool(result)
 

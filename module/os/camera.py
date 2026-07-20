@@ -25,7 +25,7 @@ class OSCamera(OSMapOperation, Camera):
     radar: Radar
     fleet_current: GridLocation
 
-    def _map_swipe(self, vector: Point, box: Area = (239, 128, 993, 628)) -> bool:
+    def _map_swipe(self, vector: Point, box: Area | None = (239, 128, 993, 628)) -> bool:
         return super()._map_swipe(vector, box=box)
 
     @staticmethod
