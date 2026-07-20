@@ -109,6 +109,12 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
     def _fleet_2_enabled(self) -> bool:
         return bool(self.config.fleet_2)
 
+    @property
+    def configured_boss_fleet(self) -> int:
+        """返回当前运行实例采用的 boss 舰队配置。"""
+
+        return self.config.fleet_boss
+
     def _set_fleet_location(self, index: Literal[1, 2], location: GridLocation) -> None:
         if index == 1:
             self.fleet_1 = location
@@ -117,13 +123,13 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
 
     @property
     def fleet_boss(self) -> Self:
-        if self.config.fleet_boss == 2 and self.config.fleet_2:
+        if self.configured_boss_fleet == 2 and self.config.fleet_2:
             return self.fleet_2
         return self.fleet_1
 
     @property
     def fleet_boss_index(self) -> int:
-        if self.config.fleet_boss == 2 and self.config.fleet_2:
+        if self.configured_boss_fleet == 2 and self.config.fleet_2:
             return 2
         return 1
 

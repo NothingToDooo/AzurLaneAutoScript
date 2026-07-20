@@ -49,40 +49,10 @@ if TYPE_CHECKING:
 class _Config(AzurLaneConfig):
     def __init__(self) -> None:
         self.overlays: list[dict[str, object]] = []
-        self._fleet_2_value = -1
-        self._fleet_boss_value = -1
-        self._submarine_value = -1
 
     @override
     def apply_runtime_overlay(self, **kwargs: Unpack[ConfigOverrides]) -> None:
         self.overlays.append(dict(kwargs))
-
-    @property
-    @override
-    def fleet_2(self) -> int:
-        return self._fleet_2_value
-
-    @fleet_2.setter
-    def fleet_2(self, value: int) -> None:
-        self._fleet_2_value = value
-
-    @property
-    @override
-    def fleet_boss(self) -> int:
-        return self._fleet_boss_value
-
-    @fleet_boss.setter
-    def fleet_boss(self, value: int) -> None:
-        self._fleet_boss_value = value
-
-    @property
-    @override
-    def submarine(self) -> int:
-        return self._submarine_value
-
-    @submarine.setter
-    def submarine(self, value: int) -> None:
-        self._submarine_value = value
 
 
 class _Runtime:
@@ -427,6 +397,8 @@ def test_registry_contracts_fail_before_runtime_binding(
     ("key", "value", "match"),
     [
         (RuntimeTuningKey.FLEET_2, 1.0, "fleet_2 must be an integer"),
+        (RuntimeTuningKey.FLEET_BOSS, 0, "fleet_boss must be 1 or 2"),
+        (RuntimeTuningKey.FLEET_BOSS, 3, "fleet_boss must be 1 or 2"),
         (
             RuntimeTuningKey.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD,
             "bright",
@@ -521,8 +493,8 @@ def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() ->
 
     assert len(config.overlays) == 1
     assert config.overlays[0]["Fleet_Fleet2"] == 1
-    assert config.fleet_boss == 1
     assert config.overlays[0]["Submarine_Fleet"] == 1
+    assert manager.configured_boss_fleet == 1
     assert runtime.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
     assert runtime.MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
     assert runtime.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
@@ -533,6 +505,7 @@ def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() ->
     assert manager.combat_disable_stuck_detection_battle == 1
     assert other.boss_appear_refocus_preset is None
     assert other.map_clear_percentage_multiplier == 1.0
+    assert other.configured_boss_fleet is None
 
 
 def test_map_and_camera_grid_ports_are_selected_independently() -> None:

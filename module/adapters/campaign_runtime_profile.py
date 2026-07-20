@@ -668,6 +668,7 @@ class CampaignRuntimeProfileManager:
     def _validate_projection_contracts(self) -> None:
         for key, value in self._direct_config_tunings.items():
             _integer_tuning(value, key)
+        _ = self.configured_boss_fleet
         for key, value in self._runtime_attribute_tunings.items():
             _number_tuning(value, key)
         _ = self.boss_appear_refocus_preset
@@ -723,17 +724,22 @@ class CampaignRuntimeProfileManager:
         fleet_2 = self._direct_config_tunings.get(RuntimeTuningKey.FLEET_2)
         if fleet_2 is not None:
             overlay["Fleet_Fleet2"] = _integer_tuning(fleet_2, RuntimeTuningKey.FLEET_2)
-        fleet_boss = self._direct_config_tunings.get(RuntimeTuningKey.FLEET_BOSS)
-        if fleet_boss is not None:
-            config.fleet_boss = _integer_tuning(
-                fleet_boss,
-                RuntimeTuningKey.FLEET_BOSS,
-            )
         submarine = self._direct_config_tunings.get(RuntimeTuningKey.SUBMARINE)
         if submarine is not None:
             overlay["Submarine_Fleet"] = _integer_tuning(submarine, RuntimeTuningKey.SUBMARINE)
         if overlay:
             config.apply_runtime_overlay(**cast("ConfigOverrides", overlay))
+
+    @property
+    def configured_boss_fleet(self) -> int | None:
+        value = self._direct_config_tunings.get(RuntimeTuningKey.FLEET_BOSS)
+        if value is None:
+            return None
+        fleet = _integer_tuning(value, RuntimeTuningKey.FLEET_BOSS)
+        if fleet not in (1, 2):
+            message = "fleet_boss must be 1 or 2"
+            raise CampaignRuntimeProfileError(message)
+        return fleet
 
     def install_map_grid(self, compiled_map: CampaignMap) -> None:
         if not isinstance(compiled_map, CampaignMap):

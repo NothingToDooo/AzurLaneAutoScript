@@ -58,6 +58,20 @@ def test_generic_personal_config_view_cannot_write_alas_json() -> None:
         config.save()
 
 
+def test_fleet_convenience_properties_are_read_only_and_stateless() -> None:
+    assert AzurLaneConfig.fleet_2.fset is None
+    assert AzurLaneConfig.submarine.fset is None
+    assert AzurLaneConfig.fleet_boss.fset is None
+    assert "_fleet_boss" not in vars(AzurLaneConfig)
+
+    config = AzurLaneConfig.__new__(AzurLaneConfig)
+    config._initialize_state("alas")  # ruff:ignore[private-member-access] - 直接验证无持久状态的派生值。
+    config.apply_runtime_overlay(Fleet_Fleet2=0)
+    assert config.fleet_boss == 1
+    config.apply_runtime_overlay(Fleet_Fleet2=2, Fleet_FleetOrder="fleet1_mob_fleet2_boss")
+    assert config.fleet_boss == 2
+
+
 def test_task_bind_chain_adds_event_defaults_in_existing_order() -> None:
     assert AzurLaneConfig.task_bind_chain("Event") == [
         "General",

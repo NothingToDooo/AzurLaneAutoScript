@@ -464,6 +464,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     session_variant: CampaignRunVariant
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
     _event_ui_services: CampaignEventUiServices
+    _configured_boss_fleet: int
     _profile_fleet_preparation_service: FleetPreparationService
     _program_capabilities: CampaignProgramCapabilityReader
     _submarine_services: CampaignSubmarineServices
@@ -496,6 +497,8 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         if camera_grid_class is not None:
             self.grid_class = camera_grid_class
         self._runtime_profile.apply_config(config)
+        profile_boss_fleet = self._runtime_profile.configured_boss_fleet
+        self._configured_boss_fleet = config.fleet_boss if profile_boss_fleet is None else profile_boss_fleet
         self.ENEMY_FILTER = definition.enemy_filter
         self.session_variant = CampaignRunVariant.NORMAL
         self._gems_behavior = None
@@ -525,6 +528,10 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             self._runtime_profile,
             self._event_ui_services,
         )
+
+    @property
+    def configured_boss_fleet(self) -> int:
+        return self._configured_boss_fleet
 
     def runtime_super(
         self,

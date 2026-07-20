@@ -219,6 +219,48 @@ def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
     assert combat_result.handle_experience_result(runtime) is False
 
 
+def test_declarative_runtime_owns_boss_fleet_across_sequential_profiles_and_hard_composition() -> None:
+    config = in_memory_config("campaign-boss-fleet-owner", {})
+    config.replace_runtime_overlay(
+        Fleet_Fleet2=2,
+        Fleet_FleetOrder="fleet1_all_fleet2_standby",
+    )
+    stage_7_1 = load_default_stage(StageRef("campaign_main", "7-1"))
+    stage_8_1 = load_default_stage(StageRef("campaign_main", "8-1"))
+
+    normal_7_1 = DeclarativeCampaignMapRuntime(config, object.__new__(Device), stage_7_1)
+    normal_8_1 = DeclarativeCampaignMapRuntime(config, object.__new__(Device), stage_8_1)
+    hard_7_1 = DeclarativeCampaignMapRuntime(
+        config,
+        object.__new__(Device),
+        compose_campaign_attempt_definition(stage_7_1, CampaignDifficulty.HARD),
+    )
+
+    assert normal_7_1.configured_boss_fleet == 2
+    assert normal_7_1.fleet_boss_index == 2
+    assert normal_8_1.configured_boss_fleet == 1
+    assert normal_8_1.fleet_boss_index == 1
+    assert hard_7_1.configured_boss_fleet == 2
+    assert hard_7_1.fleet_boss_index == 2
+
+
+def test_declarative_runtime_without_boss_tuning_uses_the_stateless_config_derivation() -> None:
+    config = in_memory_config("campaign-boss-fleet-default", {})
+    config.replace_runtime_overlay(
+        Fleet_Fleet2=2,
+        Fleet_FleetOrder="fleet1_mob_fleet2_boss",
+    )
+
+    runtime = DeclarativeCampaignMapRuntime(
+        config,
+        object.__new__(Device),
+        load_default_stage(StageRef("campaign_main", "8-1")),
+    )
+
+    assert runtime.configured_boss_fleet == 2
+    assert runtime.fleet_boss_index == 2
+
+
 def test_declarative_runtime_wires_t4_map_observer_to_the_real_fortress_grid() -> None:
     config = in_memory_config("campaign-map-observer-wiring", {})
     definition = load_default_stage(StageRef("event_20211125_cn", "t4"))

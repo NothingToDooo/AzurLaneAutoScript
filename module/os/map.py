@@ -42,7 +42,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     def os_init(self) -> None:
         """调用大世界功能前完成页面定位、区域状态刷新和当前区域清理，结束于区域地图。"""
         logger.hr("OS init", level=1)
-        self.config.override(Submarine_Fleet=1, Submarine_Mode="every_combat", STORY_ALLOW_SKIP=False)
+        self.config.apply_runtime_overlay(Submarine_Fleet=1, Submarine_Mode="every_combat", STORY_ALLOW_SKIP=False)
         self._os_init_ensure_page()
         self._os_init_prepare_current_zone()
         self._os_init_clear_current_zone()

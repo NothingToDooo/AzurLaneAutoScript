@@ -180,7 +180,6 @@ class _Config:
     MAP_HAS_MOVABLE_ENEMY: bool = False
     POOR_MAP_DATA: bool = False
     fleet_2: int = 2
-    fleet_boss: int = 2
 
 
 @dataclass(slots=True)
@@ -231,6 +230,7 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
         self.mystery_count = 3
         self.fleet_step = 2
         self.fleet_boss_index = 2
+        self.configured_boss_fleet = 2
         self.fleet_current_index = 1
         self.fleet_1_location: tuple[int, int] = (0, 0)
         self.fleet_2_location: tuple[int, int] = (1, 0)

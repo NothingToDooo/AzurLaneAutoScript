@@ -341,7 +341,7 @@ class FleetPreparation(InfoHandler):
             if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
-            self.config.submarine = 0
+            self.config.apply_runtime_overlay(Submarine_Fleet=0)
 
     def _prepare_submarine_fleet(self, fleet_2: FleetOperator, submarine: FleetOperator) -> bool:
         # 缓存 submarine.allow()，避免设置 fleet_2 后结果不一致。
@@ -388,7 +388,7 @@ class FleetPreparation(InfoHandler):
             if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
-            self.config.submarine = 0
+            self.config.apply_runtime_overlay(Submarine_Fleet=0)
 
     def fleet_preparation(self) -> bool:
         return self._fleet_preparation_service.prepare(self)

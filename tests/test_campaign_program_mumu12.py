@@ -46,7 +46,6 @@ class _Config:
     POOR_MAP_DATA = False
     MAP_HAS_MOVABLE_ENEMY = True
     MAP_HAS_MOVABLE_NORMAL_ENEMY = False
-    fleet_boss = 1
 
 
 class _Runtime:
@@ -56,6 +55,7 @@ class _Runtime:
     fleet_step = 0
     mystery_count = 0
     fleet_boss_index = 1
+    configured_boss_fleet = 1
     fleet_current_index = 1
     fleet_1_location = (0, 0)
     fleet_2_location = ()

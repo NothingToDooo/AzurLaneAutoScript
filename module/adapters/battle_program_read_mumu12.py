@@ -29,8 +29,9 @@ class _ProgramConfig(Protocol):
     MAP_HAS_MOVABLE_ENEMY: bool
     MAP_HAS_MOVABLE_NORMAL_ENEMY: bool
     POOR_MAP_DATA: bool
-    fleet_2: int
-    fleet_boss: int
+
+    @property
+    def fleet_2(self) -> int: ...
 
 
 class _SelectionProgramConfig(Protocol):
@@ -112,6 +113,9 @@ class Mumu12ProgramReadSource(Protocol):
 
     @property
     def fleet_boss_index(self) -> int: ...
+
+    @property
+    def configured_boss_fleet(self) -> int: ...
 
     @property
     def fleet_current_index(self) -> int: ...
@@ -411,7 +415,7 @@ class Mumu12BattleProgramReadModel:
             self._integer(source.fleet_step, "fleet_step"),
             self._integer(source.mystery_count, "mystery_count"),
             self._fleet_index(source.fleet_boss_index, "fleet_boss_index"),
-            self._integer(source.config.fleet_boss, "configured_boss_fleet"),
+            self._fleet_index(source.configured_boss_fleet, "configured_boss_fleet"),
             self._fleet_index(source.fleet_current_index, "fleet_current_index"),
             self._location(source.fleet_1_location, "fleet_1_location"),
             self._location(source.fleet_2_location, "fleet_2_location"),
