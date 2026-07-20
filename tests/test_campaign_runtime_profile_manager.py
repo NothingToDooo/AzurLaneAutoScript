@@ -388,7 +388,7 @@ def test_same_kind_composes_base_to_derived_as_an_around_chain() -> None:
 
 
 def test_derived_executor_can_short_circuit_without_calling_next() -> None:
-    operation = RuntimeOperation.FULL_SCAN
+    operation = RuntimeOperation.ENEMY_SEARCHING_APPEAR
     called: list[str] = []
 
     def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:

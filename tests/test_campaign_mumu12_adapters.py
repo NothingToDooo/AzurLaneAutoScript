@@ -226,11 +226,36 @@ def test_declarative_runtime_wires_t4_map_observer_to_the_real_fortress_grid() -
     runtime.map_is_clear_mode = False
 
     assert destination.is_fortress
-    assert runtime._map_observer.camera_repositioned_after_combat(  # ruff:ignore[private-member-access] - 删除 profile wiring 时必须失败。
+    assert runtime._map_observer.combat.camera_repositioned_after_combat(  # ruff:ignore[private-member-access] - 删除 profile wiring 时必须失败。
         runtime,
         destination,
     )
     assert sleeps == [3]
+
+
+def test_declarative_runtime_wires_real_preserve_enemy_genre_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = in_memory_config("campaign-map-scanner-wiring", {})
+    definition = load_default_stage(StageRef("event_20210325_cn", "a1"))
+    runtime = DeclarativeCampaignMapRuntime(config, object.__new__(Device), definition)
+    runtime.map = runtime.MAP
+    grid = runtime.map[(0, 0)]
+    grid.is_siren = True
+    grid.enemy_genre = "Siren_Dace"
+    observed: list[bool] = []
+
+    def standard_movable(*, enemy_cleared: bool = True) -> None:
+        observed.append(enemy_cleared)
+        grid.wipe_out()
+
+    monkeypatch.setattr(runtime, "_standard_full_scan_movable", standard_movable)
+
+    runtime.full_scan_movable(enemy_cleared=False)
+
+    assert observed == [False]
+    assert grid.is_siren
+    assert grid.enemy_genre == "Siren_Dace"
 
 
 class _ExpectedEndTransitionProbe:

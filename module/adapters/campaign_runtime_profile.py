@@ -40,8 +40,6 @@ class RuntimeOperation(StrEnum):
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
     FIND_CURRENT_FLEET = "find_current_fleet"
     FLEET_PREPARATION = "fleet_preparation"
-    FULL_SCAN = "full_scan"
-    FULL_SCAN_MOVABLE = "full_scan_movable"
     GET_MAP_CLEAR_PERCENTAGE = "get_map_clear_percentage"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
     HANDLE_MYSTERY_ITEMS = "handle_mystery_items"

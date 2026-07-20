@@ -214,7 +214,7 @@ def test_t4_observation_preserves_base_result_and_destination_identity() -> None
             *manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
         )
     )
-    result = observer.camera_repositioned_after_combat(runtime, destination)
+    result = observer.combat.camera_repositioned_after_combat(runtime, destination)
 
     assert result is True
     assert observed == [(runtime, destination)]
@@ -241,7 +241,7 @@ def test_t4_observation_only_waits_for_a_fortress_camera_move(
     destination.is_fortress = is_fortress
 
     observer = build_campaign_map_observer(manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION))
-    result = observer.camera_repositioned_after_combat(runtime, destination)
+    result = observer.combat.camera_repositioned_after_combat(runtime, destination)
 
     assert result is expected
     assert runtime.device.sleeps == expected_sleeps

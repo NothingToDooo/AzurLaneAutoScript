@@ -9,6 +9,13 @@ from module.handler.fast_forward import AUTO_SEARCH
 from module.logger import logger
 from module.map.utils import location_ensure
 
+from .campaign_map_observer import (
+    CampaignMapObserverContributor,
+    CampaignMapObserverExecutor,
+    FullScanMovableNext,
+    FullScanNext,
+    FullScanRequest,
+)
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
@@ -24,6 +31,7 @@ if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
     from module.device.device import Device
     from module.map.map_grids import SelectedGrids
+    from module.map.map_observer import MapScannerRuntime
     from module.map.utils import HasLocation
     from module.map_detection.grid_info import GridInfo
 
@@ -86,52 +94,59 @@ def _string(options: Mapping[str, RuntimeTuningValue], name: str) -> str:
     return value
 
 
-class PreserveEnemyGenreExecutor(RuntimeExecutorInstance):
+class PreserveEnemyGenreExecutor(CampaignMapObserverExecutor):
     """全图扫描移动敌人时暂存并恢复会短暂消失的敌人类型。"""
 
     __slots__ = ("_genre", "_preserved")
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-        _require_operations(options, frozenset({"full_scan", "full_scan_movable"}))
-        state = options["state"]
-        if state != ("dace",):
-            message = "preserved enemy genre state must be ['dace']"
-            raise CampaignRuntimeProfileError(message)
         self._genre = _string(options, "genre")
         self._preserved: SelectedGrids[GridInfo] | None = None
         super().__init__(
-            {RuntimeExecutorKind.MAP_OBSERVATION},
-            methods={
-                RuntimeExecutorKind.MAP_OBSERVATION: {
-                    RuntimeOperation.FULL_SCAN: self._full_scan,
-                    RuntimeOperation.FULL_SCAN_MOVABLE: self._full_scan_movable,
-                }
-            },
+            CampaignMapObserverContributor(
+                full_scan=self._full_scan,
+                full_scan_movable=self._full_scan_movable,
+            )
         )
 
     @override
     def reset(self) -> None:
+        self._restore_preserved()
         super().reset()
+
+    def _restore_preserved(self) -> None:
+        preserved = self._preserved
+        if preserved is None:
+            return
         self._preserved = None
+        logger.attr("Preserved_enemy_genre", preserved)
+        for grid in preserved:
+            grid.is_siren = True
+            grid.enemy_genre = self._genre
 
-    def _full_scan_movable(self, runtime: object, *args: object, **kwargs: object) -> object:
-        host = _host(runtime)
-        typed_map = cast("CampaignEngine", runtime).map
-        self._preserved = typed_map.select(enemy_genre=self._genre)
+    def _full_scan_movable(
+        self,
+        runtime: MapScannerRuntime,
+        next_handler: FullScanMovableNext,
+        *,
+        enemy_cleared: bool = True,
+    ) -> None:
+        self._preserved = runtime.map.select(enemy_genre=self._genre)
         logger.attr("Preserved_enemy_genre", self._preserved)
-        return host.runtime_super(RuntimeOperation.FULL_SCAN_MOVABLE, *args, **kwargs)
+        try:
+            next_handler(runtime, enemy_cleared=enemy_cleared)
+        finally:
+            self._restore_preserved()
 
-    def _full_scan(self, runtime: object, *args: object, **kwargs: object) -> object:
-        host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.FULL_SCAN, *args, **kwargs)
-        if self._preserved is not None:
-            logger.attr("Preserved_enemy_genre", self._preserved)
-            for grid in self._preserved:
-                grid.is_siren = True
-                grid.enemy_genre = self._genre
-            self._preserved = None
-        return result
+    def _full_scan(
+        self,
+        runtime: MapScannerRuntime,
+        request: FullScanRequest,
+        next_handler: FullScanNext,
+    ) -> None:
+        next_handler(runtime, request)
+        self._restore_preserved()
 
 
 def _build_preserve_enemy_genre(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
@@ -368,7 +383,7 @@ def observation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDe
             RuntimeImplementationId("observation/preserve_enemy_genre"),
             {
                 observation: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "state", "genre"}),
+                    required=frozenset({"genre"}),
                 )
             },
             _build_preserve_enemy_genre,

@@ -5,7 +5,10 @@ from module.content.runtime_profile import RuntimeExecutorKind
 from module.map.map_observer import (
     STANDARD_CAMPAIGN_MAP_OBSERVER,
     CampaignMapObserver,
+    CampaignMapScanner,
+    CombatMapObserver,
     MapObserverRuntime,
+    MapScannerRuntime,
 )
 
 from .campaign_runtime_profile import RuntimeExecutorInstance
@@ -13,6 +16,9 @@ from .campaign_runtime_profile import RuntimeExecutorInstance
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    from module.map.camera import FullScanOptions
+    from module.map.map_grids import SelectedGrids
+    from module.map.type_alias import GridMode
     from module.map_detection.grid_info import GridInfo
 
 type CameraRepositioningNext = Callable[[MapObserverRuntime, GridInfo], bool]
@@ -23,8 +29,41 @@ type CameraRepositioningHandler = Callable[
 
 
 @dataclass(frozen=True, slots=True)
+class FullScanRequest:
+    options: FullScanOptions | None = None
+    queue: SelectedGrids[GridInfo] | None = None
+    must_scan: SelectedGrids[GridInfo] | None = None
+    mode: GridMode = "normal"
+
+
+type FullScanNext = Callable[[MapScannerRuntime, FullScanRequest], None]
+type FullScanHandler = Callable[[MapScannerRuntime, FullScanRequest, FullScanNext], None]
+
+
+class FullScanMovableNext(Protocol):
+    def __call__(
+        self,
+        runtime: MapScannerRuntime,
+        *,
+        enemy_cleared: bool = True,
+    ) -> None: ...
+
+
+class FullScanMovableHandler(Protocol):
+    def __call__(
+        self,
+        runtime: MapScannerRuntime,
+        next_handler: FullScanMovableNext,
+        *,
+        enemy_cleared: bool = True,
+    ) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
 class CampaignMapObserverContributor:
     camera_repositioning: CameraRepositioningHandler | None = None
+    full_scan: FullScanHandler | None = None
+    full_scan_movable: FullScanMovableHandler | None = None
 
 
 @runtime_checkable
@@ -51,7 +90,7 @@ class CampaignMapObserverExecutor(RuntimeExecutorInstance):
 
 
 @dataclass(frozen=True, slots=True)
-class _ComposedCampaignMapObserver(CampaignMapObserver):
+class _ComposedCombatMapObserver(CombatMapObserver):
     camera_repositioning_handler: CameraRepositioningNext
 
     @override
@@ -61,6 +100,40 @@ class _ComposedCampaignMapObserver(CampaignMapObserver):
         destination: GridInfo,
     ) -> bool:
         return self.camera_repositioning_handler(runtime, destination)
+
+
+@dataclass(frozen=True, slots=True)
+class _ComposedCampaignMapScanner(CampaignMapScanner):
+    full_scan_handler: FullScanNext
+    full_scan_movable_handler: FullScanMovableNext
+
+    @override
+    def full_scan(
+        self,
+        runtime: MapScannerRuntime,
+        options: FullScanOptions | None = None,
+        queue: SelectedGrids[GridInfo] | None = None,
+        must_scan: SelectedGrids[GridInfo] | None = None,
+        mode: GridMode = "normal",
+    ) -> None:
+        self.full_scan_handler(
+            runtime,
+            FullScanRequest(
+                options=options,
+                queue=queue,
+                must_scan=must_scan,
+                mode=mode,
+            ),
+        )
+
+    @override
+    def full_scan_movable(
+        self,
+        runtime: MapScannerRuntime,
+        *,
+        enemy_cleared: bool = True,
+    ) -> None:
+        self.full_scan_movable_handler(runtime, enemy_cleared=enemy_cleared)
 
 
 def _overlay_camera_repositioning(
@@ -73,14 +146,63 @@ def _overlay_camera_repositioning(
     return execute
 
 
+def _overlay_full_scan(
+    handler: FullScanHandler,
+    next_handler: FullScanNext,
+) -> FullScanNext:
+    def execute(runtime: MapScannerRuntime, request: FullScanRequest) -> None:
+        handler(runtime, request, next_handler)
+
+    return execute
+
+
+def _overlay_full_scan_movable(
+    handler: FullScanMovableHandler,
+    next_handler: FullScanMovableNext,
+) -> FullScanMovableNext:
+    def execute(
+        runtime: MapScannerRuntime,
+        *,
+        enemy_cleared: bool = True,
+    ) -> None:
+        handler(runtime, next_handler, enemy_cleared=enemy_cleared)
+
+    return execute
+
+
+def _standard_full_scan(runtime: MapScannerRuntime, request: FullScanRequest) -> None:
+    STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan(
+        runtime,
+        options=request.options,
+        queue=request.queue,
+        must_scan=request.must_scan,
+        mode=request.mode,
+    )
+
+
 def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObserver:
     """按 profile 顺序组合地图观察规则；后声明的 contributor 先获得处理权。"""
 
-    camera_repositioning = STANDARD_CAMPAIGN_MAP_OBSERVER.camera_repositioned_after_combat
+    camera_repositioning = STANDARD_CAMPAIGN_MAP_OBSERVER.combat.camera_repositioned_after_combat
+    full_scan = _standard_full_scan
+    full_scan_movable = STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan_movable
     for instance in instances:
         if not isinstance(instance, CampaignMapObserverContributorSource):
             continue
-        handler = instance.map_observer_contributor.camera_repositioning
-        if handler is not None:
-            camera_repositioning = _overlay_camera_repositioning(handler, camera_repositioning)
-    return _ComposedCampaignMapObserver(camera_repositioning)
+        contributor = instance.map_observer_contributor
+        if contributor.camera_repositioning is not None:
+            camera_repositioning = _overlay_camera_repositioning(
+                contributor.camera_repositioning,
+                camera_repositioning,
+            )
+        if contributor.full_scan is not None:
+            full_scan = _overlay_full_scan(contributor.full_scan, full_scan)
+        if contributor.full_scan_movable is not None:
+            full_scan_movable = _overlay_full_scan_movable(
+                contributor.full_scan_movable,
+                full_scan_movable,
+            )
+    return CampaignMapObserver(
+        combat=_ComposedCombatMapObserver(camera_repositioning),
+        scanner=_ComposedCampaignMapScanner(full_scan, full_scan_movable),
+    )

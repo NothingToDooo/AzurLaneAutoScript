@@ -2,12 +2,13 @@ from typing import TYPE_CHECKING, override
 
 from module.map.fleet import Fleet
 from module.map.map_base import CampaignMap
+from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
 from module.map_detection.grid import Grid
 
 if TYPE_CHECKING:
     from module.base.type_alias import Point
     from module.combat.combat import CombatEnd
-    from module.map.map_observer import CampaignMapObserver, MapObserverRuntime
+    from module.map.map_observer import MapObserverRuntime
     from module.map.type_alias import GridLocation
     from module.map_detection.grid_info import GridInfo
 
@@ -37,14 +38,21 @@ class _LocalGrid(Grid):
 
 class _RecordingObserver:
     def __init__(self) -> None:
-        self.calls: list[tuple[MapObserverRuntime, GridInfo]] = []
+        self.calls: list[tuple[MapObserverRuntime, GridInfo, int, bool]] = []
 
     def camera_repositioned_after_combat(
         self,
         runtime: MapObserverRuntime,
         destination: GridInfo,
     ) -> bool:
-        self.calls.append((runtime, destination))
+        self.calls.append(
+            (
+                runtime,
+                destination,
+                runtime.battle_count,
+                destination.is_cleared,
+            )
+        )
         destination.is_fortress = True
         return False
 
@@ -105,15 +113,22 @@ class _CombatFleet(Fleet):
 
 def test_combat_observer_receives_and_mutates_the_exact_destination_grid() -> None:
     observer = _RecordingObserver()
-    fleet = _CombatFleet(observer)
+    fleet = _CombatFleet(
+        CampaignMapObserver(
+            combat=observer,
+            scanner=STANDARD_CAMPAIGN_MAP_OBSERVER.scanner,
+        )
+    )
     destination = fleet.map[(0, 0)]
     destination.may_enemy = True
 
     fleet.run_combat_at((0, 0))
 
     assert len(observer.calls) == 1
-    observed_runtime, observed_destination = observer.calls[0]
+    observed_runtime, observed_destination, observed_battle_count, observed_cleared = observer.calls[0]
     assert observed_runtime is fleet
     assert observed_destination is destination
+    assert observed_battle_count == 1
+    assert observed_cleared
     assert destination.is_cleared
     assert destination.is_fortress

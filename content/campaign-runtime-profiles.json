@@ -516,14 +516,7 @@
           "implementation": "observation/preserve_enemy_genre",
           "kind": "map_observation",
           "options": {
-            "genre": "Siren_Dace",
-            "operations": [
-              "full_scan",
-              "full_scan_movable"
-            ],
-            "state": [
-              "dace"
-            ]
+            "genre": "Siren_Dace"
           }
         }
       ],
@@ -2214,14 +2207,7 @@
           "implementation": "observation/preserve_enemy_genre",
           "kind": "map_observation",
           "options": {
-            "genre": "Siren_Dace",
-            "operations": [
-              "full_scan",
-              "full_scan_movable"
-            ],
-            "state": [
-              "dace"
-            ]
+            "genre": "Siren_Dace"
           }
         }
       ],

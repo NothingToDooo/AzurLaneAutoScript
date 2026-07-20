@@ -117,10 +117,8 @@ if TYPE_CHECKING:
     from module.content.models import StageRef
     from module.content.stage_rules import MapCalibration, StageNavigation
     from module.gameplay.campaign_factories import CampaignSessionSource
-    from module.map.camera import FullScanOptions
     from module.map.fleet import FleetLocation
-    from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import GridLocation, GridMode
+    from module.map.type_alias import GridLocation
     from module.map_detection.grid import Grid
     from module.map_detection.grid_info import GridInfo
 
@@ -687,40 +685,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             lambda: CampaignEngine.find_current_fleet(self),
         )
         return cast("FleetLocation", result)
-
-    def full_scan(
-        self,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None:
-        self._runtime_profile.observation.invoke(
-            RuntimeOperation.FULL_SCAN,
-            self,
-            lambda options=None, queue=None, must_scan=None, mode="normal": CampaignEngine.full_scan(
-                self,
-                options=options,
-                queue=queue,
-                must_scan=must_scan,
-                mode=mode,
-            ),
-            options,
-            queue,
-            must_scan,
-            mode,
-        )
-
-    def full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
-        self._runtime_profile.observation.invoke(
-            RuntimeOperation.FULL_SCAN_MOVABLE,
-            self,
-            lambda *, enemy_cleared=True: CampaignEngine.full_scan_movable(
-                self,
-                enemy_cleared=enemy_cleared,
-            ),
-            enemy_cleared=enemy_cleared,
-        )
 
     def get_map_clear_percentage(self) -> float:
         result = self._runtime_profile.observation.invoke(

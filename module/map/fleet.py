@@ -334,7 +334,7 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         elif destination.may_enemy:
             destination.is_cleared = True
 
-        if self._map_observer.camera_repositioned_after_combat(self, destination):
+        if self._map_observer.combat.camera_repositioned_after_combat(self, destination):
             self.handle_boss_appear_refocus()
             if sum(self.hp) < 0.01:
                 logger.warning("Empty HP on all slots, trying hp_get again")
@@ -641,6 +641,21 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         must_scan: SelectedGrids[GridInfo] | None = None,
         mode: GridMode = "normal",
     ) -> None:
+        self._map_observer.scanner.full_scan(
+            self,
+            options=options,
+            queue=queue,
+            must_scan=must_scan,
+            mode=mode,
+        )
+
+    def _standard_full_scan(
+        self,
+        options: FullScanOptions | None = None,
+        queue: SelectedGrids[GridInfo] | None = None,
+        must_scan: SelectedGrids[GridInfo] | None = None,
+        mode: GridMode = "normal",
+    ) -> None:
         if options is None:
             options = FullScanOptions(
                 queue=queue,
@@ -678,6 +693,12 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         logger.info(f"Carrier spawn: {diff}")
 
     def full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
+        self._map_observer.scanner.full_scan_movable(
+            self,
+            enemy_cleared=enemy_cleared,
+        )
+
+    def _standard_full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
         """敌人移动后扫描；enemy_cleared 为 True 时也扫描新刷敌人。"""
         if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
             if self.config.MAP_HAS_MOVABLE_ENEMY:
