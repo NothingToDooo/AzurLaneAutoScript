@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: TH4
   shape: I8
@@ -102,7 +102,6 @@ mechanics:
     - G5
     - I2
     tag: clear_map_items
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

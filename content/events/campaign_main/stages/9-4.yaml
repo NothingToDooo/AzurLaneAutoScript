@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: 9-4
   shape: I6
@@ -107,7 +107,6 @@ mechanics:
     fleet: active
     tag: ammo
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []

@@ -81,7 +81,7 @@ def _write_stage(root: Path, body: str) -> tuple[StageSpecLoader, StageSpec]:
 def _minimal_stage(**replacements: str) -> str:
     body = inspect.cleandoc(
         """
-        schema_version: 5
+        schema_version: 6
         map:
           name: T1
           shape: A1
@@ -110,7 +110,6 @@ def _minimal_stage(**replacements: str) -> str:
           fleet_coordination: []
           pickups: []
           map_interactions: []
-          map_mutations: []
           moving_enemies:
             turns: []
             wait_until_clear: false
@@ -371,9 +370,62 @@ def test_loader_wraps_yaml_parse_errors_at_the_root(tmp_path: Path) -> None:
 
 
 def test_loader_rejects_the_removed_stage_schema_without_a_compatibility_path(tmp_path: Path) -> None:
-    loader, spec = _write_stage(tmp_path / "events", _minimal_stage().replace("schema_version: 5", "schema_version: 4"))
+    loader, spec = _write_stage(tmp_path / "events", _minimal_stage().replace("schema_version: 6", "schema_version: 5"))
 
-    with pytest.raises(ContentValidationError, match=r"schema_version: must be 5"):
+    with pytest.raises(ContentValidationError, match=r"schema_version: must be 6"):
+        loader.load(spec)
+
+
+def test_loader_decodes_the_complete_normal_enemy_spawn_candidate_mask(tmp_path: Path) -> None:
+    body = _minimal_stage(
+        shape="B1",
+        map_data="-- --",
+        weight_data="50 50",
+    ).replace(
+        "  camera_data_spawn_point: [A1]",
+        "  camera_data_spawn_point: [A1]\n  normal_enemy_spawn_candidates: [A1, B1]",
+    )
+    loader, spec = _write_stage(tmp_path / "candidate-mask", body)
+
+    definition = loader.load(spec)
+
+    assert definition.map.normal_enemy_spawn_candidates == (CellId(0, 0), CellId(1, 0))
+
+
+@pytest.mark.parametrize(
+    ("candidate_yaml", "message"),
+    [
+        ("[A1, A1]", "duplicate cells"),
+        ("[A1, B1]", r"normal_enemy_spawn_candidates\[1\].*outside shape"),
+        (
+            "\n  - phase: map_init\n    patches: []",
+            r"normal_enemy_spawn_candidates\[0\].*must be a non-empty string",
+        ),
+    ],
+)
+def test_loader_rejects_invalid_or_removed_enemy_candidate_mask_shapes(
+    tmp_path: Path,
+    candidate_yaml: str,
+    message: str,
+) -> None:
+    body = _minimal_stage().replace(
+        "  camera_data_spawn_point: [A1]",
+        f"  camera_data_spawn_point: [A1]\n  normal_enemy_spawn_candidates: {candidate_yaml}",
+    )
+    loader, spec = _write_stage(tmp_path / "invalid-candidate-mask", body)
+
+    with pytest.raises(ContentValidationError, match=message):
+        loader.load(spec)
+
+
+def test_loader_rejects_the_removed_map_mutations_field(tmp_path: Path) -> None:
+    body = _minimal_stage().replace(
+        "  map_interactions: []",
+        "  map_interactions: []\n  map_mutations: []",
+    )
+    loader, spec = _write_stage(tmp_path / "removed-map-mutations", body)
+
+    with pytest.raises(ContentValidationError, match=r"mechanics.*map_mutations"):
         loader.load(spec)
 
 
@@ -518,7 +570,7 @@ def test_native_loader_requires_explicit_boss_strategy_and_rejects_non_boss_step
 
 def test_loader_preserves_distinct_loop_portal_and_land_based_data(tmp_path: Path) -> None:
     body = """
-        schema_version: 5
+        schema_version: 6
         map:
           name: T1
           shape: B2
@@ -565,7 +617,6 @@ def test_loader_preserves_distinct_loop_portal_and_land_based_data(tmp_path: Pat
           fleet_coordination: []
           pickups: []
           map_interactions: []
-          map_mutations: []
           moving_enemies:
             turns: []
             wait_until_clear: false

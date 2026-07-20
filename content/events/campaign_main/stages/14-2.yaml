@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: 14-2
   shape: I8
@@ -120,7 +120,6 @@ mechanics:
     kind: flare
     tag: map_item
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []

@@ -7,13 +7,10 @@ from typing import TYPE_CHECKING, ClassVar, Unpack, cast, override
 import pytest
 from config_factory import in_memory_config
 
-import module.adapters.campaign_map_session_mumu12 as map_session_adapters
 import module.adapters.campaign_mumu12 as campaign_adapters
 import module.adapters.encounter_mumu12 as encounter_adapters
-from module.adapters.campaign_map_session_mumu12 import (
-    Mumu12CampaignMapSessionOwner,
-    apply_campaign_map_mutations,
-)
+from module.adapters.campaign_map_data_mumu12 import apply_normal_enemy_candidate_mask
+from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionOwner
 from module.adapters.campaign_mumu12 import (
     CampaignRuntimeEvidenceError,
     DeclarativeCampaignMapRuntime,
@@ -56,11 +53,6 @@ from module.content.campaign_session import (
 from module.content.campaign_session_source import CampaignStageSelection
 from module.content.cell import CellId
 from module.content.mechanic_rules import (
-    MapCellAttribute,
-    MapCellPatch,
-    MapMutationPhase,
-    MapMutationRules,
-    MapMutationVariant,
     MapStructureRules,
     MovingEnemyRules,
     StageMechanicRules,
@@ -953,136 +945,99 @@ def test_refreshing_gems_cancellation_preserves_the_active_map_emotion_ledger() 
     assert service.replace_hard_fleet == second.prepare_hard_fleet
 
 
-def test_runtime_applies_only_the_requested_before_battle_patches() -> None:
-    definition = _definition()
-    definition = replace(
-        definition,
-        mechanics=StageMechanicRules(
-            map_mutations=MapMutationRules(
-                (
-                    MapCellPatch(
-                        phase=MapMutationPhase.BEFORE_BATTLE,
-                        cell=CellId(0, 1),
-                        attribute=MapCellAttribute.IS_ENEMY,
-                        value=True,
-                        battle=0,
-                    ),
-                    MapCellPatch(
-                        phase=MapMutationPhase.BEFORE_BATTLE,
-                        cell=CellId(1, 0),
-                        attribute=MapCellAttribute.IS_SIREN,
-                        value=True,
-                        battle=1,
-                    ),
-                )
-            )
-        ),
-    )
-    runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    runtime.definition = definition
-    runtime.map = compile_campaign_map(definition)
-    runtime.session_variant = CampaignRunVariant.NORMAL
-
-    apply_campaign_map_mutations(
-        runtime.map,
-        definition.mechanics.map_mutations,
-        CampaignRunVariant.NORMAL,
-        MapMutationPhase.BEFORE_BATTLE,
-        0,
-    )
-
-    assert runtime.map[(0, 1)].is_enemy is True
-    assert runtime.map[(1, 0)].is_siren is False
-
-
-def test_runtime_applies_map_patches_only_to_the_declared_variant() -> None:
-    definition = _definition()
-    definition = replace(
-        definition,
-        mechanics=StageMechanicRules(
-            map_mutations=MapMutationRules(
-                (
-                    MapCellPatch(
-                        phase=MapMutationPhase.MAP_DATA_INIT,
-                        cell=CellId(0, 1),
-                        attribute=MapCellAttribute.MAY_ENEMY,
-                        value=True,
-                        variant=MapMutationVariant.NORMAL,
-                    ),
-                )
-            )
-        ),
-    )
-    runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    runtime.definition = definition
-    runtime.map = compile_campaign_map(definition)
-    runtime.session_variant = CampaignRunVariant.LOOP
-
-    apply_campaign_map_mutations(
-        runtime.map,
-        definition.mechanics.map_mutations,
-        CampaignRunVariant.LOOP,
-        MapMutationPhase.MAP_DATA_INIT,
-    )
-
-    assert runtime.map[(0, 1)].may_enemy is False
-    runtime.session_variant = CampaignRunVariant.NORMAL
-    apply_campaign_map_mutations(
-        runtime.map,
-        definition.mechanics.map_mutations,
-        CampaignRunVariant.NORMAL,
-        MapMutationPhase.MAP_DATA_INIT,
-    )
-    assert runtime.map[(0, 1)].may_enemy is True
-
-
-def test_campaign_14_4_normal_override_is_declarative_and_does_not_leak_into_loop() -> None:
+def test_campaign_14_4_normal_enemy_candidate_mask_is_complete_and_preserves_ambush() -> None:
     definition = load_default_stage(StageRef("campaign_main", "14-4"))
-    patches = definition.mechanics.map_mutations.patches
-    assert len(patches) == 21
-    assert {patch.variant for patch in patches} == {MapMutationVariant.NORMAL}
+    expected = tuple(
+        CellId.parse(node)
+        for node in (
+            "A1",
+            "G1",
+            "B2",
+            "C2",
+            "F2",
+            "H2",
+            "D3",
+            "D4",
+            "G4",
+            "K4",
+            "C5",
+            "D5",
+            "F5",
+            "K5",
+            "B6",
+            "C6",
+            "G6",
+            "C7",
+            "I7",
+            "B8",
+            "E8",
+            "G8",
+            "H8",
+            "I8",
+            "J9",
+        )
+    )
+    assert definition.map.normal_enemy_spawn_candidates == expected
 
-    runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    runtime.definition = definition
-    runtime.map = compile_campaign_map(definition)
-    runtime.session_variant = CampaignRunVariant.NORMAL
-    assert runtime.map[(7, 1)].may_enemy is False
-    assert runtime.map[(5, 0)].may_enemy is True
-    apply_campaign_map_mutations(
-        runtime.map,
-        definition.mechanics.map_mutations,
+    map_ = compile_campaign_map(definition)
+    expected_locations = frozenset((cell.x, cell.y) for cell in expected)
+    for grid in map_:
+        grid.may_enemy = grid.location not in expected_locations
+    map_[(7, 1)].may_ambush = True
+    map_[(5, 0)].may_ambush = False
+
+    apply_normal_enemy_candidate_mask(
+        map_,
+        definition.map.normal_enemy_spawn_candidates,
         CampaignRunVariant.NORMAL,
-        MapMutationPhase.MAP_DATA_INIT,
     )
-    assert runtime.map[(7, 1)].may_enemy is True
-    assert runtime.map[(5, 0)].may_enemy is False
 
-    runtime.map.load_map_data(use_loop=True)
-    runtime.session_variant = CampaignRunVariant.LOOP
-    apply_campaign_map_mutations(
-        runtime.map,
-        definition.mechanics.map_mutations,
+    assert frozenset(grid.location for grid in map_ if grid.may_enemy) == expected_locations
+    assert map_[(7, 1)].may_enemy is True
+    assert map_[(7, 1)].may_ambush is True
+    assert map_[(5, 0)].may_enemy is False
+    assert map_[(5, 0)].may_ambush is False
+
+
+def test_campaign_14_4_enemy_candidate_mask_is_a_loop_noop() -> None:
+    definition = load_default_stage(StageRef("campaign_main", "14-4"))
+    map_ = compile_campaign_map(definition)
+    map_.load_map_data(use_loop=True)
+    before = tuple(grid.may_enemy for grid in map_)
+
+    apply_normal_enemy_candidate_mask(
+        map_,
+        definition.map.normal_enemy_spawn_candidates,
         CampaignRunVariant.LOOP,
-        MapMutationPhase.MAP_DATA_INIT,
-    )
-    assert runtime.map[(7, 1)].may_enemy is False
-    assert runtime.map[(5, 0)].may_enemy is True
-
-
-def test_map_session_owner_rejects_invalid_battle_index_before_mutating_map() -> None:
-    runtime = _FakeDeclarativeRuntime(
-        in_memory_config("campaign-invalid-battle", {}),
-        object.__new__(Device),
-        _definition(),
-    )
-    owner = Mumu12CampaignMapSessionOwner(
-        runtime,
-        runtime._runtime_profile_lease,  # ruff:ignore[private-member-access] - 测试显式接管 runtime lease。
-        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
     )
 
-    with pytest.raises(ValueError, match="non-negative"):
-        owner.prepare_battle(-1)
+    assert tuple(grid.may_enemy for grid in map_) == before
+
+
+def test_normal_enemy_candidate_mask_rejects_an_untyped_variant() -> None:
+    definition = load_default_stage(StageRef("campaign_main", "14-4"))
+
+    with pytest.raises(TypeError, match="CampaignRunVariant"):
+        apply_normal_enemy_candidate_mask(
+            compile_campaign_map(definition),
+            definition.map.normal_enemy_spawn_candidates,
+            cast("CampaignRunVariant", "normal"),
+        )
+
+
+def test_normal_enemy_candidate_mask_validates_every_cell_before_writing() -> None:
+    definition = load_default_stage(StageRef("campaign_main", "14-4"))
+    map_ = compile_campaign_map(definition)
+    before = tuple(grid.may_enemy for grid in map_)
+
+    with pytest.raises(ValueError, match="outside the active map"):
+        apply_normal_enemy_candidate_mask(
+            map_,
+            (CellId(0, 0), CellId(99, 99)),
+            CampaignRunVariant.NORMAL,
+        )
+
+    assert tuple(grid.may_enemy for grid in map_) == before
 
 
 def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None:
@@ -1155,19 +1110,12 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
         del map_
         raise initialization_error
 
-    definition = cast(
-        "CampaignStageDefinition",
-        SimpleNamespace(mechanics=SimpleNamespace(map_mutations=MapMutationRules())),
-    )
     runtime = cast(
         "Mumu12CampaignMapSessionRuntime",
         SimpleNamespace(
-            definition=definition,
             MAP=compile_campaign_map(_definition()),
-            map=compile_campaign_map(_definition()),
             session_variant=CampaignRunVariant.NORMAL,
             map_is_clear_mode=False,
-            battle_count=0,
             map_init=fail_map_init,
         ),
     )
@@ -1346,6 +1294,13 @@ def test_fresh_activation_orders_entry_session_phases_overlay_and_publication(
 ) -> None:
     events: list[object] = []
 
+    def base_map_data_init(runtime: DeclarativeCampaignMapRuntime, map_: CampaignMap | None) -> None:
+        assert map_ is runtime.MAP
+        runtime.map = map_
+        events.append("base_map_data_init")
+
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "map_data_init", base_map_data_init)
+
     class _OrderedRuntime(_FakeDeclarativeRuntime):
         created: ClassVar[list[object]] = []
 
@@ -1372,27 +1327,22 @@ def test_fresh_activation_orders_entry_session_phases_overlay_and_publication(
         @override
         def map_init(self, map_: CampaignMap | None) -> None:
             events.append("map_init")
-            super().map_init(map_)
-            map_session_adapters.apply_campaign_map_mutations(
-                self.map,
-                self.definition.mechanics.map_mutations,
-                self.session_variant,
-                MapMutationPhase.MAP_DATA_INIT,
+            DeclarativeCampaignMapRuntime._declarative_map_data_init(  # ruff:ignore[private-member-access] - 直接约束生产 map-data 接线。
+                self,
+                map_,
             )
 
-    original_mutations = map_session_adapters.apply_campaign_map_mutations
+    original_mask = campaign_adapters.apply_normal_enemy_candidate_mask
 
-    def trace_mutations(
+    def trace_mask(
         map_: CampaignMap,
-        rules: MapMutationRules,
+        candidates: tuple[CellId, ...] | None,
         variant: CampaignRunVariant,
-        phase: MapMutationPhase,
-        battle: int | None = None,
     ) -> None:
-        events.append(phase)
-        original_mutations(map_, rules, variant, phase, battle)
+        events.append("normal_enemy_candidate_mask")
+        original_mask(map_, candidates, variant)
 
-    monkeypatch.setattr(map_session_adapters, "apply_campaign_map_mutations", trace_mutations)
+    monkeypatch.setattr(campaign_adapters, "apply_normal_enemy_candidate_mask", trace_mask)
     config = in_memory_config("campaign-activation-order", {})
     original_overlay = config.apply_runtime_overlay
 
@@ -1416,9 +1366,8 @@ def test_fresh_activation_orders_entry_session_phases_overlay_and_publication(
         "fleet_lock",
         ("lease.start", CampaignRunVariant.LOOP),
         "map_init",
-        MapMutationPhase.MAP_DATA_INIT,
-        MapMutationPhase.MAP_INIT,
-        MapMutationPhase.BEFORE_BATTLE,
+        "base_map_data_init",
+        "normal_enemy_candidate_mask",
         "overlay",
     ]
     assert provider.active_runtime(activated, AbortToken()) is _OrderedRuntime.created[-1]

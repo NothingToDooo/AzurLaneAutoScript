@@ -1,11 +1,8 @@
-from dataclasses import replace
-
 from module.adapters.campaign_mumu12 import compile_campaign_map
 from module.content.campaign_session import CampaignRunVariant
 from module.content.campaign_session_source import CompiledCampaignSessionSource
 from module.content.catalog import ContentCatalog
 from module.content.manifest import load_default_event_manifests
-from module.content.mechanic_rules import MapMutationRules
 from module.content.models import StageRef
 from module.content.stage_definition import CellId
 from module.content.stage_loader import StageSpecLoader, load_default_stage
@@ -48,7 +45,9 @@ def test_campaign_hard_14_4_resolves_to_its_complete_declarative_override() -> N
     assert hard.runtime_profile.profile_id == main.runtime_profile.profile_id
     assert hard.rules == main.rules
     assert hard.enemy_filter == main.enemy_filter
-    assert hard.mechanics == replace(main.mechanics, map_mutations=MapMutationRules())
+    assert hard.mechanics == main.mechanics
+    assert main.map.normal_enemy_spawn_candidates is not None
+    assert hard.map.normal_enemy_spawn_candidates is None
     assert hard.battle_programs == main.battle_programs
     assert compiled.shape == (10, 8)
     assert [str(grid) for grid in compiled.camera_data] == ["D2", "D6", "D7", "H2", "H6", "H7"]

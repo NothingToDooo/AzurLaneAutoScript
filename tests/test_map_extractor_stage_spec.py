@@ -78,7 +78,7 @@ def test_stage_renderer_is_exact_deterministic_and_uses_finite_policies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _module, stage = _map_data(monkeypatch)
-    expected = """schema_version: 5
+    expected = """schema_version: 6
 map:
   name: HT2
   shape: B2
@@ -135,7 +135,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

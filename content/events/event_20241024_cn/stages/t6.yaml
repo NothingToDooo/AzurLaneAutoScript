@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: T6
   shape: K10
@@ -102,7 +102,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

@@ -169,6 +169,7 @@ class MapDefinition:
     map_covered: tuple[CellId, ...] = ()
     portals: tuple[PortalSpec, ...] = ()
     land_based: tuple[LandBasedSpec, ...] = ()
+    normal_enemy_spawn_candidates: tuple[CellId, ...] | None = None
 
     def __post_init__(self) -> None:
         self._validate_root_types()
@@ -177,7 +178,9 @@ class MapDefinition:
         map_covered = tuple(self.map_covered)
         portals = tuple(self.portals)
         land_based = tuple(self.land_based)
+        candidates = None if self.normal_enemy_spawn_candidates is None else tuple(self.normal_enemy_spawn_candidates)
         self._validate_collection_types(camera_data, camera_spawn, map_covered, portals, land_based)
+        self._validate_normal_enemy_spawn_candidates(candidates)
         self._validate_variants()
         self._validate_referenced_cells(camera_data, camera_spawn, map_covered, portals, land_based)
 
@@ -186,6 +189,7 @@ class MapDefinition:
         object.__setattr__(self, "map_covered", map_covered)
         object.__setattr__(self, "portals", portals)
         object.__setattr__(self, "land_based", land_based)
+        object.__setattr__(self, "normal_enemy_spawn_candidates", candidates)
 
     def _validate_root_types(self) -> None:
         if not isinstance(self.name, str) or not self.name.strip():
@@ -218,6 +222,22 @@ class MapDefinition:
         if any(not isinstance(unit, LandBasedSpec) for unit in land_based):
             message = "land_based must contain LandBasedSpec values"
             raise TypeError(message)
+
+    def _validate_normal_enemy_spawn_candidates(self, candidates: tuple[CellId, ...] | None) -> None:
+        if candidates is None:
+            return
+        if any(not isinstance(cell, CellId) for cell in candidates):
+            message = "normal_enemy_spawn_candidates must contain CellId values"
+            raise TypeError(message)
+        if not candidates:
+            message = "normal_enemy_spawn_candidates must not be empty"
+            raise ContentValidationError(message)
+        if len(set(candidates)) != len(candidates):
+            message = "normal_enemy_spawn_candidates must not contain duplicate cells"
+            raise ContentValidationError(message)
+        if any(not self.shape.contains(cell) for cell in candidates):
+            message = "normal_enemy_spawn_candidates references a cell outside its shape"
+            raise ContentValidationError(message)
 
     def _validate_variants(self) -> None:
         expected_cells = self.shape.cell_ids()

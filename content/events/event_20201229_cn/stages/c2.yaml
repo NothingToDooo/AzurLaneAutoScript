@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: C2
   shape: J6
@@ -97,7 +97,6 @@ mechanics:
     tag: protect
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

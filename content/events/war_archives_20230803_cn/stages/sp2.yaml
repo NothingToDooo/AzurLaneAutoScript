@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: SP2
   shape: H7
@@ -112,7 +112,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

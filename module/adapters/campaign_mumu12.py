@@ -15,10 +15,10 @@ from module.adapters.campaign_live import (
     CommittedCampaignUnit,
     build_existing_campaign_map_workflow,
 )
+from module.adapters.campaign_map_data_mumu12 import apply_normal_enemy_candidate_mask
 from module.adapters.campaign_map_observer import build_campaign_map_observer
 from module.adapters.campaign_map_session_mumu12 import (
     Mumu12CampaignMapSessionOwner,
-    apply_campaign_map_mutations,
 )
 from module.adapters.campaign_map_swipe import build_campaign_map_swipe_service
 from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
@@ -69,7 +69,6 @@ from module.content.campaign_session import (
     CampaignSessionState,
     CampaignSessionStatus,
 )
-from module.content.mechanic_rules import MapMutationPhase, MapStructureRules
 from module.content.runtime_profile import (
     CampaignRuntimeExtensionId,
     CampaignRuntimeProfile,
@@ -124,6 +123,7 @@ if TYPE_CHECKING:
     from module.config.config_generated import ConfigOverrides
     from module.content.battle_program import BattleProgramMode
     from module.content.cell import CellId
+    from module.content.mechanic_rules import MapStructureRules
     from module.content.models import StageRef
     from module.content.stage_rules import MapCalibration, StageNavigation
     from module.gameplay.campaign_factories import CampaignSessionSource
@@ -583,11 +583,10 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             self.map[(cell.x, cell.y)].is_enemy = True
         for cell in moving.initial_siren_cells:
             self.map[(cell.x, cell.y)].is_siren = True
-        apply_campaign_map_mutations(
+        apply_normal_enemy_candidate_mask(
             self.map,
-            self.definition.mechanics.map_mutations,
+            self.definition.map.normal_enemy_spawn_candidates,
             self.session_variant,
-            MapMutationPhase.MAP_DATA_INIT,
         )
 
     def map_data_init(self, map_: CampaignMap | None) -> None:
@@ -1184,7 +1183,6 @@ class Mumu12CampaignRuntimeProvider:
             self._release_handle(RuntimeSessionOutcome.INTERRUPTED)
             self._reset_to_map_boundary(job, session, cancellation)
             return CampaignCheckpointReset("client left the retained checkpoint map")
-        handle.owner.prepare_battle(progress_state.battle_index)
         return _ActivatedMap(session, progress_state)
 
     def _activate_fresh(
@@ -1226,7 +1224,6 @@ class Mumu12CampaignRuntimeProvider:
         activated = self._entered_session(job, session, variant)
         state = activated.initial_state()
         handle.owner.initialize(state, RuntimeSessionEntryKind.FRESH)
-        handle.owner.prepare_battle(state.battle_index)
         return _ActivatedMap(activated, state)
 
     @staticmethod

@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: SP3
   shape: K7
@@ -117,7 +117,6 @@ mechanics:
   - battle: 0
     cells: []
     tag: clear_mechanism
-  map_mutations: []
   moving_enemies:
     turns:
     - 3

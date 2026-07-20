@@ -13,41 +13,17 @@ from module.adapters.campaign_submarine import (
 from module.application import AbortRequested
 from module.base.failure import preserve_cleanup_failure
 from module.content.campaign_session import CampaignRunVariant, CampaignSessionState
-from module.content.mechanic_rules import MapMutationPhase, MapMutationRules, MapMutationVariant
 
 if TYPE_CHECKING:
-    from module.content.stage_definition import CampaignStageDefinition
     from module.map.map_base import CampaignMap
 
 
 class Mumu12CampaignMapSessionRuntime(SubmarineFreshCombatRuntime, Protocol):
-    definition: CampaignStageDefinition
     MAP: CampaignMap
-    map: CampaignMap
     session_variant: CampaignRunVariant
     map_is_clear_mode: bool
 
     def map_init(self, map_: CampaignMap | None) -> None: ...
-
-
-def apply_campaign_map_mutations(
-    map_: CampaignMap,
-    rules: MapMutationRules,
-    variant: CampaignRunVariant,
-    phase: MapMutationPhase,
-    battle: int | None = None,
-) -> None:
-    """把已编译的地图修补限制在明确的 phase、variant 与 battle。"""
-
-    for patch in rules.patches:
-        if patch.phase is not phase or patch.battle != battle:
-            continue
-        if patch.variant is MapMutationVariant.NORMAL and variant is not CampaignRunVariant.NORMAL:
-            continue
-        if patch.variant is MapMutationVariant.LOOP and variant is not CampaignRunVariant.LOOP:
-            continue
-        grid = map_[(patch.cell.x, patch.cell.y)]
-        setattr(grid, patch.attribute.value, patch.value)
 
 
 class Mumu12CampaignMapSessionOwner:
@@ -98,12 +74,6 @@ class Mumu12CampaignMapSessionOwner:
             if entry_kind is RuntimeSessionEntryKind.FRESH:
                 self._fresh_combat.start(runtime)
             runtime.map_init(runtime.MAP)
-            apply_campaign_map_mutations(
-                runtime.map,
-                runtime.definition.mechanics.map_mutations,
-                state.variant,
-                MapMutationPhase.MAP_INIT,
-            )
         except BaseException as error:
             outcome = (
                 RuntimeSessionOutcome.INTERRUPTED if isinstance(error, AbortRequested) else RuntimeSessionOutcome.FAILED
@@ -114,19 +84,6 @@ class Mumu12CampaignMapSessionOwner:
                 message="campaign map session initialization and cleanup both failed",
             )
             raise
-
-    def prepare_battle(self, battle_index: int) -> None:
-        if type(battle_index) is not int or battle_index < 0:
-            message = "campaign battle_index must be a non-negative integer"
-            raise ValueError(message)
-        runtime = self._runtime
-        apply_campaign_map_mutations(
-            runtime.map,
-            runtime.definition.mechanics.map_mutations,
-            runtime.session_variant,
-            MapMutationPhase.BEFORE_BATTLE,
-            battle_index,
-        )
 
     def close(self, outcome: RuntimeSessionOutcome) -> None:
         self._lease.close(outcome)

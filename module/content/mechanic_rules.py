@@ -459,18 +459,6 @@ class MapInteractionRules:
         object.__setattr__(self, "actions", actions)
 
 
-class MapMutationPhase(StrEnum):
-    MAP_DATA_INIT = "map_data_init"
-    MAP_INIT = "map_init"
-    BEFORE_BATTLE = "before_battle"
-
-
-class MapMutationVariant(StrEnum):
-    ALL = "all"
-    NORMAL = "normal"
-    LOOP = "loop"
-
-
 class MechanicOperation(StrEnum):
     """确实无参数的关卡机制操作。"""
 
@@ -526,64 +514,6 @@ class EnemyMovementRules:
             message = "enemy movement rules contain an invalid move"
             raise TypeError(message)
         object.__setattr__(self, "moves", moves)
-
-
-class MapCellAttribute(StrEnum):
-    MAY_ENEMY = "may_enemy"
-    IS_ENEMY = "is_enemy"
-    IS_SIREN = "is_siren"
-    IS_BOSS = "is_boss"
-    MAY_BOSS = "may_boss"
-    IS_ACCESSIBLE = "is_accessible"
-
-
-@dataclass(frozen=True, slots=True)
-class MapCellPatch:
-    phase: MapMutationPhase
-    cell: CellId
-    attribute: MapCellAttribute
-    value: bool
-    variant: MapMutationVariant = MapMutationVariant.ALL
-    battle: int | None = None
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.phase, MapMutationPhase):
-            message = "map mutation phase must be a MapMutationPhase"
-            raise TypeError(message)
-        _validate_cell(self.cell, field_name="map patch cell")
-        if not isinstance(self.attribute, MapCellAttribute):
-            message = "map patch attribute must be a MapCellAttribute"
-            raise TypeError(message)
-        if type(self.value) is not bool:
-            message = "map patch value must be a boolean"
-            raise TypeError(message)
-        if not isinstance(self.variant, MapMutationVariant):
-            message = "map mutation variant must be a MapMutationVariant"
-            raise TypeError(message)
-        if self.phase is MapMutationPhase.BEFORE_BATTLE:
-            if self.battle is None:
-                message = "before-battle map patch requires a battle"
-                raise ContentValidationError(message)
-            _validate_battle(self.battle)
-        elif self.battle is not None:
-            message = f"{self.phase.value} map patch does not accept a battle"
-            raise ContentValidationError(message)
-
-
-@dataclass(frozen=True, slots=True)
-class MapMutationRules:
-    patches: tuple[MapCellPatch, ...] = ()
-
-    def __post_init__(self) -> None:
-        patches = tuple(self.patches)
-        if any(not isinstance(patch, MapCellPatch) for patch in patches):
-            message = "map mutation rules must contain MapCellPatch values"
-            raise TypeError(message)
-        keys = tuple((patch.phase, patch.variant, patch.battle, patch.cell, patch.attribute) for patch in patches)
-        if len(set(keys)) != len(keys):
-            message = "map mutation rules contain duplicate patch targets"
-            raise ContentValidationError(message)
-        object.__setattr__(self, "patches", patches)
 
 
 @dataclass(frozen=True, slots=True)
@@ -683,7 +613,6 @@ class StageMechanicRules:
     fleet_coordination: FleetCoordinationRules = field(default_factory=FleetCoordinationRules)
     pickups: PickupRules = field(default_factory=PickupRules)
     map_interactions: MapInteractionRules = field(default_factory=MapInteractionRules)
-    map_mutations: MapMutationRules = field(default_factory=MapMutationRules)
     moving_enemies: MovingEnemyRules = field(default_factory=MovingEnemyRules)
     procedures: tuple[MechanicProcedure, ...] = ()
     enemy_movement: EnemyMovementRules = field(default_factory=EnemyMovementRules)
@@ -695,7 +624,6 @@ class StageMechanicRules:
             (self.fleet_coordination, FleetCoordinationRules, "fleet_coordination"),
             (self.pickups, PickupRules, "pickups"),
             (self.map_interactions, MapInteractionRules, "map_interactions"),
-            (self.map_mutations, MapMutationRules, "map_mutations"),
             (self.moving_enemies, MovingEnemyRules, "moving_enemies"),
         )
         for value, expected_type, field_name in expected:
@@ -723,7 +651,6 @@ class StageMechanicRules:
             *self.map_interactions.actions,
         )
         battles = {action.battle for action in actions}
-        battles.update(patch.battle for patch in self.map_mutations.patches if patch.battle is not None)
         battles.update(procedure.battle for procedure in self.procedures)
         battles.update(move.battle for move in self.enemy_movement.moves)
         return frozenset(battles)
@@ -740,7 +667,6 @@ class StageMechanicRules:
                 cells.add(action.cell)
         for action in self.map_interactions.actions:
             cells.update(_map_interaction_cells(action))
-        cells.update(patch.cell for patch in self.map_mutations.patches)
         cells.update(self.moving_enemies.initial_enemy_cells)
         cells.update(self.moving_enemies.initial_siren_cells)
         for move in self.enemy_movement.moves:

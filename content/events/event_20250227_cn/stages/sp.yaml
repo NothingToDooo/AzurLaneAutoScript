@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: SP
   shape: I9
@@ -150,7 +150,6 @@ mechanics:
     target: D7
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []

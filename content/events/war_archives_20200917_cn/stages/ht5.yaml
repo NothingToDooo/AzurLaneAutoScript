@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: HT5
   shape: I9
@@ -167,7 +167,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: D2
   shape: I9
@@ -143,7 +143,6 @@ mechanics:
     tag: protect
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

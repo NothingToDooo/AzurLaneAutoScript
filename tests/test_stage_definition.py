@@ -58,6 +58,53 @@ def test_cell_id_rejects_noncanonical_grid_nodes(node: object) -> None:
         CellId.parse(node)
 
 
+def _map_definition_with_candidates(
+    candidates: tuple[CellId, ...] | None,
+) -> MapDefinition:
+    shape = GridShape(2, 1)
+    cells = tuple(CellSpec(cell_id, "--", 50.0) for cell_id in shape.cell_ids())
+    variant = RunVariant(cells, ())
+    return MapDefinition(
+        name="TEST",
+        shape=shape,
+        camera_data=(CellId(0, 0),),
+        camera_data_spawn_point=(CellId(0, 0),),
+        normal=variant,
+        loop=variant,
+        normal_enemy_spawn_candidates=candidates,
+    )
+
+
+def test_map_definition_accepts_a_complete_normal_enemy_spawn_candidate_mask() -> None:
+    candidates = (CellId(0, 0), CellId(1, 0))
+
+    definition = _map_definition_with_candidates(candidates)
+
+    assert definition.normal_enemy_spawn_candidates == candidates
+
+
+def test_map_definition_rejects_an_empty_normal_enemy_spawn_candidate_mask() -> None:
+    with pytest.raises(ContentValidationError, match="must not be empty"):
+        _map_definition_with_candidates(())
+
+
+def test_map_definition_rejects_duplicate_normal_enemy_spawn_candidates() -> None:
+    with pytest.raises(ContentValidationError, match="duplicate cells"):
+        _map_definition_with_candidates((CellId(0, 0), CellId(0, 0)))
+
+
+def test_map_definition_rejects_a_normal_enemy_spawn_candidate_outside_its_shape() -> None:
+    with pytest.raises(ContentValidationError, match="outside its shape"):
+        _map_definition_with_candidates((CellId(2, 0),))
+
+
+def test_map_definition_rejects_an_untyped_normal_enemy_spawn_candidate() -> None:
+    candidates = cast("tuple[CellId, ...]", (object(),))
+
+    with pytest.raises(TypeError, match="must contain CellId values"):
+        _map_definition_with_candidates(candidates)
+
+
 def _definition(
     waves: tuple[SpawnWave, ...],
     policies: dict[int, StagePolicy | BattlePolicy],

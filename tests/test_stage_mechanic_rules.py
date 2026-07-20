@@ -15,13 +15,8 @@ from module.content.mechanic_rules import (
     FleetClearTarget,
     FleetCoordinationRules,
     FleetRole,
-    MapCellAttribute,
-    MapCellPatch,
     MapInteractionRules,
     MapItemKind,
-    MapMutationPhase,
-    MapMutationRules,
-    MapMutationVariant,
     MovingEnemyRules,
     PickupAmmo,
     PickupMapItem,
@@ -60,17 +55,6 @@ def test_mechanic_rules_preserve_closed_actions_and_expose_all_references() -> N
             )
         ),
         map_interactions=MapInteractionRules((ClearAllMystery(0, nearby=False, ignored=(a1,)), AirStrike(1, b2))),
-        map_mutations=MapMutationRules(
-            (
-                MapCellPatch(
-                    MapMutationPhase.BEFORE_BATTLE,
-                    a2,
-                    MapCellAttribute.MAY_ENEMY,
-                    value=True,
-                    battle=1,
-                ),
-            )
-        ),
         moving_enemies=MovingEnemyRules((2,), initial_enemy_cells=(b2,)),
     )
 
@@ -89,20 +73,8 @@ def test_mechanic_rules_preserve_closed_actions_and_expose_all_references() -> N
         StepFleetOn(0, (a1,), fleet=FleetRole.FLEET_1)
 
 
-def test_mechanic_models_reject_ambiguous_mutation_and_moving_enemy_state() -> None:
+def test_mechanic_models_reject_ambiguous_moving_enemy_state() -> None:
     a1 = CellId(0, 0)
-    with pytest.raises(ContentValidationError, match="requires a battle"):
-        MapCellPatch(MapMutationPhase.BEFORE_BATTLE, a1, MapCellAttribute.IS_ENEMY, value=True)
-    with pytest.raises(ContentValidationError, match="does not accept a battle"):
-        MapCellPatch(MapMutationPhase.MAP_INIT, a1, MapCellAttribute.IS_ENEMY, value=True, battle=0)
-    with pytest.raises(TypeError, match="MapMutationVariant"):
-        MapCellPatch(
-            MapMutationPhase.MAP_INIT,
-            a1,
-            MapCellAttribute.IS_ENEMY,
-            value=True,
-            variant=cast("MapMutationVariant", "normal"),
-        )
     with pytest.raises(ContentValidationError, match="must not overlap"):
         MovingEnemyRules(initial_enemy_cells=(a1,), initial_siren_cells=(a1,))
 

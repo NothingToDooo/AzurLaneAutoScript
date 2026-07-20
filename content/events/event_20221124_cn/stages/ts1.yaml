@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: TS1
   shape: H5
@@ -76,7 +76,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

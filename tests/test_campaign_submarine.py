@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 from config_factory import in_memory_config
@@ -36,7 +35,6 @@ from module.content.campaign_session import (
     CampaignSessionStatus,
     RemainingSpawns,
 )
-from module.content.mechanic_rules import MapMutationRules
 from module.content.models import StageRef
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -59,9 +57,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from module.combat.combat import CombatEnd
-    from module.content.stage_definition import CampaignStageDefinition
-
-
 _SUPPORT_ID = "map_mechanic/support_fleet"
 _POPUP_ID = "map_mechanic/submarine_support_popup"
 _FRESH_COMBAT_ID = "map_mechanic/submarine_fresh_combat"
@@ -280,10 +275,6 @@ class _SessionRuntime:
     FUNCTION_NAME_BASE = "SESSION_TEST_"
 
     def __init__(self, events: list[object]) -> None:
-        self.definition = cast(
-            "CampaignStageDefinition",
-            SimpleNamespace(mechanics=SimpleNamespace(map_mutations=MapMutationRules())),
-        )
         self.MAP = CampaignMap("submarine-session")
         self.map = self.MAP
         self.session_variant = CampaignRunVariant.NORMAL

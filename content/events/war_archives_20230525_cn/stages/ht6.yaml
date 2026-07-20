@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: HT6
   shape: J8
@@ -164,7 +164,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

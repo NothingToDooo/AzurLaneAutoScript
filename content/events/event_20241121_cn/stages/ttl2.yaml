@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: TTL2
   shape: E5
@@ -61,7 +61,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []

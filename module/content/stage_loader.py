@@ -28,13 +28,8 @@ from module.content.mechanic_rules import (
     FleetCoordinationAction,
     FleetCoordinationRules,
     FleetRole,
-    MapCellAttribute,
-    MapCellPatch,
     MapInteractionRules,
     MapItemKind,
-    MapMutationPhase,
-    MapMutationRules,
-    MapMutationVariant,
     MapStructureRules,
     MoveFleet,
     MoveFleetToBestCandidate,
@@ -100,7 +95,7 @@ from module.content.yaml_loader import load_strict_yaml_mapping
 if TYPE_CHECKING:
     from module.content.battle_policy import StagePolicy
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 _TOP_LEVEL_FIELDS = {
     "schema_version",
@@ -121,6 +116,7 @@ _MAP_FIELDS = {
     "map_covered",
     "map_data",
     "map_data_loop",
+    "normal_enemy_spawn_candidates",
     "weight_data",
     "portal_data",
     "land_based_data",
@@ -142,7 +138,6 @@ _MECHANIC_FIELDS = {
     "fleet_coordination",
     "pickups",
     "map_interactions",
-    "map_mutations",
     "moving_enemies",
     "map_structures",
     "enemy_movement",
@@ -172,7 +167,6 @@ _MAP_INTERACTION_FIELDS = {
     "clear_map_items": {"tag", "battle", "cells"},
     "air_strike": {"tag", "battle", "target"},
 }
-_MAP_MUTATION_FIELDS = {"phase", "variant", "battle", "cell", "attribute", "value"}
 _MOVING_ENEMY_FIELDS = {
     "turns",
     "normal_turns",
@@ -933,42 +927,6 @@ def _map_interaction_rules(value: object, path: Path, shape: tuple[int, int]) ->
     return MapInteractionRules(tuple(actions))
 
 
-def _map_mutation_rules(value: object, path: Path, shape: tuple[int, int]) -> MapMutationRules:
-    location = "mechanics.map_mutations"
-    patches: list[MapCellPatch] = []
-    for index, raw_patch in enumerate(_sequence(value, path, location)):
-        item_location = f"{location}[{index}]"
-        item = _fields_mapping(raw_patch, path, item_location, _MAP_MUTATION_FIELDS)
-        if set(item) != _MAP_MUTATION_FIELDS:
-            raise _fail(path, item_location, f"required fields are {sorted(_MAP_MUTATION_FIELDS)}")
-        raw_battle = item["battle"]
-        battle = None if raw_battle is None else _exact_integer(raw_battle, path, f"{item_location}.battle")
-        try:
-            patches.append(
-                MapCellPatch(
-                    phase=_enum_value(MapMutationPhase, item["phase"], path, f"{item_location}.phase"),
-                    battle=battle,
-                    cell=_grid_node(item["cell"], path, f"{item_location}.cell", shape),
-                    attribute=_enum_value(
-                        MapCellAttribute,
-                        item["attribute"],
-                        path,
-                        f"{item_location}.attribute",
-                    ),
-                    value=_boolean(item["value"], path, f"{item_location}.value"),
-                    variant=_enum_value(
-                        MapMutationVariant,
-                        item["variant"],
-                        path,
-                        f"{item_location}.variant",
-                    ),
-                )
-            )
-        except ContentValidationError as error:
-            raise _fail(path, item_location, str(error)) from error
-    return MapMutationRules(tuple(patches))
-
-
 def _moving_enemy_rules(value: object, path: Path, shape: tuple[int, int]) -> MovingEnemyRules:
     location = "mechanics.moving_enemies"
     item = _fields_mapping(value, path, location, _MOVING_ENEMY_FIELDS)
@@ -1064,7 +1022,6 @@ def _mechanic_rules(value: object, path: Path, map_definition: MapDefinition) ->
         fleet_coordination=_fleet_coordination_rules(item["fleet_coordination"], path, shape),
         pickups=_pickup_rules(item["pickups"], path, shape),
         map_interactions=_map_interaction_rules(item["map_interactions"], path, shape),
-        map_mutations=_map_mutation_rules(item["map_mutations"], path, shape),
         moving_enemies=_moving_enemy_rules(item["moving_enemies"], path, shape),
         map_structures=_map_structure_rules(item["map_structures"], path, shape),
         enemy_movement=enemy_movement,
@@ -1255,6 +1212,16 @@ def _build_map_definition(value: object, path: Path) -> MapDefinition:
             _land_based_data(data["land_based_data"], path, "map.land_based_data", max_coordinate)
             if "land_based_data" in data
             else ()
+        ),
+        normal_enemy_spawn_candidates=(
+            _grid_nodes(
+                data["normal_enemy_spawn_candidates"],
+                path,
+                "map.normal_enemy_spawn_candidates",
+                max_coordinate,
+            )
+            if "normal_enemy_spawn_candidates" in data
+            else None
         ),
     )
 

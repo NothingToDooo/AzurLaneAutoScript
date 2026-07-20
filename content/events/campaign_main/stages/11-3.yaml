@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: 11-3
   shape: I7
@@ -113,7 +113,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []

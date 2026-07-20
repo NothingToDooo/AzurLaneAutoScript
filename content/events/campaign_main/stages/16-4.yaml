@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: 16-4
   shape: K8
@@ -205,7 +205,6 @@ mechanics:
   - battle: 4
     tag: air_strike
     target: I8
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []

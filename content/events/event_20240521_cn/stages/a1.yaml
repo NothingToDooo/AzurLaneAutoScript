@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: A1
   shape: I9
@@ -117,7 +117,6 @@ mechanics:
   - tag: clear_mechanism
     battle: 4
     cells: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

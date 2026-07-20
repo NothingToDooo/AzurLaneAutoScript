@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: HT6
   shape: K10
@@ -138,7 +138,6 @@ mechanics:
     tag: protect
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2

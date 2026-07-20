@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 map:
   name: 7-2
   shape: H5
@@ -191,7 +191,6 @@ mechanics:
     - H3
     nearby: false
     tag: clear_all_mystery
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
