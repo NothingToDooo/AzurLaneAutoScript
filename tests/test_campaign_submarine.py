@@ -16,8 +16,6 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeOperation,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
@@ -30,12 +28,7 @@ from module.adapters.campaign_submarine import (
     build_campaign_submarine_services,
 )
 from module.application import AbortRequested
-from module.content.campaign_session import (
-    CampaignRunVariant,
-    CampaignSessionState,
-    CampaignSessionStatus,
-    RemainingSpawns,
-)
+from module.content.campaign_session import CampaignRunVariant
 from module.content.models import StageRef
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -126,13 +119,7 @@ def _bind_services(
 
 
 def _begin(manager: CampaignRuntimeProfileManager) -> None:
-    manager.begin_session(
-        RuntimeSessionContext(
-            CampaignRunVariant.NORMAL,
-            0,
-            RuntimeSessionEntryKind.FRESH,
-        )
-    )
+    manager.begin_session()
 
 
 def test_popup_service_retries_and_reads_ready_or_sealed_support_state() -> None:
@@ -262,8 +249,8 @@ class _SessionManager:
     def __init__(self, events: list[object]) -> None:
         self.events = events
 
-    def begin_session(self, context: RuntimeSessionContext) -> None:
-        self.events.append(("lease.start", context.entry_kind))
+    def begin_session(self) -> None:
+        self.events.append("lease.start")
 
     def end_session(self, outcome: RuntimeSessionOutcome) -> None:
         self.events.append(("lease.close", outcome))
@@ -303,15 +290,6 @@ class _SessionRuntime:
         raise AssertionError(message)
 
 
-def _session_state(battle_index: int = 0) -> CampaignSessionState:
-    return CampaignSessionState(
-        CampaignRunVariant.NORMAL,
-        CampaignSessionStatus.ACTIVE,
-        battle_index,
-        RemainingSpawns(),
-    )
-
-
 def _owner(
     events: list[object],
     handler: Callable[[SubmarineFreshCombatRuntime], None],
@@ -331,23 +309,11 @@ def test_session_owner_runs_fresh_hook_before_fixed_map_initialization() -> None
     events: list[object] = []
     owner, _runtime = _owner(events, lambda _runtime: events.append("fresh_combat"))
 
-    owner.initialize(_session_state(), RuntimeSessionEntryKind.FRESH)
+    owner.initialize(CampaignRunVariant.NORMAL)
 
     assert events == [
-        ("lease.start", RuntimeSessionEntryKind.FRESH),
+        "lease.start",
         "fresh_combat",
-        "map_data_init",
-        "map_control_init",
-    ]
-
-
-def test_session_owner_skips_fresh_hook_for_a_resume_entry() -> None:
-    cold_events: list[object] = []
-    cold_owner, _runtime = _owner(cold_events, lambda _runtime: cold_events.append("fresh_combat"))
-
-    cold_owner.initialize(_session_state(2), RuntimeSessionEntryKind.RESUME)
-    assert cold_events == [
-        ("lease.start", RuntimeSessionEntryKind.RESUME),
         "map_data_init",
         "map_control_init",
     ]
@@ -373,11 +339,11 @@ def test_fresh_hook_failure_closes_the_started_session(
     owner, _runtime = _owner(events, fail)
 
     with pytest.raises(type(error)) as raised:
-        owner.initialize(_session_state(), RuntimeSessionEntryKind.FRESH)
+        owner.initialize(CampaignRunVariant.NORMAL)
 
     assert raised.value is error
     assert events == [
-        ("lease.start", RuntimeSessionEntryKind.FRESH),
+        "lease.start",
         ("lease.close", outcome),
         "reset",
     ]
@@ -425,13 +391,7 @@ def test_real_chapter_16_profiles_wire_only_the_early_submarine_services(
 
     assert runtime.handle_submarine_support_popup() is expected_submarine
     assert popup_calls == (["SUBMARINE_SUPPORT"] if expected_submarine else [])
-    runtime._runtime_profile_lease.start(  # ruff:ignore[private-member-access] - direct hard-style lease boundary must not execute owner hooks.
-        RuntimeSessionContext(
-            CampaignRunVariant.NORMAL,
-            0,
-            RuntimeSessionEntryKind.FRESH,
-        )
-    )
+    runtime._runtime_profile_lease.start()  # ruff:ignore[private-member-access] - direct hard-style lease boundary must not execute owner hooks.
     assert combat_calls == []
     runtime._submarine_services.fresh_combat.start(runtime)  # ruff:ignore[private-member-access] - 验证生产 profile 编译出的 typed hook。
     assert combat_calls == (["combat"] if expected_submarine else [])

@@ -12,12 +12,9 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeOperation,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
 from module.base.button import Button
-from module.content.campaign_session import CampaignRunVariant
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -319,13 +316,7 @@ def test_hard_attempt_entrance_is_scoped_to_one_runtime_session() -> None:
     manager = _manager()
     runtime = _Runtime()
     manager.bind(runtime, CampaignMap("hard-attempt-entrance"))
-    manager.begin_session(
-        RuntimeSessionContext(
-            CampaignRunVariant.LOOP,
-            0,
-            RuntimeSessionEntryKind.FRESH,
-        )
-    )
+    manager.begin_session()
     executor = _executor(manager)
     executor.prepare_attempt(Button(area=(), color=(), button=(), name="first"))
     with pytest.raises(CampaignRuntimeProfileError, match="already prepared"):

@@ -25,8 +25,6 @@ from module.adapters.campaign_mumu12 import (
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeOperation,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
@@ -664,9 +662,9 @@ class _FakeRuntimeProfileSessionManager:
         self._runtime = runtime
         self._started = False
 
-    def begin_session(self, context: RuntimeSessionContext) -> None:
+    def begin_session(self) -> None:
         self._started = True
-        self._runtime.calls.append(("initialize_session", context))
+        self._runtime.calls.append("initialize_session")
         events = getattr(self._runtime, "lifecycle_events", None)
         if isinstance(events, list):
             events.append(("lease.start", self._runtime.session_variant))
@@ -1051,8 +1049,8 @@ def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None
 
     class _EndFailingProfile:
         @staticmethod
-        def begin_session(context: RuntimeSessionContext) -> None:
-            calls.append(("begin_session", context))
+        def begin_session() -> None:
+            calls.append("begin_session")
 
         @staticmethod
         def end_session(outcome: RuntimeSessionOutcome) -> None:
@@ -1064,12 +1062,7 @@ def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None
             calls.append("reset")
 
     lease = RuntimeProfileLease(_EndFailingProfile())
-    context = RuntimeSessionContext(
-        CampaignRunVariant.NORMAL,
-        0,
-        RuntimeSessionEntryKind.FRESH,
-    )
-    lease.start(context)
+    lease.start()
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
     owner = Mumu12CampaignMapSessionOwner(
         runtime,
@@ -1085,12 +1078,12 @@ def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None
     assert lease.state is RuntimeProfileLeaseState.CLOSED
     assert owner.active is False
     assert calls == [
-        ("begin_session", context),
+        "begin_session",
         ("end_session", RuntimeSessionOutcome.FAILED),
         "reset",
     ]
     with pytest.raises(CampaignRuntimeProfileError, match="cannot start from closed"):
-        lease.start(context)
+        lease.start()
 
 
 def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> None:
@@ -1100,8 +1093,8 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
 
     class _CleanupFailingProfile:
         @staticmethod
-        def begin_session(context: RuntimeSessionContext) -> None:
-            calls.append(("begin_session", context))
+        def begin_session() -> None:
+            calls.append("begin_session")
 
         @staticmethod
         def end_session(outcome: RuntimeSessionOutcome) -> None:
@@ -1132,20 +1125,13 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
         STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
         CampaignMapInitializationService(),
     )
-    state = CampaignSessionState(
-        CampaignRunVariant.NORMAL,
-        CampaignSessionStatus.ACTIVE,
-        0,
-        RemainingSpawns(),
-    )
-
     with pytest.raises(BaseExceptionGroup) as raised:
-        owner.initialize(state, RuntimeSessionEntryKind.FRESH)
+        owner.initialize(CampaignRunVariant.NORMAL)
 
     assert raised.value.exceptions == (initialization_error, cleanup_error)
     assert owner.active is False
     assert calls == [
-        ("begin_session", RuntimeSessionContext(CampaignRunVariant.NORMAL, 0, RuntimeSessionEntryKind.FRESH)),
+        "begin_session",
         ("end_session", RuntimeSessionOutcome.FAILED),
         "reset",
     ]
@@ -1176,7 +1162,7 @@ def test_map_session_owner_maps_map_initialization_abort_to_interrupted() -> Non
     session = CampaignSession(runtime.definition, CampaignRunVariant.NORMAL)
 
     with pytest.raises(AbortRequested) as raised:
-        owner.initialize(session.initial_state(), RuntimeSessionEntryKind.FRESH)
+        owner.initialize(session.variant)
 
     assert raised.value is abort
     assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in runtime.calls
@@ -1292,8 +1278,7 @@ def test_provider_enters_once_and_exposes_only_the_exact_activated_variant() -> 
     runtime = _FakeDeclarativeRuntime.created[-1]
     assert isinstance(runtime, _FakeDeclarativeRuntime)
     assert ("select_stage", "t1", "normal") in runtime.calls
-    context = RuntimeSessionContext(activated.variant, 0, RuntimeSessionEntryKind.FRESH)
-    assert ("initialize_session", context) in runtime.calls
+    assert "initialize_session" in runtime.calls
     assert config.Campaign_UseAutoSearch is True
     assert provider.active_runtime(activated, AbortToken()) is runtime
 
@@ -1499,8 +1484,7 @@ def test_provider_keeps_one_runtime_across_resumable_turns_then_releases_it() ->
 
     assert resumed == activated
     assert len(_FakeDeclarativeRuntime.created) == 1
-    initial_context = RuntimeSessionContext(state.variant, 0, RuntimeSessionEntryKind.FRESH)
-    assert runtime.calls.count(("initialize_session", initial_context)) == 1
+    assert runtime.calls.count("initialize_session") == 1
     assert runtime.battle_count == state.battle_index + 7
 
     provider.finish(activated, state, CampaignStopReason.CANCELLED)

@@ -14,13 +14,10 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_strategy_set import build_campaign_strategy_set_service
 from module.application import AbortToken
-from module.content.campaign_session import CampaignRunVariant
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -114,26 +111,16 @@ def _bind(
     manager.bind(runtime, CampaignMap("mechanic-test"))
 
 
-def _begin(
-    manager: CampaignRuntimeProfileManager,
-    entry_kind: RuntimeSessionEntryKind,
-) -> None:
-    manager.begin_session(
-        RuntimeSessionContext(
-            CampaignRunVariant.LOOP,
-            0,
-            entry_kind,
-        )
-    )
+def _begin(manager: CampaignRuntimeProfileManager) -> None:
+    manager.begin_session()
 
 
 def _start(
     manager: CampaignRuntimeProfileManager,
     runtime: _Runtime,
-    entry_kind: RuntimeSessionEntryKind,
 ) -> None:
     _bind(manager, runtime)
-    _begin(manager, entry_kind)
+    _begin(manager)
 
 
 def _prepare(manager: CampaignRuntimeProfileManager, runtime: _Runtime) -> bool:
@@ -155,7 +142,7 @@ def test_support_fleet_retry_replaces_the_previous_ui_observation() -> None:
     assert manager.use_support_fleet(AbortToken())
     assert manager.support_fleet_status(AbortToken()) is SupportFleetStatus.PRESENT
 
-    _begin(manager, RuntimeSessionEntryKind.FRESH)
+    _begin(manager)
     assert manager.use_support_fleet(AbortToken())
 
 
@@ -171,7 +158,7 @@ def test_runtime_ui_mask_restores_all_derived_caches() -> None:
         )
     )
     runtime = _Runtime()
-    _start(manager, runtime, RuntimeSessionEntryKind.FRESH)
+    _start(manager, runtime)
     cache = ASSETS.__dict__
     original = {key: cache[key] for key in ("ui_mask", "ui_mask_stroke", "ui_mask_in_map") if key in cache}
 
@@ -256,7 +243,7 @@ def test_chapter16_session_state_projects_stage_specific_fleet_order() -> None:
         manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
     )
     assert capabilities.map_has_mob_move(AbortToken()) is False
-    _start(manager, runtime, RuntimeSessionEntryKind.FRESH)
+    _start(manager, runtime)
 
     assert manager.use_single_fleet_override(AbortToken()) is False
     initialization = build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())

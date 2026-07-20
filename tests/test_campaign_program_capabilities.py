@@ -23,12 +23,9 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeOperation,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
 from module.application import AbortToken
-from module.content.campaign_session import CampaignRunVariant
 from module.content.models import StageRef
 from module.content.runtime_profile import RuntimeExecutorKind
 from module.content.stage_loader import load_default_stage
@@ -255,13 +252,7 @@ def test_real_chapter_16_map_init_updates_live_override_and_reset_clears_it(
     manager.bind(runtime, CampaignMap("capability-test"))
     service = build_campaign_fleet_preparation_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
     assert service.prepare(runtime)
-    manager.begin_session(
-        RuntimeSessionContext(
-            CampaignRunVariant.LOOP,
-            0,
-            RuntimeSessionEntryKind.FRESH,
-        )
-    )
+    manager.begin_session()
 
     initialization = build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())
     initialization.post_control(cast("CampaignMapInitializationRuntime", runtime))

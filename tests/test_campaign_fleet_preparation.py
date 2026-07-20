@@ -1,6 +1,6 @@
 from dataclasses import fields
 from types import MappingProxyType
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from config_factory import in_memory_config
@@ -11,15 +11,9 @@ from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
 from module.adapters.campaign_runtime_profile import (
-    CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileManager,
-    RuntimeExecutorBuildContext,
-    RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
-    RuntimeExecutorOptionsSchema,
     RuntimeOperation,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
     RuntimeStateSeed,
 )
@@ -28,18 +22,9 @@ from module.adapters.gems_mumu12 import (
     GemsHardRetryFleetPreparationService,
 )
 from module.application import AbortToken
-from module.content.campaign_session import CampaignRunVariant
 from module.content.manifest import load_default_event_manifests
 from module.content.models import StageRef
-from module.content.runtime_profile import (
-    CampaignRuntimeExtension,
-    CampaignRuntimeExtensionId,
-    CampaignRuntimeProfile,
-    CampaignRuntimeProfileId,
-    RuntimeExecutorBinding,
-    RuntimeExecutorKind,
-    RuntimeImplementationId,
-)
+from module.content.runtime_profile import RuntimeExecutorKind
 from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
 from module.content.stage_loader import load_default_stage
 from module.device.device import Device
@@ -88,28 +73,6 @@ class _PreparationRuntime:
         return outcome
 
 
-class _SealedAtBeginExecutor(RuntimeExecutorInstance):
-    __slots__ = ("_support_fleet_state", "begin_observation")
-
-    def __init__(self) -> None:
-        self._support_fleet_state = SupportFleetAttemptState()
-        self.begin_observation: tuple[bool, SupportFleetStatus, bool] | None = None
-        super().__init__({RuntimeExecutorKind.MAP_MECHANIC})
-
-    @property
-    def support_fleet_state(self) -> SupportFleetAttemptState:
-        return self._support_fleet_state
-
-    @override
-    def begin_session(self, context: RuntimeSessionContext) -> None:
-        self.begin_observation = (
-            self._support_fleet_state.sealed,
-            self._support_fleet_state.status,
-            self._support_fleet_state.available,
-        )
-        super().begin_session(context)
-
-
 @pytest.fixture(scope="module")
 def packs_by_id() -> Mapping[str, EventPack]:
     return MappingProxyType({str(pack.pack_id): pack for pack in load_default_event_manifests()})
@@ -134,34 +97,6 @@ def _manager(
     return CampaignRuntimeProfileManager(
         profile,
         load_default_campaign_runtime_executor_registry(),
-    )
-
-
-def _seal_observer_manager(
-    executor: _SealedAtBeginExecutor,
-) -> CampaignRuntimeProfileManager:
-    implementation_id = RuntimeImplementationId("test/support-fleet-seal-observer")
-
-    def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-        del context
-        return executor
-
-    descriptor = RuntimeExecutorFactoryDescriptor(
-        implementation_id,
-        {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()},
-        factory,
-    )
-    extension = CampaignRuntimeExtension(
-        CampaignRuntimeExtensionId("test/support-fleet-seal-observer"),
-        (RuntimeExecutorBinding(RuntimeExecutorKind.MAP_MECHANIC, implementation_id, {}),),
-    )
-    profile = CampaignRuntimeProfile(
-        CampaignRuntimeProfileId("test/support-fleet-seal-observer"),
-        (extension,),
-    )
-    return CampaignRuntimeProfileManager(
-        profile,
-        CampaignRuntimeExecutorRegistry((descriptor,)),
     )
 
 
@@ -236,7 +171,7 @@ def test_begin_seals_support_observation_and_reset_clears_it(
     service = _service(manager)
     manager.bind(runtime, CampaignMap("support-fleet-lifecycle"))
     assert service.prepare(runtime)
-    manager.begin_session(RuntimeSessionContext(CampaignRunVariant.NORMAL, 0, RuntimeSessionEntryKind.FRESH))
+    manager.begin_session()
 
     with pytest.raises(SupportFleetStateError, match="sealed"):
         service.prepare(runtime)
@@ -248,27 +183,16 @@ def test_begin_seals_support_observation_and_reset_clears_it(
     assert manager.use_support_fleet(AbortToken()) is True
 
 
-def test_manager_seals_support_state_before_executor_begin_hooks() -> None:
-    executor = _SealedAtBeginExecutor()
-    manager = _seal_observer_manager(executor)
-    executor.support_fleet_state.observe(SupportFleetStatus.EMPTY)
-    manager.bind(object(), CampaignMap("support-fleet-seal-order"))
-
-    manager.begin_session(RuntimeSessionContext(CampaignRunVariant.NORMAL, 0, RuntimeSessionEntryKind.FRESH))
-
-    assert executor.begin_observation == (True, SupportFleetStatus.EMPTY, False)
-
-
-def test_resume_seals_unobserved_support_as_available_and_rejects_late_preparation(
+def test_begin_seals_unobserved_support_as_available_and_rejects_late_preparation(
     packs_by_id: Mapping[str, EventPack],
     profile_registry: CampaignRuntimeProfileRegistry,
 ) -> None:
     manager = _manager(packs_by_id, profile_registry, "campaign_main", "15-1")
     runtime = _PreparationRuntime(support_empty=[False])
     service = _service(manager)
-    manager.bind(runtime, CampaignMap("support-fleet-resume-seal"))
+    manager.bind(runtime, CampaignMap("support-fleet-unobserved-seal"))
 
-    manager.begin_session(RuntimeSessionContext(CampaignRunVariant.NORMAL, 3, RuntimeSessionEntryKind.RESUME))
+    manager.begin_session()
 
     assert manager.support_fleet_status(AbortToken()) is SupportFleetStatus.UNOBSERVED
     assert manager.use_support_fleet(AbortToken()) is True

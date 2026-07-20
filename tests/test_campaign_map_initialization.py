@@ -18,16 +18,10 @@ from module.adapters.campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeSessionEntryKind,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
 from module.adapters.campaign_submarine import STANDARD_CAMPAIGN_SUBMARINE_SERVICES
-from module.content.campaign_session import (
-    CampaignRunVariant,
-    CampaignSessionState,
-    CampaignSessionStatus,
-    RemainingSpawns,
-)
+from module.content.campaign_session import CampaignRunVariant
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -269,15 +263,8 @@ def test_initialization_failure_closes_lease_and_restores_all_ui_mask_caches(
         STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
         initialization,
     )
-    state = CampaignSessionState(
-        CampaignRunVariant.NORMAL,
-        CampaignSessionStatus.ACTIVE,
-        0,
-        RemainingSpawns(),
-    )
-
     with pytest.raises(RuntimeError, match=rf"{failure_phase} failed"):
-        owner.initialize(state, RuntimeSessionEntryKind.FRESH)
+        owner.initialize(CampaignRunVariant.NORMAL)
 
     assert trace == expected_trace
     assert lease.state is RuntimeProfileLeaseState.CLOSED

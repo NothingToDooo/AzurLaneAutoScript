@@ -3,8 +3,6 @@ import pytest
 from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import (
@@ -35,8 +33,8 @@ class _SessionManager:
         self.lease: RuntimeProfileLease | None = None
         self.cleanup_states: list[RuntimeProfileLeaseState] = []
 
-    def begin_session(self, context: RuntimeSessionContext) -> None:
-        self.calls.append(("begin", context))
+    def begin_session(self) -> None:
+        self.calls.append("begin")
         if self.begin_error is not None:
             raise self.begin_error
 
@@ -55,14 +53,6 @@ class _SessionManager:
             raise self.reset_error
 
 
-def _context() -> RuntimeSessionContext:
-    return RuntimeSessionContext(
-        CampaignRunVariant.LOOP,
-        3,
-        RuntimeSessionEntryKind.RESUME,
-    )
-
-
 def _hard_runtime(manager: _SessionManager) -> DeclarativeCampaignMapRuntime:
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
     lease = RuntimeProfileLease(manager)
@@ -78,12 +68,11 @@ def _entrance() -> Button:
 def test_lease_runs_one_session_and_closes_in_order() -> None:
     manager = _SessionManager()
     lease = RuntimeProfileLease(manager)
-    context = _context()
 
     assert lease.state is RuntimeProfileLeaseState.READY
     assert lease.active is False
 
-    lease.start(context)
+    lease.start()
 
     assert lease.state is RuntimeProfileLeaseState.ACTIVE
     assert lease.active is True
@@ -93,13 +82,13 @@ def test_lease_runs_one_session_and_closes_in_order() -> None:
     assert lease.state is RuntimeProfileLeaseState.CLOSED
     assert lease.active is False
     assert manager.calls == [
-        ("begin", context),
+        "begin",
         ("end", RuntimeSessionOutcome.COMPLETED),
         "reset",
     ]
     lease.discard()
     assert manager.calls == [
-        ("begin", context),
+        "begin",
         ("end", RuntimeSessionOutcome.COMPLETED),
         "reset",
     ]
@@ -113,16 +102,16 @@ def test_lease_rejects_invalid_transitions_without_changing_ownership() -> None:
         lease.close(RuntimeSessionOutcome.FAILED)
     assert lease.state is RuntimeProfileLeaseState.READY
 
-    lease.start(_context())
+    lease.start()
     with pytest.raises(CampaignRuntimeProfileError, match="cannot start from active"):
-        lease.start(_context())
+        lease.start()
     with pytest.raises(CampaignRuntimeProfileError, match="must close before discard"):
         lease.discard()
     assert lease.state is RuntimeProfileLeaseState.ACTIVE
 
     lease.close(RuntimeSessionOutcome.INTERRUPTED)
     with pytest.raises(CampaignRuntimeProfileError, match="cannot start from closed"):
-        lease.start(_context())
+        lease.start()
 
 
 def test_lease_begin_failure_closes_before_reset_and_cannot_be_reused() -> None:
@@ -132,14 +121,14 @@ def test_lease_begin_failure_closes_before_reset_and_cannot_be_reused() -> None:
     manager.lease = lease
 
     with pytest.raises(RuntimeError) as raised:
-        lease.start(_context())
+        lease.start()
 
     assert raised.value is begin_error
     assert lease.state is RuntimeProfileLeaseState.CLOSED
     assert manager.cleanup_states == [RuntimeProfileLeaseState.CLOSED]
-    assert manager.calls == [("begin", _context()), "reset"]
+    assert manager.calls == ["begin", "reset"]
     lease.discard()
-    assert manager.calls == [("begin", _context()), "reset"]
+    assert manager.calls == ["begin", "reset"]
 
 
 def test_lease_preserves_begin_and_reset_failures_in_order() -> None:
@@ -149,18 +138,18 @@ def test_lease_preserves_begin_and_reset_failures_in_order() -> None:
     lease = RuntimeProfileLease(manager)
 
     with pytest.raises(BaseExceptionGroup) as raised:
-        lease.start(_context())
+        lease.start()
 
     assert raised.value.exceptions == (begin_error, reset_error)
     assert lease.state is RuntimeProfileLeaseState.CLOSED
-    assert manager.calls == [("begin", _context()), "reset"]
+    assert manager.calls == ["begin", "reset"]
 
 
 def test_lease_close_runs_reset_after_end_failure_and_stays_closed() -> None:
     end_error = RuntimeError("end failed")
     manager = _SessionManager(end_error=end_error)
     lease = RuntimeProfileLease(manager)
-    lease.start(_context())
+    lease.start()
 
     with pytest.raises(RuntimeError) as raised:
         lease.close(RuntimeSessionOutcome.FAILED)
@@ -176,7 +165,7 @@ def test_lease_preserves_end_and_reset_failures_in_order() -> None:
     manager = _SessionManager(end_error=end_error, reset_error=reset_error)
     lease = RuntimeProfileLease(manager)
     manager.lease = lease
-    lease.start(_context())
+    lease.start()
 
     with pytest.raises(BaseExceptionGroup) as raised:
         lease.close(RuntimeSessionOutcome.FAILED)
@@ -209,17 +198,13 @@ def test_lease_validates_contract_values_before_mutating_state() -> None:
         RuntimeProfileLease(object())  # ty: ignore[invalid-argument-type] - 验证运行时边界。
 
     lease = RuntimeProfileLease(_SessionManager())
-    with pytest.raises(TypeError, match="RuntimeSessionContext"):
-        lease.start(object())  # ty: ignore[invalid-argument-type] - 验证运行时边界。
-    assert lease.state is RuntimeProfileLeaseState.READY
-
-    lease.start(_context())
+    lease.start()
     with pytest.raises(TypeError, match="RuntimeSessionOutcome"):
         lease.close("failed")  # ty: ignore[invalid-argument-type] - 验证运行时边界。
     assert lease.state is RuntimeProfileLeaseState.ACTIVE
 
 
-def test_hard_attempt_uses_a_direct_loop_context_and_completes(
+def test_hard_attempt_uses_a_direct_loop_session_and_completes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     manager = _SessionManager()
@@ -243,15 +228,10 @@ def test_hard_attempt_uses_a_direct_loop_context_and_completes(
 
     runtime.execute_hard_attempt(entrance, cancellation)
 
-    context = RuntimeSessionContext(
-        CampaignRunVariant.LOOP,
-        0,
-        RuntimeSessionEntryKind.FRESH,
-    )
     assert body_calls == [(entrance, cancellation)]
     assert fresh_combat_calls == []
     assert manager.calls == [
-        ("begin", context),
+        "begin",
         ("end", RuntimeSessionOutcome.COMPLETED),
         "reset",
     ]

@@ -11,7 +11,6 @@ from module.adapters.campaign_runtime_tunings import (
 )
 from module.base.failure import raise_cleanup_errors
 from module.config.config import AzurLaneConfig
-from module.content.campaign_session import CampaignRunVariant
 from module.content.errors import ContentValidationError
 from module.content.runtime_profile import (
     CampaignRuntimeExtensionId,
@@ -48,33 +47,10 @@ class RuntimeOperation(StrEnum):
     RUNTIME_CREATED = "runtime_created"
 
 
-class RuntimeSessionEntryKind(StrEnum):
-    FRESH = "fresh"
-    RESUME = "resume"
-
-
 class RuntimeSessionOutcome(StrEnum):
     COMPLETED = "completed"
     INTERRUPTED = "interrupted"
     FAILED = "failed"
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeSessionContext:
-    variant: CampaignRunVariant
-    battle_index: int
-    entry_kind: RuntimeSessionEntryKind
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.variant, CampaignRunVariant):
-            message = "runtime session variant must be a CampaignRunVariant"
-            raise TypeError(message)
-        if type(self.battle_index) is not int or self.battle_index < 0:
-            message = "runtime session battle_index must be a non-negative integer"
-            raise ValueError(message)
-        if not isinstance(self.entry_kind, RuntimeSessionEntryKind):
-            message = "runtime session entry_kind must be a RuntimeSessionEntryKind"
-            raise TypeError(message)
 
 
 type RuntimeFallback = Callable[..., object]
@@ -243,12 +219,6 @@ class RuntimeExecutorInstance:
             message = "runtime executor instance is already bound"
             raise CampaignRuntimeProfileError(message)
         self._runtime = runtime
-
-    def begin_session(self, context: RuntimeSessionContext) -> None:
-        if self._runtime is None:
-            message = "runtime executor must be bound before begin_session"
-            raise CampaignRuntimeProfileError(message)
-        del context
 
     def end_session(self, outcome: RuntimeSessionOutcome) -> None:
         if self._runtime is None:
@@ -475,7 +445,6 @@ class CampaignRuntimeProfileManager:
     """把不可变 profile 编译为单 attempt 多 facet executor 链和 tuning 投影。"""
 
     __slots__ = (
-        "_active_context",
         "_compiled_map",
         "_facets",
         "_frames",
@@ -483,6 +452,7 @@ class CampaignRuntimeProfileManager:
         "_profile",
         "_registry",
         "_runtime",
+        "_session_active",
         "_shared_state",
         "_tuning_patch",
     )
@@ -508,7 +478,7 @@ class CampaignRuntimeProfileManager:
         self._frames: list[_InvocationFrame] = []
         self._runtime: object | None = None
         self._compiled_map: CampaignMap | None = None
-        self._active_context: RuntimeSessionContext | None = None
+        self._session_active = False
         try:
             self._tuning_patch = compile_campaign_runtime_tuning_patch(profile.tunings)
         except (RuntimeTuningValidationError, TypeError, ValueError) as error:
@@ -650,33 +620,28 @@ class CampaignRuntimeProfileManager:
             instance.bind(runtime, compiled_map)
         self.runtime_created(runtime)
 
-    def begin_session(self, context: RuntimeSessionContext) -> None:
+    def begin_session(self) -> None:
         if self._runtime is None:
             message = "runtime profile manager must be bound before begin_session"
             raise CampaignRuntimeProfileError(message)
-        if self._active_context is not None:
+        if self._session_active:
             message = "runtime profile manager already has an active session"
             raise CampaignRuntimeProfileError(message)
-        if not isinstance(context, RuntimeSessionContext):
-            message = "runtime profile begin_session requires RuntimeSessionContext"
-            raise TypeError(message)
         # 支援舰队允许 READY 阶段反复观察；session 一旦开始，后续消费者只能读取封存事实。
         support_fleet = self._shared_state.support_fleet
         if support_fleet is not None:
             support_fleet.seal()
-        for instance in self._instances:
-            instance.begin_session(context)
-        self._active_context = context
+        self._session_active = True
 
     def end_session(self, outcome: RuntimeSessionOutcome) -> None:
-        if self._active_context is None:
+        if not self._session_active:
             message = "runtime profile manager has no active session"
             raise CampaignRuntimeProfileError(message)
         if not isinstance(outcome, RuntimeSessionOutcome):
             message = "runtime profile end_session requires RuntimeSessionOutcome"
             raise TypeError(message)
         # manager 先放弃 active ownership，避免任一 executor 失败后留下可复用的半关闭会话。
-        self._active_context = None
+        self._session_active = False
         errors: list[BaseException] = []
         for instance in reversed(self._instances):
             try:
@@ -686,7 +651,7 @@ class CampaignRuntimeProfileManager:
         raise_cleanup_errors(errors, message="runtime profile session cleanup failed")
 
     def reset(self) -> None:
-        if self._active_context is not None:
+        if self._session_active:
             message = "runtime profile manager cannot reset an active session"
             raise CampaignRuntimeProfileError(message)
         # ownership 状态先失效；executor reset 即使失败也不能让 manager 再次参与执行。

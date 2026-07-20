@@ -3,14 +3,13 @@ from typing import Protocol
 
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
-    RuntimeSessionContext,
     RuntimeSessionOutcome,
 )
 from module.base.failure import preserve_cleanup_failure, raise_cleanup_errors
 
 
 class _RuntimeProfileSessionManager(Protocol):
-    def begin_session(self, context: RuntimeSessionContext) -> None: ...
+    def begin_session(self) -> None: ...
 
     def end_session(self, outcome: RuntimeSessionOutcome) -> None: ...
 
@@ -45,15 +44,12 @@ class RuntimeProfileLease:
     def active(self) -> bool:
         return self._state is RuntimeProfileLeaseState.ACTIVE
 
-    def start(self, context: RuntimeSessionContext) -> None:
-        if not isinstance(context, RuntimeSessionContext):
-            message = "runtime profile lease context must be a RuntimeSessionContext"
-            raise TypeError(message)
+    def start(self) -> None:
         if self._state is not RuntimeProfileLeaseState.READY:
             message = f"runtime profile lease cannot start from {self._state.value}"
             raise CampaignRuntimeProfileError(message)
         try:
-            self._manager.begin_session(context)
+            self._manager.begin_session()
         except BaseException as error:
             self._state = RuntimeProfileLeaseState.CLOSED
             preserve_cleanup_failure(

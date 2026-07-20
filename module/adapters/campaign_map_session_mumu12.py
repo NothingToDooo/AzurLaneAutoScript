@@ -4,11 +4,7 @@ from module.adapters.campaign_map_initialization import (
     CampaignMapInitializationRuntime,
     CampaignMapInitializationService,
 )
-from module.adapters.campaign_runtime_profile import (
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
-    RuntimeSessionOutcome,
-)
+from module.adapters.campaign_runtime_profile import RuntimeSessionOutcome
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
 from module.adapters.campaign_submarine import (
     CampaignSubmarineFreshCombatService,
@@ -16,7 +12,7 @@ from module.adapters.campaign_submarine import (
 )
 from module.application import AbortRequested
 from module.base.failure import preserve_cleanup_failure
-from module.content.campaign_session import CampaignRunVariant, CampaignSessionState
+from module.content.campaign_session import CampaignRunVariant
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -72,25 +68,16 @@ class Mumu12CampaignMapSessionOwner:
     def active(self) -> bool:
         return self._lease.active
 
-    def initialize(
-        self,
-        state: CampaignSessionState,
-        entry_kind: RuntimeSessionEntryKind,
-    ) -> None:
-        if not isinstance(state, CampaignSessionState):
-            message = "campaign map session initialization requires a CampaignSessionState"
+    def initialize(self, variant: CampaignRunVariant) -> None:
+        if not isinstance(variant, CampaignRunVariant):
+            message = "campaign map session initialization requires a CampaignRunVariant"
             raise TypeError(message)
-        if not isinstance(entry_kind, RuntimeSessionEntryKind):
-            message = "campaign map session initialization requires a RuntimeSessionEntryKind"
-            raise TypeError(message)
-        context = RuntimeSessionContext(state.variant, state.battle_index, entry_kind)
         runtime = self._runtime
-        runtime.session_variant = state.variant
-        runtime.map_is_clear_mode = state.variant is CampaignRunVariant.LOOP
-        self._lease.start(context)
+        runtime.session_variant = variant
+        runtime.map_is_clear_mode = variant is CampaignRunVariant.LOOP
+        self._lease.start()
         try:
-            if entry_kind is RuntimeSessionEntryKind.FRESH:
-                self._fresh_combat.start(runtime)
+            self._fresh_combat.start(runtime)
             logger.hr("Map init")
             runtime.map_data_init(runtime.MAP)
             self._initialization.pre_control(runtime)

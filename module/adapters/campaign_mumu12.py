@@ -44,8 +44,6 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeOperation,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
@@ -694,14 +692,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         """完成一次困难图结算；hard clear-mode 的一次 attempt 是最小可恢复业务单元。"""
 
         cancellation.raise_if_requested()
-        context = RuntimeSessionContext(
-            variant=CampaignRunVariant.LOOP,
-            battle_index=0,
-            entry_kind=RuntimeSessionEntryKind.FRESH,
-        )
-        self.session_variant = context.variant
+        self.session_variant = CampaignRunVariant.LOOP
         self.map_is_clear_mode = True
-        self._runtime_profile_lease.start(context)
+        self._runtime_profile_lease.start()
         try:
             self._execute_hard_attempt_body(entrance, cancellation)
         except AbortRequested as error:
@@ -1211,7 +1204,7 @@ class Mumu12CampaignRuntimeProvider:
         variant = CampaignRunVariant.LOOP if runtime.map_is_clear_mode else CampaignRunVariant.NORMAL
         activated = self._entered_session(job, session, variant)
         state = activated.initial_state()
-        handle.owner.initialize(state, RuntimeSessionEntryKind.FRESH)
+        handle.owner.initialize(activated.variant)
         return _ActivatedMap(activated, state)
 
     @staticmethod
