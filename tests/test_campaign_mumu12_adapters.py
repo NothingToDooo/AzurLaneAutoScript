@@ -21,9 +21,11 @@ from module.adapters.campaign_mumu12 import (
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
+    RuntimeSessionContext,
     RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
+from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
 from module.adapters.gems_mumu12 import Mumu12GemsRuntimeBehavior
 from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, SafeUnitCancellation, TaskId
 from module.base.button import Button
@@ -31,6 +33,7 @@ from module.content.battle_policy import BossStrategy, ClearBoss, StagePolicy
 from module.content.campaign_session import (
     CampaignRunVariant,
     CampaignSession,
+    CampaignSessionState,
     CampaignSessionStatus,
     RemainingSpawns,
 )
@@ -345,13 +348,11 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
 
     def initialize_session(
         self,
-        variant: CampaignRunVariant,
-        battle_index: int,
+        state: CampaignSessionState,
         entry_kind: RuntimeSessionEntryKind,
-        state: object | None = None,
     ) -> None:
         self._runtime_session_active = True
-        self.calls.append(("initialize_session", variant, battle_index, entry_kind, state))
+        self.calls.append(("initialize_session", state, entry_kind))
 
     def resume_session(self, state: object) -> None:
         if not self._runtime_session_active:
@@ -581,12 +582,12 @@ def test_every_remaining_profile_operation_has_an_explicit_dispatch_boundary() -
             operations = binding.options.get("operations", ())
             if isinstance(operations, tuple):
                 missing.update(
-                        operation
-                        for operation in operations
-                        if isinstance(operation, str)
-                        and (binding.kind, operation) not in direct_dispatch
-                        and operation not in DeclarativeCampaignMapRuntime.__dict__
-                    )
+                    operation
+                    for operation in operations
+                    if isinstance(operation, str)
+                    and (binding.kind, operation) not in direct_dispatch
+                    and operation not in DeclarativeCampaignMapRuntime.__dict__
+                )
 
     assert missing == set()
 
@@ -759,6 +760,10 @@ def test_runtime_is_poisoned_before_session_cleanup_can_fail() -> None:
 
     class _EndFailingProfile:
         @staticmethod
+        def begin_session(context: RuntimeSessionContext) -> None:
+            calls.append(("begin_session", context))
+
+        @staticmethod
         def end_session(outcome: RuntimeSessionOutcome) -> None:
             calls.append(("end_session", outcome))
             raise cleanup_error
@@ -767,26 +772,29 @@ def test_runtime_is_poisoned_before_session_cleanup_can_fail() -> None:
         def reset() -> None:
             calls.append("reset")
 
-    runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    vars(runtime).update(
-        _runtime_profile=_EndFailingProfile(),
-        _runtime_profile_available=True,
-        _runtime_profile_session_active=True,
+    lease = RuntimeProfileLease(_EndFailingProfile())
+    context = RuntimeSessionContext(
+        CampaignRunVariant.NORMAL,
+        0,
+        RuntimeSessionEntryKind.FRESH,
     )
+    lease.start(context)
+    runtime = object.__new__(DeclarativeCampaignMapRuntime)
+    vars(runtime)["_runtime_profile_lease"] = lease
 
     with pytest.raises(RuntimeError) as raised:
         runtime.finish_runtime_session(RuntimeSessionOutcome.FAILED)
 
     assert raised.value is cleanup_error
-    assert runtime._runtime_profile_available is False  # ruff:ignore[private-member-access] - 验证失败后的所有权状态。
-    assert runtime._runtime_profile_session_active is False  # ruff:ignore[private-member-access] - 失败后不能再报告 active。
-    assert calls == [("end_session", RuntimeSessionOutcome.FAILED), "reset"]
-    with pytest.raises(CampaignRuntimeProfileError, match="already been released"):
-        runtime.initialize_session(
-            CampaignRunVariant.NORMAL,
-            0,
-            RuntimeSessionEntryKind.FRESH,
-        )
+    assert lease.state is RuntimeProfileLeaseState.CLOSED
+    assert runtime.runtime_session_active is False
+    assert calls == [
+        ("begin_session", context),
+        ("end_session", RuntimeSessionOutcome.FAILED),
+        "reset",
+    ]
+    with pytest.raises(CampaignRuntimeProfileError, match="cannot start from closed"):
+        lease.start(context)
 
 
 def test_new_runtime_refresh_failure_cleans_the_factory_result(
@@ -908,10 +916,8 @@ def test_provider_enters_once_and_exposes_only_the_exact_activated_variant() -> 
     assert ("select_stage", "t1", "normal") in runtime.calls
     assert (
         "initialize_session",
-        CampaignRunVariant.LOOP,
-        0,
-        RuntimeSessionEntryKind.FRESH,
         activated.initial_state(),
+        RuntimeSessionEntryKind.FRESH,
     ) in runtime.calls
     assert config.Campaign_UseAutoSearch is True
     assert provider.active_runtime(activated, AbortToken()) is runtime
@@ -1084,16 +1090,22 @@ def test_provider_attempts_prepared_and_active_cleanup_after_each_failure() -> N
             self._label = label
             self._error = error
 
+        @staticmethod
+        def begin_session(context: RuntimeSessionContext) -> None:
+            del context
+
+        @staticmethod
+        def end_session(outcome: RuntimeSessionOutcome) -> None:
+            del outcome
+
         def reset(self) -> None:
             calls.append(self._label)
             raise self._error
 
     def failing_runtime(label: str, error: BaseException) -> DeclarativeCampaignMapRuntime:
         runtime = object.__new__(DeclarativeCampaignMapRuntime)
-        vars(runtime).update(
-            _runtime_profile=_ResetFailingProfile(label, error),
-            _runtime_profile_available=True,
-            _runtime_profile_session_active=False,
+        vars(runtime)["_runtime_profile_lease"] = RuntimeProfileLease(
+            _ResetFailingProfile(label, error),
         )
         return runtime
 
@@ -1111,8 +1123,9 @@ def test_provider_attempts_prepared_and_active_cleanup_after_each_failure() -> N
     assert calls == ["prepared", "active"]
     assert provider._prepared_runtime is None  # ruff:ignore[private-member-access] - 验证失败后 owner 已释放。
     assert provider._active_runtime is None  # ruff:ignore[private-member-access] - 验证失败后 owner 已释放。
-    assert prepared_runtime._runtime_profile_available is False  # ruff:ignore[private-member-access] - 验证 prepared owner 已失效。
-    assert active_runtime._runtime_profile_available is False  # ruff:ignore[private-member-access] - 验证 active owner 已失效。
+    prepared_runtime.discard_runtime()
+    active_runtime.discard_runtime()
+    assert calls == ["prepared", "active"]
 
 
 def test_in_progress_completed_state_closes_the_finished_map_runtime() -> None:

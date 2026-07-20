@@ -16,6 +16,7 @@ from module.adapters.campaign_runtime_profile import (
     RuntimeSessionOutcome,
     RuntimeStateSeed,
 )
+from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
 from module.application import AbortToken
 from module.config.config import AzurLaneConfig
 from module.content.campaign_session import CampaignRunVariant
@@ -698,6 +699,77 @@ def test_lifecycle_distinguishes_fresh_and_resume_and_resets_session_state() -> 
         ("begin", RuntimeSessionEntryKind.RESUME, 3),
     ]
     assert other.use_support_fleet(AbortToken())
+
+
+def test_lease_rolls_back_a_partially_started_real_profile_in_reverse_order() -> None:
+    trace: list[tuple[str, str]] = []
+    begin_error = RuntimeError("second begin failed")
+
+    class _BeginExecutor(RuntimeExecutorInstance):
+        def __init__(self, label: str, *, fail: bool) -> None:
+            super().__init__({RuntimeExecutorKind.MAP_MECHANIC})
+            self._label = label
+            self._fail = fail
+
+        @override
+        def bind(self, runtime: object, compiled_map: CampaignMap) -> None:
+            super().bind(runtime, compiled_map)
+            trace.append((self._label, "bind"))
+
+        @override
+        def begin_session(self, context: RuntimeSessionContext) -> None:
+            super().begin_session(context)
+            trace.append((self._label, "begin"))
+            if self._fail:
+                raise begin_error
+
+        @override
+        def reset(self) -> None:
+            super().reset()
+            trace.append((self._label, "reset"))
+
+    def executor_factory(label: str, *, fail: bool) -> RuntimeExecutorFactory:
+        def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+            del context
+            return _BeginExecutor(label, fail=fail)
+
+        return factory
+
+    schema = {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()}
+    manager = CampaignRuntimeProfileManager(
+        _profile(
+            _extension("first", _binding("first", RuntimeExecutorKind.MAP_MECHANIC)),
+            _extension("second", _binding("second", RuntimeExecutorKind.MAP_MECHANIC)),
+        ),
+        CampaignRuntimeExecutorRegistry(
+            (
+                _descriptor("first", schema, executor_factory("first", fail=False)),
+                _descriptor("second", schema, executor_factory("second", fail=True)),
+            )
+        ),
+    )
+    manager.bind(_Runtime(), CampaignMap("partial-begin"))
+    lease = RuntimeProfileLease(manager)
+
+    with pytest.raises(RuntimeError) as raised:
+        lease.start(
+            RuntimeSessionContext(
+                CampaignRunVariant.NORMAL,
+                0,
+                RuntimeSessionEntryKind.FRESH,
+            )
+        )
+
+    assert raised.value is begin_error
+    assert lease.state is RuntimeProfileLeaseState.CLOSED
+    assert trace == [
+        ("first", "bind"),
+        ("second", "bind"),
+        ("first", "begin"),
+        ("second", "begin"),
+        ("second", "reset"),
+        ("first", "reset"),
+    ]
 
 
 def test_lifecycle_attempts_every_executor_cleanup_and_poison_manager() -> None:

@@ -31,6 +31,7 @@ from module.adapters.campaign_runtime_profile import (
     RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
+from module.adapters.campaign_runtime_session import RuntimeProfileLease
 from module.adapters.campaign_stage_navigator import build_campaign_stage_navigator
 from module.adapters.gems_mumu12 import (
     GemsHardPreparationError,
@@ -38,7 +39,7 @@ from module.adapters.gems_mumu12 import (
     Mumu12GemsRuntimeBehavior,
 )
 from module.adapters.mumu12 import CancellationAwareMumu12Device, emotion_runtime_overlay
-from module.application import SafeUnitCancellation
+from module.application import AbortRequested, SafeUnitCancellation
 from module.base.decorator import cached_property
 from module.base.failure import preserve_cleanup_failure, raise_cleanup_errors
 from module.base.utils import location2node
@@ -474,8 +475,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
     fleet_destination: object | None
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
     _runtime_profile: CampaignRuntimeProfileManager
-    _runtime_profile_available: bool
-    _runtime_profile_session_active: bool
+    _runtime_profile_lease: RuntimeProfileLease
     grid_class: type[Grid]
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD: float
     MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD: float
@@ -507,11 +507,10 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         self.session_variant = CampaignRunVariant.NORMAL
         self.fleet_destination = None
         self._gems_behavior = None
-        self._runtime_profile_available = True
-        self._runtime_profile_session_active = False
         super().__init__(config=config, device=device)
         self._runtime_profile.apply_runtime_tunings(self)
         self._runtime_profile.bind(self, self.MAP)
+        self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
         self.stage_navigator = build_campaign_stage_navigator(self, self._runtime_profile)
 
     def runtime_super(
@@ -944,47 +943,21 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
             grid = self.map[(patch.cell.x, patch.cell.y)]
             setattr(grid, patch.attribute.value, patch.value)
 
-    def _begin_runtime_session(
-        self,
-        variant: CampaignRunVariant,
-        battle_index: int,
-        entry_kind: RuntimeSessionEntryKind,
-        state: CampaignSessionState | None = None,
-    ) -> None:
-        if not isinstance(variant, CampaignRunVariant):
-            message = "campaign runtime variant must be a CampaignRunVariant"
-            raise TypeError(message)
-        if type(battle_index) is not int or battle_index < 0:
-            message = "campaign runtime battle_index must be a non-negative integer"
-            raise ValueError(message)
-        if not isinstance(entry_kind, RuntimeSessionEntryKind):
-            message = "campaign runtime entry_kind must be a RuntimeSessionEntryKind"
-            raise TypeError(message)
-        if state is not None and (not isinstance(state, CampaignSessionState) or state.variant is not variant):
-            message = "campaign runtime state must match the selected variant"
-            raise ValueError(message)
-        if not self._runtime_profile_available:
-            message = "campaign runtime profile has already been released"
-            raise CampaignRuntimeProfileError(message)
-        if self._runtime_profile_session_active:
-            message = "campaign runtime profile session is already active"
-            raise CampaignRuntimeProfileError(message)
-        self.session_variant = variant
-        self.map_is_clear_mode = variant is CampaignRunVariant.LOOP
-        self._runtime_profile.begin_session(RuntimeSessionContext(variant, battle_index, entry_kind))
-        self._runtime_profile_session_active = True
-
     def initialize_session(
         self,
-        variant: CampaignRunVariant,
-        battle_index: int,
+        state: CampaignSessionState,
         entry_kind: RuntimeSessionEntryKind,
-        state: CampaignSessionState | None = None,
     ) -> None:
-        self._begin_runtime_session(variant, battle_index, entry_kind, state)
+        if not isinstance(state, CampaignSessionState):
+            message = "campaign runtime initialization requires a CampaignSessionState"
+            raise TypeError(message)
+        context = RuntimeSessionContext(state.variant, state.battle_index, entry_kind)
+        self.session_variant = state.variant
+        self.map_is_clear_mode = state.variant is CampaignRunVariant.LOOP
+        self._runtime_profile_lease.start(context)
         try:
             self.map_init(self.MAP)
-            self.battle_count = battle_index
+            self.battle_count = state.battle_index
             self._apply_map_patches(MapMutationPhase.MAP_INIT)
         except BaseException as error:
             preserve_cleanup_failure(
@@ -998,7 +971,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         if not isinstance(state, CampaignSessionState):
             message = "campaign runtime resume requires a CampaignSessionState"
             raise TypeError(message)
-        if not self._runtime_profile_session_active:
+        if not self._runtime_profile_lease.active:
             message = "campaign runtime profile session is not active"
             raise CampaignRuntimeProfileError(message)
         if state.variant is not self.session_variant:
@@ -1007,37 +980,14 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         self.battle_count = state.battle_index
 
     def finish_runtime_session(self, outcome: RuntimeSessionOutcome) -> None:
-        if not isinstance(outcome, RuntimeSessionOutcome):
-            message = "campaign runtime outcome must be a RuntimeSessionOutcome"
-            raise TypeError(message)
-        if not self._runtime_profile_session_active:
-            message = "campaign runtime profile session is not active"
-            raise CampaignRuntimeProfileError(message)
-        self._runtime_profile_available = False
-        self._runtime_profile_session_active = False
-        errors: list[BaseException] = []
-        for cleanup in (
-            partial(self._runtime_profile.end_session, outcome),
-            self._runtime_profile.reset,
-        ):
-            try:
-                cleanup()
-            except BaseException as error:  # ruff:ignore[blind-except] - end 与 reset 是独立的关闭阶段。
-                errors.append(error)
-        raise_cleanup_errors(errors, message="campaign runtime session cleanup failed")
+        self._runtime_profile_lease.close(outcome)
 
     def discard_runtime(self) -> None:
-        if self._runtime_profile_session_active:
-            message = "active campaign runtime must finish its session before discard"
-            raise CampaignRuntimeProfileError(message)
-        if not self._runtime_profile_available:
-            return
-        self._runtime_profile_available = False
-        self._runtime_profile.reset()
+        self._runtime_profile_lease.discard()
 
     @property
     def runtime_session_active(self) -> bool:
-        return self._runtime_profile_session_active
+        return self._runtime_profile_lease.active
 
     def prepare_battle(self, battle_index: int) -> None:
         if type(battle_index) is not int or battle_index < 0:
@@ -1057,20 +1007,29 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         """完成一次困难图结算；hard clear-mode 的一次 attempt 是最小可恢复业务单元。"""
 
         cancellation.raise_if_requested()
-        self._begin_runtime_session(
-            CampaignRunVariant.LOOP,
-            0,
-            RuntimeSessionEntryKind.FRESH,
+        context = RuntimeSessionContext(
+            variant=CampaignRunVariant.LOOP,
+            battle_index=0,
+            entry_kind=RuntimeSessionEntryKind.FRESH,
         )
+        self.session_variant = context.variant
+        self.map_is_clear_mode = True
+        self._runtime_profile_lease.start(context)
         try:
             self._execute_hard_attempt_body(entrance, cancellation)
+        except AbortRequested as error:
+            preserve_cleanup_failure(
+                error,
+                partial(self.finish_runtime_session, RuntimeSessionOutcome.INTERRUPTED),
+                message="cancelled hard campaign attempt and cleanup both failed",
+            )
+            raise
         except BaseException as error:
-            if self._runtime_profile_session_active:
-                preserve_cleanup_failure(
-                    error,
-                    partial(self.finish_runtime_session, RuntimeSessionOutcome.FAILED),
-                    message="hard campaign attempt and cleanup both failed",
-                )
+            preserve_cleanup_failure(
+                error,
+                partial(self.finish_runtime_session, RuntimeSessionOutcome.FAILED),
+                message="hard campaign attempt and cleanup both failed",
+            )
             raise
         self.finish_runtime_session(RuntimeSessionOutcome.COMPLETED)
 
@@ -1505,12 +1464,7 @@ class Mumu12CampaignRuntimeProvider:
         if runtime.runtime_session_active:
             runtime.resume_session(progress_state)
         else:
-            runtime.initialize_session(
-                progress_state.variant,
-                progress_state.battle_index,
-                RuntimeSessionEntryKind.RESUME,
-                progress_state,
-            )
+            runtime.initialize_session(progress_state, RuntimeSessionEntryKind.RESUME)
         runtime.prepare_battle(progress_state.battle_index)
         return session
 
@@ -1554,12 +1508,7 @@ class Mumu12CampaignRuntimeProvider:
         variant = CampaignRunVariant.LOOP if runtime.map_is_clear_mode else CampaignRunVariant.NORMAL
         activated = self._entered_session(job, session, variant)
         state = activated.initial_state()
-        runtime.initialize_session(
-            variant,
-            state.battle_index,
-            RuntimeSessionEntryKind.FRESH,
-            state,
-        )
+        runtime.initialize_session(state, RuntimeSessionEntryKind.FRESH)
         runtime.prepare_battle(state.battle_index)
         return _ActivatedMap(activated, state)
 
