@@ -1,7 +1,6 @@
 from contextlib import suppress
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Protocol, override
 
-from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import area_offset
 from module.campaign import assets as campaign_assets
@@ -18,6 +17,9 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from module.base.base import ModuleBase
+    from module.base.button import Button
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
 
 CAMPAIGN_NAME_ERROR_MESSAGE = "Campaign name error"
 
@@ -52,7 +54,7 @@ ASIDE_SWITCH_20241219.add_state("ex", campaign_assets.CHAPTER_20241219_EX)
 # 游戏 bug 可能导致关卡撤退或结束后侧边指示器消失。
 ASIDE_SWITCH_20241219.set_unknown_timer = Timer(0.6, count=2)
 
-_CHAPTER_SWITCH_20241219_ASIDE = {
+CHAPTER_SWITCH_20241219_ASIDE = {
     "a": "part1",
     "c": "part1",
     "t": "part1",
@@ -62,16 +64,20 @@ _CHAPTER_SWITCH_20241219_ASIDE = {
     "ex_sp": "sp",
     "ex_ex": "ex",
 }
-_CHAPTER_SWITCH_20241219_SP_ASIDE = {
+CHAPTER_SWITCH_20241219_SP_ASIDE = {
     "sp": "part2",
     "t": "part2",
     "ht": "part2",
     "ex_sp": "sp",
 }
-_CHAPTER_SWITCH_20241219_SPEX_ASIDE = {
-    **_CHAPTER_SWITCH_20241219_SP_ASIDE,
+CHAPTER_SWITCH_20241219_SPEX_ASIDE = {
+    **CHAPTER_SWITCH_20241219_SP_ASIDE,
     "ex_ex": "ex",
 }
+NORMAL_EVENT_CHAPTERS = frozenset({"a", "b", "as", "bs", "t", "ts", "tss"})
+HARD_EVENT_CHAPTERS = frozenset({"c", "d", "cs", "ds", "ht", "hts"})
+EX_EVENT_CHAPTERS = frozenset({"ex_sp"})
+EVENT_CHAPTERS = NORMAL_EVENT_CHAPTERS | HARD_EVENT_CHAPTERS | EX_EVENT_CHAPTERS
 
 
 def is_digit_chapter(chapter: str | int) -> bool:
@@ -83,9 +89,61 @@ def is_digit_chapter(chapter: str | int) -> bool:
         return False
 
 
+class CampaignStageNavigator(Protocol):
+    def select(
+        self,
+        name: str,
+        mode: str = "normal",
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> Button: ...
+
+
+class _DefaultCampaignStageNavigator:
+    """通用 CampaignUI 的默认关卡选择策略；声明式 runtime 会注入 typed navigator。"""
+
+    __slots__ = ("_host",)
+
+    def __init__(self, host: CampaignUI) -> None:
+        self._host = host
+
+    def select(
+        self,
+        name: str,
+        mode: str = "normal",
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> Button:
+        host = self._host
+        timeout = Timer(5, count=20).start()
+        while True:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                host.device.screenshot()
+
+            if timeout.reached():
+                break
+            try:
+                host.campaign_set_chapter(name, mode)
+                return host.campaign_get_entrance(name=name)
+            except CampaignNameError:
+                pass
+
+            if host.handle_campaign_ui_additional():
+                continue
+
+        logger.warning(CAMPAIGN_NAME_ERROR_MESSAGE)
+        raise CampaignSelectionError(CAMPAIGN_NAME_ERROR_MESSAGE)
+
+
 class CampaignUI(MapOperation, EventCampaignNavigation, CampaignOcr):
-    ENTRANCE = Button(area=(), color=(), button=(), name="default_button")
     stage_entrance: dict[str, Button]
+    stage_navigator: CampaignStageNavigator
+
+    def __init__(self, config: AzurLaneConfig, device: Device) -> None:
+        super().__init__(config=config, device=device)
+        self.stage_navigator = _DefaultCampaignStageNavigator(self)
 
     def campaign_ensure_chapter(self, chapter: str | int, *, skip_first_screenshot: bool = True) -> None:
         """chapter 接受数字章节或 d、sp 等活动章节名。"""
@@ -235,13 +293,13 @@ class CampaignUI(MapOperation, EventCampaignNavigation, CampaignOcr):
 
     def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
         del mode
-        if chapter in ["a", "b", "c", "d", "ex_sp", "as", "bs", "cs", "ds", "t", "ts", "tss", "ht", "hts"]:
+        if chapter in EVENT_CHAPTERS:
             self.ui_goto_event()
-            if chapter in ["a", "b", "as", "bs", "t", "ts", "tss"]:
+            if chapter in NORMAL_EVENT_CHAPTERS:
                 self.campaign_ensure_mode("normal")
-            elif chapter in ["c", "d", "cs", "ds", "ht", "hts"]:
+            elif chapter in HARD_EVENT_CHAPTERS:
                 self.campaign_ensure_mode("hard")
-            elif chapter == "ex_sp":
+            elif chapter in EX_EVENT_CHAPTERS:
                 self.campaign_ensure_mode("ex")
             self.campaign_ensure_chapter(chapter)
             return True
@@ -280,17 +338,17 @@ class CampaignUI(MapOperation, EventCampaignNavigation, CampaignOcr):
             if mode == "story":
                 self.campaign_ensure_mode_20241219("story")
                 return True
-            if self._campaign_set_chapter_20241219_aside(chapter, _CHAPTER_SWITCH_20241219_ASIDE):
+            if self._campaign_set_chapter_20241219_aside(chapter, CHAPTER_SWITCH_20241219_ASIDE):
                 return True
         if self.config.MAP_CHAPTER_SWITCH_20241219_SP:
             self._set_20241219_hard_mode(chapter, stage)
-            if self._campaign_set_chapter_20241219_aside(chapter, _CHAPTER_SWITCH_20241219_SP_ASIDE):
+            if self._campaign_set_chapter_20241219_aside(chapter, CHAPTER_SWITCH_20241219_SP_ASIDE):
                 return True
         if self.config.MAP_CHAPTER_SWITCH_20241219_SPEX:
             self._set_20241219_hard_mode(chapter, stage)
             try:
                 ASIDE_SWITCH_20241219.offset = area_offset((-20, -20, 20, 20), (0, -37))
-                if self._campaign_set_chapter_20241219_aside(chapter, _CHAPTER_SWITCH_20241219_SPEX_ASIDE):
+                if self._campaign_set_chapter_20241219_aside(chapter, CHAPTER_SWITCH_20241219_SPEX_ASIDE):
                     return True
             finally:
                 ASIDE_SWITCH_20241219.offset = (20, 20)
@@ -326,28 +384,12 @@ class CampaignUI(MapOperation, EventCampaignNavigation, CampaignOcr):
         skip_first_screenshot: bool = True,
     ) -> bool:
         """切换到指定关卡和 normal/hard 模式；重试后仍失败则抛出 CampaignSelectionError。"""
-        timeout = Timer(5, count=20).start()
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
-            if timeout.reached():
-                break
-            try:
-                self.campaign_set_chapter(name, mode)
-                self.ENTRANCE = self.campaign_get_entrance(name=name)
-            except CampaignNameError:
-                pass
-            else:
-                return True
-
-            if self.handle_campaign_ui_additional():
-                continue
-
-        logger.warning(CAMPAIGN_NAME_ERROR_MESSAGE)
-        raise CampaignSelectionError(CAMPAIGN_NAME_ERROR_MESSAGE)
+        self.stage_navigator.select(
+            name,
+            mode,
+            skip_first_screenshot=skip_first_screenshot,
+        )
+        return True
 
     def commission_notice_show_at_campaign(self) -> bool:
         return self.appear(CAMPAIGN_CHECK, offset=(20, 20)) and self.appear(

@@ -33,31 +33,8 @@ class CampaignRuntimeProfileError(RuntimeError):
 class RuntimeOperation(StrEnum):
     """旧地图引擎允许扩展的封闭调用面；值不是可反射的 Python 路径。"""
 
-    ADVANCE_ARCHIVES_SCROLL = "advance_archives_scroll"
-    ARCHIVES_LOADING_COMPLETE = "archives_loading_complete"
-    CAMPAIGN_BALL_GET = "campaign_ball_get"
-    CAMPAIGN_BALL_SET = "campaign_ball_set"
-    CAMPAIGN_BALL_STATUS = "campaign_ball_status"
-    CAMPAIGN_ENSURE_BALL_MODE = "campaign_ensure_ball_mode"
-    DISCARD_ARCHIVES_SCROLL_RECORD = "discard_archives_scroll_record"
-    ENSURE_ARCHIVES_SEARCH_PAGE = "ensure_archives_search_page"
     EXPECTED_END = "expected_end"
-    GET_ARCHIVES_ENTRANCE = "get_archives_entrance"
     MAP_SWIPE = "map_swipe"
-    SEARCH_ARCHIVES_ENTRANCE = "search_archives_entrance"
-    WAIT_ARCHIVES_LOADED = "wait_archives_loaded"
-    CAMPAIGN_ENSURE_MODE = "campaign_ensure_mode"
-    CAMPAIGN_GET_CHAPTER_INDEX = "campaign_get_chapter_index"
-    CAMPAIGN_GET_ENTRANCE = "campaign_get_entrance"
-    CAMPAIGN_MATCH_MULTI = "campaign_match_multi"
-    CAMPAIGN_OCR_RESULT_PROCESS = "campaign_ocr_result_process"
-    CAMPAIGN_SEPARATE_NAME = "campaign_separate_name"
-    CAMPAIGN_SET_CHAPTER = "campaign_set_chapter"
-    CAMPAIGN_SET_CHAPTER_20241219 = "campaign_set_chapter_20241219"
-    CAMPAIGN_SET_CHAPTER_BALL = "campaign_set_chapter_ball"
-    CAMPAIGN_SET_CHAPTER_EVENT = "campaign_set_chapter_event"
-    CAMPAIGN_SET_CHAPTER_MAIN = "campaign_set_chapter_main"
-    CAMPAIGN_SET_CHAPTER_SP = "campaign_set_chapter_sp"
     CATCH_CAMERA_REPOSITIONING = "catch_camera_repositioning"
     CLEAR_BOSS = "clear_boss"
     ENEMY_SEARCHING_APPEAR = "enemy_searching_appear"
@@ -88,9 +65,7 @@ class RuntimeOperation(StrEnum):
     MAP_GET_INFO = "map_get_info"
     MAP_INIT = "map_init"
     STRATEGY_SET_EXECUTE = "strategy_set_execute"
-    UI_GOTO_ARCHIVES_CAMPAIGN = "ui_goto_archives_campaign"
     UI_GOTO_EVENT = "ui_goto_event"
-    UI_GOTO_SP = "ui_goto_sp"
     RUNTIME_CREATED = "runtime_created"
 
 
@@ -765,16 +740,8 @@ class CampaignRuntimeProfileManager:
         return RuntimeFacetComposite(self, kind)
 
     @property
-    def navigation(self) -> RuntimeFacetComposite:
-        return self.facet(RuntimeExecutorKind.NAVIGATION)
-
-    @property
     def event_ui(self) -> RuntimeFacetComposite:
         return self.facet(RuntimeExecutorKind.EVENT_UI)
-
-    @property
-    def war_archives_navigation(self) -> RuntimeFacetComposite:
-        return self.facet(RuntimeExecutorKind.WAR_ARCHIVES_NAVIGATION)
 
     @property
     def observation(self) -> RuntimeFacetComposite:
@@ -791,6 +758,18 @@ class CampaignRuntimeProfileManager:
     @property
     def engine(self) -> RuntimeFacetComposite:
         return self.facet(RuntimeExecutorKind.ENGINE_EXTENSION)
+
+    def executor_instance(self, kind: RuntimeExecutorKind) -> RuntimeExecutorInstance | None:
+        """返回由 profile 编译出的唯一 typed executor。"""
+
+        if not isinstance(kind, RuntimeExecutorKind):
+            message = "runtime executor lookup requires a RuntimeExecutorKind"
+            raise TypeError(message)
+        values = tuple(facet.instance for facet in self._facets if facet.binding.kind is kind)
+        if len(values) > 1:
+            message = f"runtime profile contains more than one {kind.value} executor"
+            raise CampaignRuntimeProfileError(message)
+        return None if not values else values[0]
 
     def apply_config(self, config: AzurLaneConfig) -> None:
         if not isinstance(config, AzurLaneConfig):

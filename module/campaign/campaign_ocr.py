@@ -16,6 +16,8 @@ from module.ocr.ocr import Ocr
 from module.template import assets as template_assets
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+
     from module.base.button import Button
     from module.base.template import Template
     from module.base.type_alias import ImageArray
@@ -38,6 +40,12 @@ class StageMatchSettings(TypedDict, total=False):
     name_letter: tuple[int, int, int]
     name_thresh: int
     similarity: float
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignStagePage:
+    chapter: str
+    entrances: Mapping[str, Button]
 
 
 def stage_match_options(
@@ -160,68 +168,79 @@ class CampaignOcr(ModuleBase):
     def _stage_image_gray(self) -> ImageArray:
         return rgb2gray(self._stage_image)
 
-    def campaign_extract_name_image(self, image: ImageArray) -> list[Button]:
+    def campaign_extract_name_image(
+        self,
+        image: ImageArray,
+        *,
+        match_similarity: float | None = None,
+    ) -> list[Button]:
         """按 ManualConfig.STAGE_ENTRANCE 处理活动差异并返回全部关卡入口按钮。"""
         digits: list[Button] = []
 
-        if "normal" in self.config.STAGE_ENTRANCE:
-            digits += self.campaign_match_multi(
-                template_assets.TEMPLATE_STAGE_CLEAR,
+        def match(
+            template: Template,
+            stage_image: ImageArray,
+            **settings: Unpack[StageMatchSettings],
+        ) -> list[Button]:
+            if match_similarity is not None:
+                settings["similarity"] = match_similarity
+            return self.campaign_match_multi(
+                template,
                 image,
+                stage_image,
+                **settings,
+            )
+
+        if "normal" in self.config.STAGE_ENTRANCE:
+            digits += match(
+                template_assets.TEMPLATE_STAGE_CLEAR,
                 self._stage_image_gray,
                 name_offset=(75, 9),
                 name_size=(60, 16),
             )
-            digits += self.campaign_match_multi(
+            digits += match(
                 template_assets.TEMPLATE_STAGE_PERCENT,
-                image,
                 self._stage_image_gray,
                 name_offset=(48, 0),
                 name_size=(60, 16),
             )
         if "half" in self.config.STAGE_ENTRANCE:
-            digits += self.campaign_match_multi(
+            digits += match(
                 template_assets.TEMPLATE_STAGE_HALF_PERCENT,
-                image,
                 self._stage_image_gray,
                 name_offset=(48, 0),
                 name_size=(60, 16),
             )
         if "blue" in self.config.STAGE_ENTRANCE:
-            digits += self.campaign_match_multi(
+            digits += match(
                 template_assets.TEMPLATE_STAGE_BLUE_PERCENT,
-                image,
                 extract_letters(self._stage_image, letter=(255, 255, 255), threshold=153),
                 name_offset=(55, 0),
                 name_size=(60, 16),
             )
-            digits += self.campaign_match_multi(
+            digits += match(
                 template_assets.TEMPLATE_STAGE_BLUE_CLEAR,
-                image,
                 extract_letters(self._stage_image, letter=(99, 223, 239), threshold=153),
                 name_offset=(60, 12),
                 name_size=(60, 16),
             )
         if "green" in self.config.STAGE_ENTRANCE:
-            digits += self.campaign_match_multi(
+            digits += match(
                 template_assets.TEMPLATE_STAGE_GREEN_CLEAR,
-                image,
                 self._stage_image_gray,
                 name_offset=(60, 0),
                 name_size=(60, 22),
             )
-            digits += self.campaign_match_multi(
+            digits += match(
                 template_assets.TEMPLATE_STAGE_PERCENT,
-                image,
                 self._stage_image_gray,
                 similarity=0.6,
                 name_offset=(52, 0),
                 name_size=(60, 22),
             )
         if "20240725" in self.config.STAGE_ENTRANCE:
-            digits += self.campaign_match_multi(
+            digits += match(
                 template_assets.TEMPLATE_STAGE_CLEAR_20240725,
-                image,
                 self._stage_image_gray,
                 name_offset=(73, -4),
                 name_size=(60, 22),
@@ -248,12 +267,19 @@ class CampaignOcr(ModuleBase):
             int(area[3] + 7),
         )
 
-    def _get_stage_name(self, image: ImageArray) -> None:
-        """解析关卡名，并写入 campaign_chapter 和关卡名到入口按钮的 stage_entrance 映射。"""
-        self.stage_entrance = {}
+    def read_stage_page(
+        self,
+        image: ImageArray,
+        *,
+        normalize_result: Callable[[str], str],
+        separate_name: Callable[[str], tuple[str, str]],
+        match_similarity: float | None = None,
+    ) -> CampaignStagePage:
+        """使用显式识别策略读取当前章节和入口，不修改 CampaignUI 的选择状态。"""
+
         del_cached_property(self, "_stage_image")
         del_cached_property(self, "_stage_image_gray")
-        buttons = self.campaign_extract_name_image(image)
+        buttons = self.campaign_extract_name_image(image, match_similarity=match_similarity)
         del_cached_property(self, "_stage_image")
         del_cached_property(self, "_stage_image_gray")
         if len(buttons) == 0:
@@ -268,17 +294,17 @@ class CampaignOcr(ModuleBase):
             alphabet="0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ-",
         )
         result = ocr.ocr_regions(image)
-        result = [self.campaign_ocr_result_process(res) for res in result]
+        result = [normalize_result(value) for value in result]
 
-        chapters = [self.campaign_separate_name(res)[0] for res in result if res]
+        chapters = [separate_name(value)[0] for value in result if value]
         chapters = [chapter for chapter in chapters if chapter]
         if not chapters:
             raise CampaignNameError
 
         counter = collections.Counter(chapters)
-        self.campaign_chapter = counter.most_common()[0][0]
+        chapter = counter.most_common()[0][0]
 
-        if self.campaign_chapter == "0":
+        if chapter == "0":
             # OCR 误识别示例：'0F'、'F-IB'、'IGI'。
             raise CampaignNameError
 
@@ -288,13 +314,26 @@ class CampaignOcr(ModuleBase):
         # button.color：关卡图标颜色。
         # button.button：关卡图标区域。
         # button.name：OCR 识别出的关卡名。
+        entrances: dict[str, Button] = {}
         for name, button in zip(result, buttons, strict=True):
             button.area = button.button
             button.name = name
-            self.stage_entrance[name] = button
+            entrances[name] = button
 
-        logger.attr("Chapter", self.campaign_chapter)
-        logger.attr("Stage", ", ".join(self.stage_entrance.keys()))
+        logger.attr("Chapter", chapter)
+        logger.attr("Stage", ", ".join(entrances))
+        return CampaignStagePage(chapter, entrances)
+
+    def _get_stage_name(self, image: ImageArray) -> None:
+        """解析关卡名，并写入 campaign_chapter 和关卡名到入口按钮的 stage_entrance 映射。"""
+
+        page = self.read_stage_page(
+            image,
+            normalize_result=self.campaign_ocr_result_process,
+            separate_name=self.campaign_separate_name,
+        )
+        self.campaign_chapter = page.chapter
+        self.stage_entrance = dict(page.entrances)
 
     def try_update_stage_entrances(self, image: ImageArray) -> bool:
         """尝试从截图更新章节和关卡入口；预期的识别失败返回 False。"""

@@ -207,8 +207,8 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         if self.appear(FLEET_PREPARATION, offset=(20, 50)):
             return
 
-        self.campaign.ensure_campaign_ui(name=self.config.Campaign_Name, mode="hard")
-        self.campaign.ENTRANCE.area = self.campaign.ENTRANCE.button
+        entrance = self.campaign.stage_navigator.select(self.config.Campaign_Name, mode="hard")
+        entrance.area = entrance.button
         campaign_timer = Timer(5)
         map_timer = Timer(5)
         for _ in self.loop():
@@ -224,7 +224,7 @@ class GemsFleetReplacement(FleetEquipment, Dock):
                 campaign_timer.reset()
             if self.campaign.handle_retirement():
                 continue
-            if campaign_timer.reached() and self.appear_then_click(self.campaign.ENTRANCE):
+            if campaign_timer.reached() and self.appear_then_click(entrance):
                 campaign_timer.reset()
 
     def _goto_fleet(self) -> None:

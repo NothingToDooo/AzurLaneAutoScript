@@ -1,7 +1,12 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, override
 
 import numpy as np
 
+from module.adapters.campaign_runtime_navigation import (
+    CampaignNavigationPlanExecutor,
+    Event20240912NavigationPlan,
+    navigation_runtime_executor_descriptors,
+)
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileManager,
@@ -10,10 +15,9 @@ from module.adapters.campaign_runtime_profile import (
 from module.adapters.campaign_runtime_special_event_ui import (
     special_event_ui_runtime_executor_descriptors,
 )
-from module.adapters.campaign_runtime_special_navigation import (
-    special_navigation_runtime_executor_descriptors,
-)
+from module.adapters.campaign_stage_navigator import ProfileCampaignStageNavigator
 from module.base.button import Button
+from module.campaign.campaign_engine import CampaignEngine
 from module.campaign.campaign_ui import ModeSwitch
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -46,7 +50,7 @@ def _manager(
     )
     descriptors = (
         *special_event_ui_runtime_executor_descriptors(),
-        *special_navigation_runtime_executor_descriptors(),
+        *navigation_runtime_executor_descriptors(),
     )
     return CampaignRuntimeProfileManager(profile, CampaignRuntimeExecutorRegistry(descriptors))
 
@@ -229,18 +233,34 @@ class _Config:
 
 
 class _NavigationRuntime:
-    def __init__(self, manager: CampaignRuntimeProfileManager) -> None:
-        self.manager = manager
+    def __init__(self) -> None:
         self.config = _Config()
 
-    def runtime_super(
+
+class _Event20240912Harness(ProfileCampaignStageNavigator):
+    def __init__(
         self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        return self.manager.invoke_super(operation, self, *args, **kwargs)
+        runtime: _NavigationRuntime,
+        manager: CampaignRuntimeProfileManager,
+        plan: Event20240912NavigationPlan,
+    ) -> None:
+        super().__init__(cast("CampaignEngine", runtime), manager, plan, None)
+        self.base_calls: list[tuple[str, str, str]] = []
+
+    def ensure_mode(self, mode: str) -> None:
+        self._ensure_mode(mode)
+
+    def select_event(self, chapter: str, stage: str, mode: str) -> bool:
+        return self._select_event_20240912(chapter, stage, mode)
+
+    @override
+    def _select_main_chapter(self, chapter: str, mode: str) -> bool:
+        del chapter, mode
+        return False
+
+    def _select_base_20241219(self, chapter: str, stage: str, mode: str) -> bool:
+        self.base_calls.append((chapter, stage, mode))
+        return True
 
 
 def test_event_20240912_layers_selector_over_classic_mode(
@@ -249,9 +269,13 @@ def test_event_20240912_layers_selector_over_classic_mode(
     manager = _manager(
         "event_20240912_cn/campaign_base/campaign_base",
         RuntimeExecutorKind.NAVIGATION,
-        {"operations": ["campaign_ensure_mode", "campaign_set_chapter_20241219"]},
+        {"mode_switch": "event_20240912"},
     )
-    runtime = _NavigationRuntime(manager)
+    instance = manager.executor_instance(RuntimeExecutorKind.NAVIGATION)
+    assert isinstance(instance, CampaignNavigationPlanExecutor)
+    assert isinstance(instance.plan, Event20240912NavigationPlan)
+    runtime = _NavigationRuntime()
+    navigator = _Event20240912Harness(runtime, manager, instance.plan)
     selected: list[str] = []
 
     def fake_set(self: ModeSwitch, state: str, main: object, **kwargs: object) -> bool:
@@ -262,27 +286,19 @@ def test_event_20240912_layers_selector_over_classic_mode(
     monkeypatch.setattr(ModeSwitch, "set", fake_set)
     delegated: list[str] = []
 
-    def delegate_mode(mode: str) -> None:
+    def delegate_mode(runtime: object, mode: str) -> None:
+        del runtime
         delegated.append(mode)
 
-    manager.navigation.invoke(
-        RuntimeOperation.CAMPAIGN_ENSURE_MODE,
-        runtime,
-        delegate_mode,
-        "hard",
-    )
-    result = manager.navigation.invoke(
-        RuntimeOperation.CAMPAIGN_SET_CHAPTER_20241219,
-        runtime,
-        lambda chapter, stage, mode: (chapter, stage, mode),
-        "a",
-        "1",
-        "combat",
-    )
+    monkeypatch.setattr(CampaignEngine, "campaign_ensure_mode", delegate_mode)
+    navigator.ensure_mode("hard")
+    navigator.ensure_mode("story")
+    result = navigator.select_event("a", "1", "combat")
 
-    assert selected == ["combat"]
+    assert selected == ["combat", "story"]
     assert delegated == ["hard"]
-    assert result == ("a", "1", "combat")
+    assert result is True
+    assert navigator.base_calls == [("a", "1", "combat")]
     assert runtime.config.overlays == [
         {"MAP_CHAPTER_SWITCH_20241219": False, "MAP_HAS_MODE_SWITCH": False},
     ]

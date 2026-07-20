@@ -12,7 +12,12 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeOperation,
+    RuntimeSessionContext,
+    RuntimeSessionEntryKind,
+    RuntimeSessionOutcome,
 )
+from module.base.button import Button
+from module.content.campaign_session import CampaignRunVariant
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -89,7 +94,6 @@ class _Runtime:
     def __init__(self, map_: _Map | None = None) -> None:
         self.config = _Config(object())
         self.map = _Map() if map_ is None else map_
-        self.ENTRANCE = object()
         self.equipment_has_take_on = True
         self.screenshot_count = 0
         self.device = _Device(self)
@@ -169,6 +173,12 @@ def _manager(options: Mapping[str, object] | None = None) -> CampaignRuntimeProf
         profile,
         CampaignRuntimeExecutorRegistry(hard_runtime.hard_runtime_executor_descriptors()),
     )
+
+
+def _executor(manager: CampaignRuntimeProfileManager) -> hard_runtime.CampaignClearModeExecutor:
+    instance = manager.executor_instance(RuntimeExecutorKind.HARD_MODE)
+    assert isinstance(instance, hard_runtime.CampaignClearModeExecutor)
+    return instance
 
 
 def test_expected_end_is_fixed_to_in_stage() -> None:
@@ -275,8 +285,11 @@ def test_equipment_cleanup_skips_when_not_mounted() -> None:
 
 def test_equipment_cleanup_reaches_fleet_preparation_through_closed_assets() -> None:
     runtime = _Runtime()
+    entrance = Button(area=(), color=(), button=(1, 2, 3, 4), name="hard")
+    manager = _manager()
+    _executor(manager).prepare_attempt(entrance)
 
-    result = _manager().hard.invoke(
+    result = manager.hard.invoke(
         RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
         runtime,
         lambda: False,
@@ -284,13 +297,43 @@ def test_equipment_cleanup_reaches_fleet_preparation_through_closed_assets() -> 
 
     assert result is True
     assert runtime.screenshot_count == 3
-    assert runtime.device.clicks == [runtime.ENTRANCE, MAP_PREPARATION]
+    assert runtime.device.clicks == [entrance, MAP_PREPARATION]
     assert runtime.appear_calls == [
         (MAP_PREPARATION, (20, 20)),
         (FLEET_PREPARATION, (20, 50)),
     ]
     assert runtime.equipment_take_off_calls == 1
     assert runtime.ui_back_calls == [(CAMPAIGN_CHECK, FLEET_PREPARATION)]
+
+
+def test_equipment_cleanup_rejects_an_unprepared_attempt_entrance() -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match="prepared attempt entrance"):
+        _manager().hard.invoke(
+            RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
+            _Runtime(),
+            lambda: False,
+        )
+
+
+def test_hard_attempt_entrance_is_scoped_to_one_runtime_session() -> None:
+    manager = _manager()
+    runtime = _Runtime()
+    manager.bind(runtime, CampaignMap("hard-attempt-entrance"))
+    manager.begin_session(
+        RuntimeSessionContext(
+            CampaignRunVariant.LOOP,
+            0,
+            RuntimeSessionEntryKind.FRESH,
+        )
+    )
+    executor = _executor(manager)
+    executor.prepare_attempt(Button(area=(), color=(), button=(), name="first"))
+    with pytest.raises(CampaignRuntimeProfileError, match="already prepared"):
+        executor.prepare_attempt(Button(area=(), color=(), button=(), name="duplicate"))
+
+    manager.end_session(RuntimeSessionOutcome.COMPLETED)
+    executor.prepare_attempt(Button(area=(), color=(), button=(), name="next"))
+    manager.reset()
 
 
 @pytest.mark.parametrize(

@@ -293,7 +293,8 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
         self.config = config
         self.device = device
         self.definition = definition
-        self.ENTRANCE = Button(area=(), color=(), button=(1, 2, 3, 4), name="TEST_ENTRANCE")
+        self.selected_entrance = Button(area=(), color=(), button=(1, 2, 3, 4), name="TEST_ENTRANCE")
+        self.stage_navigator = self
         self.map_is_clear_mode = True
         self.map_is_100_percent_clear = type(self).full_clear
         self.map_is_3_stars = type(self).three_stars
@@ -304,9 +305,16 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
         self.calls: list[object] = []
         type(self).created.append(self)
 
-    def ensure_campaign_ui(self, name: str, mode: str = "normal", **_kwargs: object) -> bool:
-        self.calls.append(("ensure_campaign_ui", name, mode))
-        return True
+    def select(
+        self,
+        name: str,
+        mode: str = "normal",
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> Button:
+        del skip_first_screenshot
+        self.calls.append(("select_stage", name, mode))
+        return self.selected_entrance
 
     def get_oil(self, *, skip_first_screenshot: bool = True) -> int:
         del skip_first_screenshot
@@ -377,7 +385,8 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
     def is_in_map(self) -> bool:
         return type(self).client_in_map
 
-    def execute_hard_attempt(self, cancellation: CancellationSource) -> None:
+    def execute_hard_attempt(self, entrance: Button, cancellation: CancellationSource) -> None:
+        assert entrance is self.selected_entrance
         cancellation.raise_if_requested()
         self.calls.append("execute_hard_attempt")
 
@@ -390,8 +399,8 @@ class _FailingHardRuntime(_FakeDeclarativeRuntime):
     created: ClassVar[list[object]] = []
     failures: ClassVar[list[BaseException]] = []
 
-    def execute_hard_attempt(self, cancellation: CancellationSource) -> None:
-        super().execute_hard_attempt(cancellation)
+    def execute_hard_attempt(self, entrance: Button, cancellation: CancellationSource) -> None:
+        super().execute_hard_attempt(entrance, cancellation)
         if type(self).failures:
             raise type(self).failures.pop(0)
 
@@ -557,12 +566,13 @@ def test_stage_overlay_enables_every_declared_map_structure() -> None:
     assert overlay["MAP_HAS_BOUNCING_ENEMY"] is True
 
 
-def test_every_profile_operation_has_an_explicit_production_runtime_method() -> None:
+def test_every_remaining_profile_operation_has_an_explicit_dispatch_boundary() -> None:
     registry = load_default_campaign_runtime_profile_registry()
     grid_kinds = {
         RuntimeExecutorKind.MAP_GRID_RECOGNITION,
         RuntimeExecutorKind.CAMERA_GRID_RECOGNITION,
     }
+    direct_dispatch = {(RuntimeExecutorKind.EVENT_UI, "ui_goto_event")}
     missing: set[str] = set()
     for extension in registry.extensions.values():
         for binding in extension.executors:
@@ -571,10 +581,12 @@ def test_every_profile_operation_has_an_explicit_production_runtime_method() -> 
             operations = binding.options.get("operations", ())
             if isinstance(operations, tuple):
                 missing.update(
-                    operation
-                    for operation in operations
-                    if isinstance(operation, str) and operation not in DeclarativeCampaignMapRuntime.__dict__
-                )
+                        operation
+                        for operation in operations
+                        if isinstance(operation, str)
+                        and (binding.kind, operation) not in direct_dispatch
+                        and operation not in DeclarativeCampaignMapRuntime.__dict__
+                    )
 
     assert missing == set()
 
@@ -824,8 +836,14 @@ def test_fresh_activation_guard_cleans_runtime_when_entry_setup_fails() -> None:
         created: ClassVar[list[object]] = []
 
         @override
-        def ensure_campaign_ui(self, name: str, mode: str = "normal", **kwargs: object) -> bool:
-            del name, mode, kwargs
+        def select(
+            self,
+            name: str,
+            mode: str = "normal",
+            *,
+            skip_first_screenshot: bool = True,
+        ) -> Button:
+            del name, mode, skip_first_screenshot
             raise setup_error
 
         @override
@@ -887,7 +905,7 @@ def test_provider_enters_once_and_exposes_only_the_exact_activated_variant() -> 
     assert activated.variant is CampaignRunVariant.LOOP
     runtime = _FakeDeclarativeRuntime.created[-1]
     assert isinstance(runtime, _FakeDeclarativeRuntime)
-    assert ("ensure_campaign_ui", "t1", "normal") in runtime.calls
+    assert ("select_stage", "t1", "normal") in runtime.calls
     assert (
         "initialize_session",
         CampaignRunVariant.LOOP,
@@ -1368,7 +1386,7 @@ def test_provider_reuses_pre_entry_evidence_runtime_for_activation() -> None:
     assert len(_FakeDeclarativeRuntime.created) == 1
     runtime = _FakeDeclarativeRuntime.created[0]
     assert isinstance(runtime, _FakeDeclarativeRuntime)
-    assert runtime.calls.count(("ensure_campaign_ui", "t1", "normal")) == 1
+    assert runtime.calls.count(("select_stage", "t1", "normal")) == 1
     assert isinstance(activated, CampaignSession)
 
 
@@ -1466,7 +1484,7 @@ def test_hard_port_uses_explicit_override_or_main_map_and_settles_one_attempt(
     assert [extension.extension_id.value for extension in runtime.definition.runtime_profile.extensions][-1] == (
         "campaign_hard/campaign_hard/campaign"
     )
-    assert ("ensure_campaign_ui", stage, "hard") in runtime.calls
+    assert ("select_stage", stage, "hard") in runtime.calls
     assert port.advance_one(settings, cancellation) is HardBattleOutcome.SETTLED
     port.exit_ui(settings, cancellation)
     port.release()

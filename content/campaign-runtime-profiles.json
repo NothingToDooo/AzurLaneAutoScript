@@ -213,22 +213,7 @@
               "event": "ex",
               "sp": "sp"
             },
-            "operations": [
-              "_advance_archives_scroll",
-              "_archives_loading_complete",
-              "_discard_archives_scroll_record",
-              "_ensure_archives_search_page",
-              "_get_archives_entrance",
-              "_search_archives_entrance",
-              "_wait_archives_loaded",
-              "ui_goto_archives_campaign",
-              "ui_goto_event",
-              "ui_goto_sp"
-            ],
-            "page_fraction": 0.66,
-            "state": [
-              "first_run"
-            ]
+            "page_fraction": 0.66
           }
         }
       ],
@@ -294,19 +279,6 @@
               "d": "hard",
               "ex_sp": "ex"
             },
-            "main_routes": true,
-            "operations": [
-              "_campaign_ball_get",
-              "_campaign_ball_set",
-              "_campaign_ball_status",
-              "_campaign_ensure_ball_mode",
-              "campaign_get_chapter_index",
-              "campaign_set_chapter",
-              "campaign_set_chapter_ball",
-              "campaign_set_chapter_event",
-              "campaign_set_chapter_main",
-              "campaign_set_chapter_sp"
-            ],
             "sp_destination": "sp"
           }
         }
@@ -329,14 +301,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter"
-            ],
+            "route_target": "all",
             "routes": [
               {
                 "destination": "campaign",
@@ -421,7 +389,6 @@
               "sp": "vsp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -434,12 +401,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -512,14 +474,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter"
-            ],
+            "route_target": "all",
             "routes": [
               {
                 "destination": "campaign",
@@ -608,7 +566,6 @@
               "sp": "vsp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -639,13 +596,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_match_multi",
-              "campaign_separate_name",
-              "campaign_set_chapter"
-            ],
+            "route_target": "all",
             "routes": [
               {
                 "destination": "campaign",
@@ -726,7 +677,6 @@
               "field": "stage_entrance",
               "input": "sp"
             },
-            "fallback": "next",
             "mode_policy": "noop",
             "name_rules": [
               {
@@ -741,12 +691,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -827,7 +772,6 @@
               "field": "stage_entrance",
               "input": "sp"
             },
-            "fallback": "next",
             "mode_policy": "noop",
             "name_rules": [
               {
@@ -842,13 +786,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_sp"
-            ],
+            "route_target": "sp",
             "routes": [
               {
                 "chapters": [
@@ -893,7 +831,6 @@
               "sp": "esp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -913,12 +850,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_sp"
-            ],
+            "route_target": "sp",
             "routes": [
               {
                 "chapters": [
@@ -975,7 +907,6 @@
               "sp": "asp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -1010,12 +941,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -1151,18 +1077,6 @@
               "d": "hard",
               "ex_sp": "ex"
             },
-            "main_routes": true,
-            "operations": [
-              "_campaign_ball_get",
-              "_campaign_ball_set",
-              "_campaign_ball_status",
-              "_campaign_ensure_ball_mode",
-              "campaign_set_chapter",
-              "campaign_set_chapter_ball",
-              "campaign_set_chapter_event",
-              "campaign_set_chapter_main",
-              "campaign_set_chapter_sp"
-            ],
             "sp_destination": "sp"
           }
         }
@@ -1215,7 +1129,6 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -1248,11 +1161,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_separate_name",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -1280,14 +1189,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -1383,7 +1288,6 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {
@@ -1392,11 +1296,7 @@
               "jjsp": "sp",
               "usp": "sp"
             },
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_ocr_result_process",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -1634,16 +1534,13 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": {
               "hard_config_override": true,
               "kind": "bridge_20241219"
             },
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -1686,7 +1583,6 @@
               "sp": "tp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": {
               "hard_config_override": true,
               "kind": "bridge_20241219"
@@ -1701,11 +1597,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_get_entrance",
-              "campaign_separate_name"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -1719,10 +1611,7 @@
           "implementation": "event_20240912_cn/campaign_base/campaign_base",
           "kind": "navigation",
           "options": {
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_set_chapter_20241219"
-            ]
+            "mode_switch": "event_20240912"
           }
         },
         {
@@ -1747,13 +1636,10 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside_by_stage": {
@@ -1848,14 +1734,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside": "part1",
@@ -1939,13 +1821,10 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside": "part2",
@@ -2001,7 +1880,6 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {
@@ -2011,9 +1889,7 @@
               "usp": "sp",
               "ysp": "sp"
             },
-            "operations": [
-              "campaign_ocr_result_process"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -2030,13 +1906,10 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside_by_stage": {
@@ -2082,13 +1955,10 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside_by_stage": {
@@ -2127,7 +1997,6 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {
@@ -2135,9 +2004,7 @@
               "vsp": "sp",
               "ysp": "sp"
             },
-            "operations": [
-              "campaign_ocr_result_process"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -2315,14 +2182,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter"
-            ],
+            "route_target": "all",
             "routes": [
               {
                 "destination": "campaign",
@@ -2429,19 +2292,6 @@
               "d": "hard",
               "ex_sp": "ex"
             },
-            "main_routes": true,
-            "operations": [
-              "_campaign_ball_get",
-              "_campaign_ball_set",
-              "_campaign_ball_status",
-              "_campaign_ensure_ball_mode",
-              "campaign_get_chapter_index",
-              "campaign_set_chapter",
-              "campaign_set_chapter_ball",
-              "campaign_set_chapter_event",
-              "campaign_set_chapter_main",
-              "campaign_set_chapter_sp"
-            ],
             "sp_destination": "sp"
           }
         }
@@ -2581,7 +2431,6 @@
               "sp": "esp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -2601,12 +2450,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_sp"
-            ],
+            "route_target": "sp",
             "routes": [
               {
                 "chapters": [
@@ -2737,18 +2581,6 @@
               "d": "hard",
               "ex_sp": "ex"
             },
-            "main_routes": true,
-            "operations": [
-              "_campaign_ball_get",
-              "_campaign_ball_set",
-              "_campaign_ball_status",
-              "_campaign_ensure_ball_mode",
-              "campaign_set_chapter",
-              "campaign_set_chapter_ball",
-              "campaign_set_chapter_event",
-              "campaign_set_chapter_main",
-              "campaign_set_chapter_sp"
-            ],
             "sp_destination": "sp"
           }
         }
@@ -2769,7 +2601,6 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -2802,11 +2633,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_separate_name",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "sp",
@@ -2829,16 +2656,12 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": {
               "kind": "hard_config_override"
             },
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "chapters": [

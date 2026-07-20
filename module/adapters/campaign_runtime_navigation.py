@@ -1,8 +1,12 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Protocol, cast
+from dataclasses import dataclass
+from enum import StrEnum
+from types import MappingProxyType
+from typing import cast
 
 from module.base.button import Button
-from module.base.utils import get_color
+from module.campaign.assets import SWITCH_20241219_COMBAT, SWITCH_20241219_STORY
+from module.campaign.campaign_ui import ModeSwitch
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
 
 from .campaign_runtime_profile import (
@@ -11,11 +15,7 @@ from .campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
 )
-
-if TYPE_CHECKING:
-    from module.base.type_alias import ImageArray
 
 _DREAMWAKER_BALL = Button(
     area=(571, 283, 696, 387),
@@ -34,86 +34,39 @@ _BALL_ASSETS = {
     "CONFLUENCE_BALL": _CONFLUENCE_BALL,
 }
 
-_ROUTE_OPERATIONS = frozenset(
-    {
-        "campaign_ensure_mode",
-        "campaign_get_chapter_index",
-        "campaign_get_entrance",
-        "campaign_match_multi",
-        "campaign_ocr_result_process",
-        "campaign_separate_name",
-        "campaign_set_chapter",
-        "campaign_set_chapter_20241219",
-        "campaign_set_chapter_event",
-        "campaign_set_chapter_sp",
-    }
-)
-_BALL_OPERATIONS = frozenset(
-    {
-        "_campaign_ball_get",
-        "_campaign_ball_set",
-        "_campaign_ball_status",
-        "_campaign_ensure_ball_mode",
-        "campaign_get_chapter_index",
-        "campaign_set_chapter",
-        "campaign_set_chapter_ball",
-        "campaign_set_chapter_event",
-        "campaign_set_chapter_main",
-        "campaign_set_chapter_sp",
-    }
-)
+
+class CampaignRouteTarget(StrEnum):
+    ALL = "all"
+    EVENT = "event"
+    SP = "sp"
+    SWITCH_20241219 = "switch_20241219"
 
 
-class _NavigationConfig(Protocol):
-    MAP_CHAPTER_SWITCH_20241219: bool
-
-    def apply_runtime_overlay(self, **kwargs: object) -> None: ...
-
-
-class _NavigationDevice(Protocol):
-    image: ImageArray
-
-    def screenshot(self) -> None: ...
-
-    def click(self, button: Button) -> None: ...
-
-    def sleep(self, seconds: float) -> None: ...
+class CampaignRouteDestination(StrEnum):
+    CAMPAIGN = "campaign"
+    EVENT = "event"
+    SP = "sp"
 
 
-class _NavigationRuntimeHost(Protocol):
-    config: _NavigationConfig
-    device: _NavigationDevice
-    stage_entrance: Mapping[str, object]
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
-
-    def ui_goto_campaign(self) -> object: ...
-
-    def ui_goto_event(self) -> object: ...
-
-    def ui_goto_sp(self) -> object: ...
-
-    def campaign_ensure_mode(self, mode: str = "normal") -> None: ...
-
-    def campaign_ensure_mode_20241219(self, mode: str = "combat") -> None: ...
-
-    def campaign_ensure_aside_20241219(self, chapter: str) -> None: ...
-
-    def campaign_ensure_chapter(self, chapter: str | int) -> None: ...
-
-    def handle_info_bar(self) -> object: ...
-
-    def is_in_stage(self) -> bool: ...
+class CampaignRouteMode(StrEnum):
+    REQUESTED = "requested"
+    NORMAL = "normal"
+    HARD = "hard"
+    EX = "ex"
+    UNCHANGED = "unchanged"
+    COMBAT = "combat"
 
 
-def _host(runtime: object) -> _NavigationRuntimeHost:
-    return cast("_NavigationRuntimeHost", runtime)
+class CampaignModePolicyKind(StrEnum):
+    INHERITED = "inherited"
+    NOOP = "noop"
+    BRIDGE_20241219 = "bridge_20241219"
+    HARD_CONFIG_OVERRIDE = "hard_config_override"
+
+
+class CampaignBallOperation(StrEnum):
+    SET_BALL = "set_ball"
+    ENSURE_MODE = "ensure_mode"
 
 
 def _mapping(value: RuntimeTuningValue, name: str) -> Mapping[str, RuntimeTuningValue]:
@@ -138,11 +91,27 @@ def _strings(value: RuntimeTuningValue, name: str) -> tuple[str, ...]:
     return cast("tuple[str, ...]", values)
 
 
+def _optional_strings(
+    values: Mapping[str, RuntimeTuningValue],
+    name: str,
+) -> frozenset[str] | None:
+    value = values.get(name)
+    return None if value is None else frozenset(_strings(value, name))
+
+
 def _string(value: RuntimeTuningValue, name: str) -> str:
     if not isinstance(value, str) or not value:
         message = f"navigation option {name} must be a non-empty string"
         raise CampaignRuntimeProfileError(message)
     return value
+
+
+def _optional_string(
+    values: Mapping[str, RuntimeTuningValue],
+    name: str,
+) -> str | None:
+    value = values.get(name)
+    return None if value is None else _string(value, name)
 
 
 def _number(value: RuntimeTuningValue, name: str) -> float:
@@ -157,7 +126,7 @@ def _integer_mapping(value: RuntimeTuningValue, name: str) -> Mapping[str, int]:
     if any(type(item) is not int or item < 0 for item in values.values()):
         message = f"navigation option {name} must map names to non-negative integers"
         raise CampaignRuntimeProfileError(message)
-    return cast("Mapping[str, int]", values)
+    return MappingProxyType(dict(cast("Mapping[str, int]", values)))
 
 
 def _string_mapping(value: RuntimeTuningValue, name: str) -> Mapping[str, str]:
@@ -165,632 +134,352 @@ def _string_mapping(value: RuntimeTuningValue, name: str) -> Mapping[str, str]:
     if any(not isinstance(item, str) or not item for item in values.values()):
         message = f"navigation option {name} must map names to non-empty strings"
         raise CampaignRuntimeProfileError(message)
-    return cast("Mapping[str, str]", values)
+    return MappingProxyType(dict(cast("Mapping[str, str]", values)))
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignNameRule:
+    names: frozenset[str] | None
+    contains: str | None
+    prefix: str | None
+    split_on_hyphen: bool
+    require_digit_suffix: bool
+    chapter: str | None
+    stage: str | None
+
+    @classmethod
+    def from_options(
+        cls,
+        values: Mapping[str, RuntimeTuningValue],
+        name: str,
+    ) -> CampaignNameRule:
+        split = values.get("split")
+        if split not in {None, "-"}:
+            message = f"navigation option {name}.split must be '-'"
+            raise CampaignRuntimeProfileError(message)
+        suffix = values.get("suffix")
+        if suffix not in {None, "digit"}:
+            message = f"navigation option {name}.suffix must be 'digit'"
+            raise CampaignRuntimeProfileError(message)
+        chapter = _optional_string(values, "chapter")
+        stage = _optional_string(values, "stage")
+        if split is None and (chapter is None or stage is None):
+            message = f"navigation option {name} must define chapter and stage"
+            raise CampaignRuntimeProfileError(message)
+        return cls(
+            _optional_strings(values, "names"),
+            _optional_string(values, "contains"),
+            _optional_string(values, "prefix"),
+            split == "-",
+            suffix == "digit",
+            chapter,
+            stage,
+        )
+
+    def matches(self, name: str) -> bool:
+        if self.names is not None and name not in self.names:
+            return False
+        if self.contains is not None and self.contains not in name:
+            return False
+        if self.prefix is not None and not name.startswith(self.prefix):
+            return False
+        return not self.require_digit_suffix or name[-1:].isdigit()
+
+    def separate(self, name: str) -> tuple[str, str] | None:
+        if not self.matches(name):
+            return None
+        if self.split_on_hyphen:
+            if "-" not in name:
+                return None
+            return cast("tuple[str, str]", tuple(name.split("-", maxsplit=1)))
+        if self.chapter is None or self.stage is None:
+            message = "compiled campaign name rule is incomplete"
+            raise AssertionError(message)
+        chapter = name[:-1] if self.chapter == "prefix" else self.chapter
+        stage = name[-1] if self.stage == "last" else self.stage
+        return chapter, stage
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignEntranceSearch:
+    input_name: str
+    contains: str
+
+    @classmethod
+    def from_options(cls, value: RuntimeTuningValue) -> CampaignEntranceSearch | None:
+        values = _mapping(value, "entrance_search")
+        if not values:
+            return None
+        field = _string(values.get("field"), "entrance_search.field")
+        if field != "stage_entrance":
+            message = f"unsupported navigation entrance search field: {field}"
+            raise CampaignRuntimeProfileError(message)
+        return cls(
+            _string(values.get("input"), "entrance_search.input"),
+            _string(values.get("contains"), "entrance_search.contains").lower(),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignModePolicy:
+    kind: CampaignModePolicyKind
+    hard_config_override: bool
+
+    @classmethod
+    def from_options(cls, value: RuntimeTuningValue) -> CampaignModePolicy:
+        if isinstance(value, str):
+            try:
+                kind = CampaignModePolicyKind(value)
+            except ValueError:
+                message = f"unsupported navigation mode policy: {value}"
+                raise CampaignRuntimeProfileError(message) from None
+            if kind not in {CampaignModePolicyKind.INHERITED, CampaignModePolicyKind.NOOP}:
+                message = f"navigation mode policy {value} requires an object"
+                raise CampaignRuntimeProfileError(message)
+            return cls(kind, hard_config_override=True)
+        values = _mapping(value, "mode_policy")
+        kind_value = _string(values.get("kind"), "mode_policy.kind")
+        try:
+            kind = CampaignModePolicyKind(kind_value)
+        except ValueError:
+            message = f"unsupported navigation mode policy kind: {kind_value}"
+            raise CampaignRuntimeProfileError(message) from None
+        if kind not in {
+            CampaignModePolicyKind.BRIDGE_20241219,
+            CampaignModePolicyKind.HARD_CONFIG_OVERRIDE,
+        }:
+            message = f"navigation mode policy kind {kind_value} cannot use object options"
+            raise CampaignRuntimeProfileError(message)
+        override = values.get("hard_config_override", True)
+        if type(override) is not bool:
+            message = "navigation hard_config_override must be a boolean"
+            raise CampaignRuntimeProfileError(message)
+        return cls(kind, override)
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignRoute:
+    destination: CampaignRouteDestination
+    mode: CampaignRouteMode
+    match_all: bool
+    match_numeric: bool
+    chapters: frozenset[str] | None
+    prefix: str | None
+    requires_chapter_switch: bool
+    reselect_after_hard: bool
+    hard_if_campaign_name_is_hard: bool
+    aside: str | None
+    aside_by_stage: tuple[tuple[frozenset[str], str], ...]
+
+    @classmethod
+    def from_options(
+        cls,
+        values: Mapping[str, RuntimeTuningValue],
+        name: str,
+    ) -> CampaignRoute:
+        destination_value = _string(values.get("destination"), f"{name}.destination")
+        mode_value = _string(values.get("mode"), f"{name}.mode")
+        try:
+            destination = CampaignRouteDestination(destination_value)
+            mode = CampaignRouteMode(mode_value)
+        except ValueError as error:
+            message = f"unsupported navigation route value in {name}: {error}"
+            raise CampaignRuntimeProfileError(message) from None
+        match = values.get("match")
+        if match not in {None, "*", "numeric"}:
+            message = f"unsupported navigation route match: {match!r}"
+            raise CampaignRuntimeProfileError(message)
+        guard = values.get("guard")
+        if guard not in {None, "MAP_CHAPTER_SWITCH_20241219"}:
+            message = f"unsupported navigation route guard: {guard!r}"
+            raise CampaignRuntimeProfileError(message)
+        reselect = values.get("reselect_after_hard", False)
+        if type(reselect) is not bool:
+            message = f"navigation option {name}.reselect_after_hard must be a boolean"
+            raise CampaignRuntimeProfileError(message)
+        hard_if = values.get("hard_if")
+        if hard_if not in {None, "campaign_name_is_hard"}:
+            message = f"unsupported navigation route hard_if: {hard_if!r}"
+            raise CampaignRuntimeProfileError(message)
+        aside_by_stage_value = values.get("aside_by_stage")
+        aside_by_stage = ()
+        if aside_by_stage_value is not None:
+            aside_by_stage = tuple(
+                (frozenset(stages.split(",")), aside)
+                for stages, aside in _string_mapping(aside_by_stage_value, f"{name}.aside_by_stage").items()
+            )
+        return cls(
+            destination,
+            mode,
+            match == "*",
+            match == "numeric",
+            _optional_strings(values, "chapters"),
+            _optional_string(values, "prefix"),
+            guard == "MAP_CHAPTER_SWITCH_20241219",
+            reselect,
+            hard_if == "campaign_name_is_hard",
+            _optional_string(values, "aside"),
+            aside_by_stage,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ChapterRouteNavigationPlan:
+    chapter_indices: Mapping[str, int]
+    name_rules: tuple[CampaignNameRule, ...]
+    entrance_aliases: Mapping[str, str]
+    entrance_search: CampaignEntranceSearch | None
+    ocr_aliases: Mapping[str, str]
+    routes: tuple[CampaignRoute, ...]
+    route_target: CampaignRouteTarget | None
+    mode_policy: CampaignModePolicy
+    stage_match_similarity: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignBallStatusRule:
+    chapters: frozenset[str] | None
+    stages: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class BallChapterNavigationPlan:
+    chapter_indices: Mapping[str, int]
+    event_modes: Mapping[str, str]
+    sp_destination: CampaignRouteDestination
+    ball: Button
+    ball_chapters: frozenset[str]
+    normal_chapters: frozenset[str]
+    hard_chapters: frozenset[str]
+    blue_rules: tuple[CampaignBallStatusRule, ...]
+    operation_order: tuple[CampaignBallOperation, CampaignBallOperation]
+    detected_colors: Mapping[str, str]
+    click_wait_seconds: float
+
+
+@dataclass(frozen=True, slots=True)
+class Event20240912NavigationPlan:
+    mode_switch: ModeSwitch
+
+
+type CampaignNavigationPlan = ChapterRouteNavigationPlan | BallChapterNavigationPlan | Event20240912NavigationPlan
+
+
+class CampaignNavigationPlanExecutor(RuntimeExecutorInstance):
+    """profile manager 生命周期内持有一份已验证的最终 navigation plan。"""
+
+    __slots__ = ("plan",)
+
+    def __init__(self, plan: CampaignNavigationPlan) -> None:
+        self.plan = plan
+        super().__init__({RuntimeExecutorKind.NAVIGATION})
 
 
 def _rules(value: RuntimeTuningValue, name: str) -> tuple[Mapping[str, RuntimeTuningValue], ...]:
-    values = _sequence(value, name)
-    result: list[Mapping[str, RuntimeTuningValue]] = []
-    for index, item in enumerate(values):
-        result.append(_mapping(item, f"{name}[{index}]"))
-    return tuple(result)
+    return tuple(_mapping(item, f"{name}[{index}]") for index, item in enumerate(_sequence(value, name)))
 
 
-def _operations(
-    options: Mapping[str, RuntimeTuningValue],
-    supported: frozenset[str],
-) -> frozenset[str]:
-    operations = frozenset(_strings(options["operations"], "operations"))
-    unknown = sorted(operations - supported)
-    if unknown:
-        message = f"unsupported navigation operation: {unknown[0]}"
-        raise CampaignRuntimeProfileError(message)
-    return operations
-
-
-def _runtime_result(runtime: object, operation: RuntimeOperation, *args: object, **kwargs: object) -> object:
-    return _host(runtime).runtime_super(operation, *args, **kwargs)
-
-
-def _base_separate_name(name: str) -> tuple[str, str]:
-    normalized = name.strip("-")
-    if normalized == "sp":
-        return "ex_sp", "1"
-    if normalized.startswith("extra") or normalized == "ex":
-        return "ex_ex", "1"
-    if "-" in normalized:
-        return cast("tuple[str, str]", tuple(normalized.split("-", maxsplit=1)))
-    if normalized.startswith("sp") or normalized[-1:].isdigit():
-        return normalized[:-1], normalized[-1]
-    return "", ""
-
-
-class ChapterRoutePlanExecutor(RuntimeExecutorInstance):
-    """用有序 typed rules 表达章节别名、入口选择与页面路由。"""
-
-    __slots__ = (
-        "_chapter_indices",
-        "_entrance_aliases",
-        "_entrance_search",
-        "_fallback",
-        "_mode_policy",
-        "_name_rules",
-        "_ocr_aliases",
-        "_routes",
-        "_stage_match_similarity",
-    )
-
-    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
-        options = context.options(RuntimeExecutorKind.NAVIGATION)
-        operations = _operations(options, _ROUTE_OPERATIONS)
-        self._chapter_indices = _integer_mapping(options["chapter_indices"], "chapter_indices")
-        self._name_rules = _rules(options["name_rules"], "name_rules")
-        self._entrance_aliases = _string_mapping(options["entrance_aliases"], "entrance_aliases")
-        self._entrance_search = _mapping(options["entrance_search"], "entrance_search")
-        self._ocr_aliases = _string_mapping(options["ocr_aliases"], "ocr_aliases")
-        self._routes = _rules(options["routes"], "routes")
-        self._validate_routes()
-        self._mode_policy = options["mode_policy"]
-        self._validate_mode_policy()
-        similarity = options["stage_match_similarity"]
-        self._stage_match_similarity = None if similarity is None else _number(similarity, "stage_match_similarity")
-        self._fallback = _string(options["fallback"], "fallback")
-        if self._fallback != "next":
-            message = f"unsupported navigation fallback: {self._fallback}"
-            raise CampaignRuntimeProfileError(message)
-
-        available = {
-            "campaign_ensure_mode": (RuntimeOperation.CAMPAIGN_ENSURE_MODE, self._campaign_ensure_mode),
-            "campaign_get_chapter_index": (
-                RuntimeOperation.CAMPAIGN_GET_CHAPTER_INDEX,
-                self._campaign_get_chapter_index,
-            ),
-            "campaign_get_entrance": (RuntimeOperation.CAMPAIGN_GET_ENTRANCE, self._campaign_get_entrance),
-            "campaign_match_multi": (RuntimeOperation.CAMPAIGN_MATCH_MULTI, self._campaign_match_multi),
-            "campaign_ocr_result_process": (
-                RuntimeOperation.CAMPAIGN_OCR_RESULT_PROCESS,
-                self._campaign_ocr_result_process,
-            ),
-            "campaign_separate_name": (
-                RuntimeOperation.CAMPAIGN_SEPARATE_NAME,
-                self._campaign_separate_name,
-            ),
-            "campaign_set_chapter": (RuntimeOperation.CAMPAIGN_SET_CHAPTER, self._campaign_set_chapter),
-            "campaign_set_chapter_20241219": (
-                RuntimeOperation.CAMPAIGN_SET_CHAPTER_20241219,
-                self._campaign_set_chapter_20241219,
-            ),
-            "campaign_set_chapter_event": (
-                RuntimeOperation.CAMPAIGN_SET_CHAPTER_EVENT,
-                self._campaign_set_chapter_event,
-            ),
-            "campaign_set_chapter_sp": (
-                RuntimeOperation.CAMPAIGN_SET_CHAPTER_SP,
-                self._campaign_set_chapter_sp,
-            ),
-        }
-        methods = {operation: method for name, (operation, method) in available.items() if name in operations}
-        super().__init__(
-            {RuntimeExecutorKind.NAVIGATION},
-            methods={RuntimeExecutorKind.NAVIGATION: methods},
-        )
-
-    def _validate_mode_policy(self) -> None:
-        policy = self._mode_policy
-        if isinstance(policy, str):
-            if policy not in {"inherited", "noop"}:
-                message = f"unsupported navigation mode policy: {policy}"
-                raise CampaignRuntimeProfileError(message)
-            return
-        values = _mapping(policy, "mode_policy")
-        kind = values.get("kind")
-        if kind not in {"bridge_20241219", "hard_config_override"}:
-            message = f"unsupported navigation mode policy kind: {kind!r}"
-            raise CampaignRuntimeProfileError(message)
-        if "hard_config_override" in values and type(values["hard_config_override"]) is not bool:
-            message = "navigation hard_config_override must be a boolean"
-            raise CampaignRuntimeProfileError(message)
-
-    def _validate_routes(self) -> None:
-        for index, route in enumerate(self._routes):
-            destination = _string(route.get("destination"), f"routes[{index}].destination")
-            if destination not in {"campaign", "event", "sp"}:
-                message = f"unsupported navigation destination: {destination}"
-                raise CampaignRuntimeProfileError(message)
-            mode = _string(route.get("mode"), f"routes[{index}].mode")
-            if mode not in {"requested", "normal", "hard", "ex", "unchanged", "combat"}:
-                message = f"unsupported navigation route mode: {mode}"
-                raise CampaignRuntimeProfileError(message)
-            guard = route.get("guard")
-            if guard not in {None, "MAP_CHAPTER_SWITCH_20241219"}:
-                message = f"unsupported navigation route guard: {guard!r}"
-                raise CampaignRuntimeProfileError(message)
-
-    def _campaign_get_chapter_index(self, runtime: object, name: object) -> object:
-        if isinstance(name, int):
-            return name
-        if not isinstance(name, str):
-            return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_GET_CHAPTER_INDEX, name)
-        if name.isdigit():
-            return int(name)
-        if name in self._chapter_indices:
-            return self._chapter_indices[name]
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_GET_CHAPTER_INDEX, name)
-
-    def _campaign_ocr_result_process(self, runtime: object, result: object) -> object:
-        normalized = _runtime_result(runtime, RuntimeOperation.CAMPAIGN_OCR_RESULT_PROCESS, result)
-        if not isinstance(normalized, str):
-            message = "campaign OCR normalization must return a string"
-            raise CampaignRuntimeProfileError(message)
-        return self._ocr_aliases.get(normalized, normalized)
-
-    def _campaign_separate_name(self, runtime: object, name: object) -> object:
-        if not isinstance(name, str):
-            return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SEPARATE_NAME, name)
-        for rule in self._name_rules:
-            separated = self._match_name_rule(name, rule)
-            if separated is not None:
-                return separated
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SEPARATE_NAME, name)
-
-    @staticmethod
-    def _match_name_rule(
-        name: str,
-        rule: Mapping[str, RuntimeTuningValue],
-    ) -> tuple[str, str] | None:
-        names = rule.get("names")
-        contains = rule.get("contains")
-        prefix = rule.get("prefix")
-        if (
-            (names is not None and name not in _strings(names, "name_rules.names"))
-            or (contains is not None and _string(contains, "name_rules.contains") not in name)
-            or (prefix is not None and not name.startswith(_string(prefix, "name_rules.prefix")))
-        ):
-            return None
-        if rule.get("split") == "-":
-            if "-" not in name:
-                return None
-            chapter, stage = name.split("-", maxsplit=1)
-            return chapter, stage
-        if rule.get("suffix") == "digit" and not name[-1:].isdigit():
-            return None
-
-        chapter_value = rule.get("chapter")
-        stage_value = rule.get("stage")
-        if chapter_value is None or stage_value is None:
-            return None
-        chapter = name[:-1] if chapter_value == "prefix" else _string(chapter_value, "name_rules.chapter")
-        stage = name[-1] if stage_value == "last" else _string(stage_value, "name_rules.stage")
-        return chapter, stage
-
-    def _campaign_get_entrance(self, runtime: object, name: object) -> object:
-        if not isinstance(name, str):
-            return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_GET_ENTRANCE, name)
-        selected = self._entrance_aliases.get(name, name)
-        if self._entrance_search and name == self._entrance_search.get("input"):
-            contains = _string(self._entrance_search["contains"], "entrance_search.contains").lower()
-            for stage_name in _host(runtime).stage_entrance:
-                if contains in stage_name.lower():
-                    selected = stage_name
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_GET_ENTRANCE, selected)
-
-    def _campaign_match_multi(
-        self,
-        runtime: object,
-        template: object,
-        image: object,
-        stage_image: object = None,
-        options: object = None,
-        **settings: object,
-    ) -> object:
-        if self._stage_match_similarity is not None:
-            settings["similarity"] = self._stage_match_similarity
-        return _runtime_result(
-            runtime,
-            RuntimeOperation.CAMPAIGN_MATCH_MULTI,
-            template,
-            image,
-            stage_image,
-            options,
-            **settings,
-        )
-
-    def _campaign_ensure_mode(self, runtime: object, mode: object = "normal") -> object:
-        if not isinstance(mode, str):
-            return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_ENSURE_MODE, mode)
-        policy = self._mode_policy
-        if policy == "noop":
-            return None
-        if policy == "inherited":
-            return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_ENSURE_MODE, mode)
-        values = cast("Mapping[str, RuntimeTuningValue]", policy)
-        if mode == "hard" and values.get("hard_config_override", True):
-            _host(runtime).config.apply_runtime_overlay(Campaign_Mode="hard")
-        if values["kind"] == "bridge_20241219":
-            return _host(runtime).campaign_ensure_mode_20241219(mode)
+def _route_target(value: RuntimeTuningValue) -> CampaignRouteTarget | None:
+    if value is None:
         return None
-
-    def _campaign_set_chapter(self, runtime: object, name: object, mode: object = "normal") -> object:
-        if not isinstance(name, str) or not isinstance(mode, str):
-            return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SET_CHAPTER, name, mode)
-        chapter, stage = self._separate_name_for_route(name)
-        if self._apply_first_route(runtime, chapter, stage, mode):
-            return None
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SET_CHAPTER, name, mode)
-
-    def _separate_name_for_route(self, name: str) -> tuple[str, str]:
-        for rule in self._name_rules:
-            separated = self._match_name_rule(name, rule)
-            if separated is not None:
-                return separated
-        return _base_separate_name(name)
-
-    def _campaign_set_chapter_event(self, runtime: object, chapter: object, mode: object = "normal") -> object:
-        if isinstance(chapter, str) and isinstance(mode, str) and self._apply_first_route(runtime, chapter, "", mode):
-            return True
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SET_CHAPTER_EVENT, chapter, mode)
-
-    def _campaign_set_chapter_sp(self, runtime: object, chapter: object, mode: object = "normal") -> object:
-        if isinstance(chapter, str) and isinstance(mode, str) and self._apply_first_route(runtime, chapter, "", mode):
-            return True
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SET_CHAPTER_SP, chapter, mode)
-
-    def _campaign_set_chapter_20241219(
-        self,
-        runtime: object,
-        chapter: object,
-        stage: object,
-        mode: object = "combat",
-    ) -> object:
-        if (
-            isinstance(chapter, str)
-            and isinstance(stage, str)
-            and isinstance(mode, str)
-            and self._apply_first_route(runtime, chapter, stage, mode)
-        ):
-            return True
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SET_CHAPTER_20241219, chapter, stage, mode)
-
-    def _apply_first_route(self, runtime: object, chapter: str, stage: str, requested_mode: str) -> bool:
-        for route in self._routes:
-            if self._route_matches(runtime, route, chapter):
-                self._apply_route(runtime, route, chapter, stage, requested_mode)
-                return True
-        return False
-
-    @staticmethod
-    def _route_matches(
-        runtime: object,
-        route: Mapping[str, RuntimeTuningValue],
-        chapter: str,
-    ) -> bool:
-        guard = route.get("guard")
-        if guard is not None:
-            if guard != "MAP_CHAPTER_SWITCH_20241219":
-                message = f"unsupported navigation route guard: {guard!r}"
-                raise CampaignRuntimeProfileError(message)
-            if not _host(runtime).config.MAP_CHAPTER_SWITCH_20241219:
-                return False
-        match = route.get("match")
-        if match == "*":
-            return True
-        if match == "numeric":
-            return chapter.isdigit()
-        chapters = route.get("chapters")
-        if chapters is not None and chapter in _strings(chapters, "routes.chapters"):
-            return True
-        prefix = route.get("prefix")
-        return prefix is not None and chapter.startswith(_string(prefix, "routes.prefix"))
-
-    @staticmethod
-    def _apply_route(
-        runtime: object,
-        route: Mapping[str, RuntimeTuningValue],
-        chapter: str,
-        stage: str,
-        requested_mode: str,
-    ) -> None:
-        host = _host(runtime)
-        destination = _string(route["destination"], "routes.destination")
-        route_mode = _string(route["mode"], "routes.mode")
-        if destination == "campaign":
-            ChapterRoutePlanExecutor._apply_campaign_route(
-                host,
-                route,
-                chapter,
-                route_mode,
-                requested_mode,
-            )
-            return
-        ChapterRoutePlanExecutor._open_route_destination(host, destination)
-        if route.get("hard_if") == "campaign_name_is_hard" and chapter.startswith("h"):
-            host.config.apply_runtime_overlay(Campaign_Mode="hard")
-        ChapterRoutePlanExecutor._apply_route_mode(host, route_mode, requested_mode)
-        ChapterRoutePlanExecutor._apply_route_aside(host, route, stage)
-        host.campaign_ensure_chapter(chapter)
-
-    @staticmethod
-    def _apply_campaign_route(
-        host: _NavigationRuntimeHost,
-        route: Mapping[str, RuntimeTuningValue],
-        chapter: str,
-        route_mode: str,
-        requested_mode: str,
-    ) -> None:
-        host.ui_goto_campaign()
-        host.campaign_ensure_mode("normal")
-        host.campaign_ensure_chapter(chapter)
-        selected_mode = requested_mode if route_mode == "requested" else route_mode
-        if selected_mode != "hard":
-            return
-        host.campaign_ensure_mode("hard")
-        if route.get("reselect_after_hard") is True:
-            host.handle_info_bar()
-            host.campaign_ensure_chapter(chapter)
-
-    @staticmethod
-    def _open_route_destination(host: _NavigationRuntimeHost, destination: str) -> None:
-        if destination == "event":
-            host.ui_goto_event()
-            return
-        if destination == "sp":
-            host.ui_goto_sp()
-            return
-        message = f"unsupported navigation destination: {destination}"
-        raise CampaignRuntimeProfileError(message)
-
-    @staticmethod
-    def _apply_route_mode(host: _NavigationRuntimeHost, route_mode: str, requested_mode: str) -> None:
-        if route_mode in {"normal", "hard", "ex"}:
-            host.campaign_ensure_mode(route_mode)
-        elif route_mode == "requested":
-            host.campaign_ensure_mode(requested_mode)
-        elif route_mode == "combat":
-            host.campaign_ensure_mode_20241219("combat")
-        elif route_mode != "unchanged":
-            message = f"unsupported navigation route mode: {route_mode}"
-            raise CampaignRuntimeProfileError(message)
-
-    @staticmethod
-    def _apply_route_aside(
-        host: _NavigationRuntimeHost,
-        route: Mapping[str, RuntimeTuningValue],
-        stage: str,
-    ) -> None:
-        aside = route.get("aside")
-        aside_by_stage = route.get("aside_by_stage")
-        if aside_by_stage is not None:
-            for stages, candidate in _string_mapping(aside_by_stage, "routes.aside_by_stage").items():
-                if stage in stages.split(","):
-                    aside = candidate
-                    break
-        if aside is not None:
-            host.campaign_ensure_aside_20241219(_string(aside, "routes.aside"))
-
-
-class BallChapterRouteExecutor(RuntimeExecutorInstance):
-    """两代活动共用的球色章节路由；Button 资产由封闭表解析。"""
-
-    __slots__ = (
-        "_ball",
-        "_ball_chapters",
-        "_blue_rules",
-        "_chapter_indices",
-        "_click_wait_seconds",
-        "_detected_colors",
-        "_event_modes",
-        "_hard_chapters",
-        "_normal_chapters",
-        "_operation_order",
-        "_sp_destination",
-    )
-
-    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
-        options = context.options(RuntimeExecutorKind.NAVIGATION)
-        operations = _operations(options, _BALL_OPERATIONS)
-        self._chapter_indices = _integer_mapping(options["chapter_indices"], "chapter_indices")
-        if options["main_routes"] is not True:
-            message = "ball chapter route requires main_routes=true"
-            raise CampaignRuntimeProfileError(message)
-        self._event_modes = _string_mapping(options["event_modes"], "event_modes")
-        self._sp_destination = _string(options["sp_destination"], "sp_destination")
-        if self._sp_destination not in {"event", "sp"}:
-            message = f"unsupported ball SP destination: {self._sp_destination}"
-            raise CampaignRuntimeProfileError(message)
-        ball = _mapping(options["ball"], "ball")
-        asset = _string(ball["asset"], "ball.asset")
-        try:
-            self._ball = _BALL_ASSETS[asset]
-        except KeyError:
-            message = f"unsupported campaign ball asset: {asset}"
-            raise CampaignRuntimeProfileError(message) from None
-        self._ball_chapters = frozenset(_strings(ball["chapters"], "ball.chapters"))
-        self._normal_chapters = frozenset(_strings(ball["normal_chapters"], "ball.normal_chapters"))
-        self._hard_chapters = frozenset(_strings(ball["hard_chapters"], "ball.hard_chapters"))
-        self._blue_rules = _rules(ball["blue_rules"], "ball.blue_rules")
-        self._operation_order = _strings(ball["operation_order"], "ball.operation_order")
-        if set(self._operation_order) != {"set_ball", "ensure_mode"} or len(self._operation_order) != 2:
-            message = "ball operation_order must contain set_ball and ensure_mode exactly once"
-            raise CampaignRuntimeProfileError(message)
-        self._detected_colors = _string_mapping(ball["detected_colors"], "ball.detected_colors")
-        self._click_wait_seconds = _number(ball["click_wait_seconds"], "ball.click_wait_seconds")
-        if self._click_wait_seconds < 0:
-            message = "ball click_wait_seconds must be non-negative"
-            raise CampaignRuntimeProfileError(message)
-
-        available = {
-            "_campaign_ball_get": (RuntimeOperation.CAMPAIGN_BALL_GET, self._campaign_ball_get),
-            "_campaign_ball_set": (RuntimeOperation.CAMPAIGN_BALL_SET, self._campaign_ball_set),
-            "_campaign_ball_status": (RuntimeOperation.CAMPAIGN_BALL_STATUS, self._campaign_ball_status),
-            "_campaign_ensure_ball_mode": (
-                RuntimeOperation.CAMPAIGN_ENSURE_BALL_MODE,
-                self._campaign_ensure_ball_mode,
-            ),
-            "campaign_get_chapter_index": (
-                RuntimeOperation.CAMPAIGN_GET_CHAPTER_INDEX,
-                self._campaign_get_chapter_index,
-            ),
-            "campaign_set_chapter": (RuntimeOperation.CAMPAIGN_SET_CHAPTER, self._campaign_set_chapter),
-            "campaign_set_chapter_ball": (
-                RuntimeOperation.CAMPAIGN_SET_CHAPTER_BALL,
-                self._campaign_set_chapter_ball,
-            ),
-            "campaign_set_chapter_event": (
-                RuntimeOperation.CAMPAIGN_SET_CHAPTER_EVENT,
-                self._campaign_set_chapter_event,
-            ),
-            "campaign_set_chapter_main": (
-                RuntimeOperation.CAMPAIGN_SET_CHAPTER_MAIN,
-                self._campaign_set_chapter_main,
-            ),
-            "campaign_set_chapter_sp": (
-                RuntimeOperation.CAMPAIGN_SET_CHAPTER_SP,
-                self._campaign_set_chapter_sp,
-            ),
-        }
-        methods = {operation: method for name, (operation, method) in available.items() if name in operations}
-        super().__init__(
-            {RuntimeExecutorKind.NAVIGATION},
-            methods={RuntimeExecutorKind.NAVIGATION: methods},
-        )
-
-    def _campaign_get_chapter_index(self, runtime: object, name: object) -> object:
-        if isinstance(name, int):
-            return name
-        if isinstance(name, str):
-            if name.isdigit():
-                return int(name)
-            if name in self._chapter_indices:
-                return self._chapter_indices[name]
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_GET_CHAPTER_INDEX, name)
-
-    def _campaign_set_chapter(self, runtime: object, name: object, mode: object = "normal") -> object:
-        if not isinstance(name, str) or not isinstance(mode, str):
-            return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SET_CHAPTER, name, mode)
-        chapter, stage = _base_separate_name(name)
-        if (
-            self._campaign_set_chapter_main(runtime, chapter, mode)
-            or self._campaign_set_chapter_event(runtime, chapter, mode)
-            or self._campaign_set_chapter_sp(runtime, chapter, mode)
-            or self._campaign_set_chapter_ball(runtime, chapter, stage)
-        ):
-            return None
-        return _runtime_result(runtime, RuntimeOperation.CAMPAIGN_SET_CHAPTER, name, mode)
-
-    @staticmethod
-    def _campaign_set_chapter_main(runtime: object, chapter: object, mode: object = "normal") -> bool:
-        if not isinstance(chapter, str) or not chapter.isdigit() or not isinstance(mode, str):
-            return False
-        host = _host(runtime)
-        host.ui_goto_campaign()
-        host.campaign_ensure_mode("normal")
-        host.campaign_ensure_chapter(chapter)
-        if mode == "hard":
-            host.campaign_ensure_mode("hard")
-        return True
-
-    def _campaign_set_chapter_event(self, runtime: object, chapter: object, mode: object = "normal") -> bool:
-        del mode
-        if not isinstance(chapter, str):
-            return False
-        campaign_mode = self._event_modes.get(chapter)
-        if campaign_mode is None:
-            return False
-        host = _host(runtime)
-        host.ui_goto_event()
-        host.campaign_ensure_mode(campaign_mode)
-        host.campaign_ensure_chapter(chapter)
-        return True
-
-    def _campaign_set_chapter_sp(self, runtime: object, chapter: object, mode: object = "normal") -> bool:
-        del mode
-        if chapter != "sp":
-            return False
-        host = _host(runtime)
-        if self._sp_destination == "event":
-            host.ui_goto_event()
-        else:
-            host.ui_goto_sp()
-        host.campaign_ensure_chapter("sp")
-        return True
-
-    def _campaign_set_chapter_ball(self, runtime: object, chapter: object, stage: object) -> bool:
-        if not isinstance(chapter, str) or not isinstance(stage, str) or chapter not in self._ball_chapters:
-            return False
-        host = _host(runtime)
-        host.ui_goto_event()
-        for operation in self._operation_order:
-            if operation == "set_ball":
-                self._campaign_ball_set(runtime, self._campaign_ball_status(runtime, chapter, stage))
-            else:
-                self._campaign_ensure_ball_mode(runtime, chapter)
-        host.campaign_ensure_chapter(1)
-        return True
-
-    def _campaign_ball_status(self, runtime: object, *args: object) -> str:
-        del runtime
-        if len(args) == 1 and isinstance(args[0], str):
-            chapter = None
-            stage = args[0]
-        elif len(args) == 2 and all(isinstance(item, str) for item in args):
-            chapter, stage = cast("tuple[str, str]", args)
-        else:
-            message = "campaign ball status requires stage or chapter and stage"
-            raise CampaignRuntimeProfileError(message)
-        for rule in self._blue_rules:
-            chapters = rule.get("chapters")
-            if chapters is not None and chapter not in _strings(chapters, "ball.blue_rules.chapters"):
-                continue
-            if stage in _strings(rule["stages"], "ball.blue_rules.stages"):
-                return "blue"
-        return "red"
-
-    def _campaign_ensure_ball_mode(self, runtime: object, chapter: object) -> None:
-        if not isinstance(chapter, str):
-            message = "campaign ball chapter must be a string"
-            raise CampaignRuntimeProfileError(message)
-        if chapter in self._normal_chapters:
-            _host(runtime).campaign_ensure_mode("normal")
-            return
-        if chapter in self._hard_chapters:
-            _host(runtime).campaign_ensure_mode("hard")
-            return
-        message = f"unsupported campaign ball chapter: {chapter}"
-        raise CampaignRuntimeProfileError(message)
-
-    def _campaign_ball_get(self, runtime: object) -> str:
-        color = get_color(_host(runtime).device.image, self._ball.area)
-        index = max(range(len(color)), key=lambda item: color[item])
-        return self._detected_colors.get(str(index), "unknown")
-
-    def _campaign_ball_set(self, runtime: object, status: object) -> None:
-        if status not in {"blue", "red"}:
-            message = f"unsupported campaign ball status: {status!r}"
-            raise CampaignRuntimeProfileError(message)
-        host = _host(runtime)
-        skip_first_screenshot = True
-        while True:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                host.device.screenshot()
-            if self._campaign_ball_get(runtime) == status:
-                return
-            if host.is_in_stage():
-                host.device.click(self._ball)
-                host.device.sleep(self._click_wait_seconds)
-                while True:
-                    host.device.screenshot()
-                    if host.is_in_stage():
-                        break
+    raw = _string(value, "route_target")
+    try:
+        return CampaignRouteTarget(raw)
+    except ValueError:
+        message = f"unsupported navigation route target: {raw}"
+        raise CampaignRuntimeProfileError(message) from None
 
 
 def _build_chapter_route_plan(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    return ChapterRoutePlanExecutor(context)
+    options = context.options(RuntimeExecutorKind.NAVIGATION)
+    similarity = options["stage_match_similarity"]
+    plan = ChapterRouteNavigationPlan(
+        _integer_mapping(options["chapter_indices"], "chapter_indices"),
+        tuple(
+            CampaignNameRule.from_options(rule, f"name_rules[{index}]")
+            for index, rule in enumerate(_rules(options["name_rules"], "name_rules"))
+        ),
+        _string_mapping(options["entrance_aliases"], "entrance_aliases"),
+        CampaignEntranceSearch.from_options(options["entrance_search"]),
+        _string_mapping(options["ocr_aliases"], "ocr_aliases"),
+        tuple(
+            CampaignRoute.from_options(route, f"routes[{index}]")
+            for index, route in enumerate(_rules(options["routes"], "routes"))
+        ),
+        _route_target(options["route_target"]),
+        CampaignModePolicy.from_options(options["mode_policy"]),
+        None if similarity is None else _number(similarity, "stage_match_similarity"),
+    )
+    if plan.route_target is None and plan.routes:
+        message = "navigation routes require a typed route_target"
+        raise CampaignRuntimeProfileError(message)
+    if plan.route_target is not None and not plan.routes:
+        message = "navigation route_target requires at least one route"
+        raise CampaignRuntimeProfileError(message)
+    return CampaignNavigationPlanExecutor(plan)
+
+
+def _ball_status_rules(value: RuntimeTuningValue) -> tuple[CampaignBallStatusRule, ...]:
+    return tuple(
+        CampaignBallStatusRule(
+            _optional_strings(rule, "chapters"),
+            frozenset(_strings(rule["stages"], f"ball.blue_rules[{index}].stages")),
+        )
+        for index, rule in enumerate(_rules(value, "ball.blue_rules"))
+    )
 
 
 def _build_ball_chapter_route(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    return BallChapterRouteExecutor(context)
+    options = context.options(RuntimeExecutorKind.NAVIGATION)
+    sp_destination_value = _string(options["sp_destination"], "sp_destination")
+    if sp_destination_value not in {CampaignRouteDestination.EVENT, CampaignRouteDestination.SP}:
+        message = f"unsupported ball SP destination: {sp_destination_value}"
+        raise CampaignRuntimeProfileError(message)
+    ball = _mapping(options["ball"], "ball")
+    asset = _string(ball["asset"], "ball.asset")
+    try:
+        ball_button = _BALL_ASSETS[asset]
+    except KeyError:
+        message = f"unsupported campaign ball asset: {asset}"
+        raise CampaignRuntimeProfileError(message) from None
+    operation_values = _strings(ball["operation_order"], "ball.operation_order")
+    try:
+        operation_order = tuple(CampaignBallOperation(value) for value in operation_values)
+    except ValueError as error:
+        message = f"unsupported campaign ball operation: {error}"
+        raise CampaignRuntimeProfileError(message) from None
+    if set(operation_order) != set(CampaignBallOperation) or len(operation_order) != 2:
+        message = "ball operation_order must contain set_ball and ensure_mode exactly once"
+        raise CampaignRuntimeProfileError(message)
+    click_wait_seconds = _number(ball["click_wait_seconds"], "ball.click_wait_seconds")
+    if click_wait_seconds < 0:
+        message = "ball click_wait_seconds must be non-negative"
+        raise CampaignRuntimeProfileError(message)
+    plan = BallChapterNavigationPlan(
+        _integer_mapping(options["chapter_indices"], "chapter_indices"),
+        _string_mapping(options["event_modes"], "event_modes"),
+        CampaignRouteDestination(sp_destination_value),
+        ball_button,
+        frozenset(_strings(ball["chapters"], "ball.chapters")),
+        frozenset(_strings(ball["normal_chapters"], "ball.normal_chapters")),
+        frozenset(_strings(ball["hard_chapters"], "ball.hard_chapters")),
+        _ball_status_rules(ball["blue_rules"]),
+        operation_order,
+        _string_mapping(ball["detected_colors"], "ball.detected_colors"),
+        click_wait_seconds,
+    )
+    return CampaignNavigationPlanExecutor(plan)
+
+
+def _build_event_20240912_navigation(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+    options = context.options(RuntimeExecutorKind.NAVIGATION)
+    if options["mode_switch"] != "event_20240912":
+        message = "event 20240912 navigation requires its typed mode switch"
+        raise CampaignRuntimeProfileError(message)
+    mode_switch = ModeSwitch("Mode_switch_20240912", is_selector=True)
+    mode_switch.add_state("combat", SWITCH_20241219_COMBAT, offset=(444, 4))
+    mode_switch.add_state("story", SWITCH_20241219_STORY, offset=(444, 4))
+    return CampaignNavigationPlanExecutor(Event20240912NavigationPlan(mode_switch))
 
 
 def navigation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescriptor, ...]:
@@ -801,16 +490,15 @@ def navigation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDes
                 RuntimeExecutorKind.NAVIGATION: RuntimeExecutorOptionsSchema(
                     required=frozenset(
                         {
-                            "operations",
                             "chapter_indices",
                             "name_rules",
                             "entrance_aliases",
                             "entrance_search",
                             "ocr_aliases",
                             "routes",
+                            "route_target",
                             "mode_policy",
                             "stage_match_similarity",
-                            "fallback",
                         }
                     )
                 )
@@ -823,9 +511,7 @@ def navigation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDes
                 RuntimeExecutorKind.NAVIGATION: RuntimeExecutorOptionsSchema(
                     required=frozenset(
                         {
-                            "operations",
                             "chapter_indices",
-                            "main_routes",
                             "event_modes",
                             "sp_destination",
                             "ball",
@@ -834,5 +520,14 @@ def navigation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDes
                 )
             },
             _build_ball_chapter_route,
+        ),
+        RuntimeExecutorFactoryDescriptor(
+            RuntimeImplementationId("event_20240912_cn/campaign_base/campaign_base"),
+            {
+                RuntimeExecutorKind.NAVIGATION: RuntimeExecutorOptionsSchema(
+                    required=frozenset({"mode_switch"}),
+                )
+            },
+            _build_event_20240912_navigation,
         ),
     )

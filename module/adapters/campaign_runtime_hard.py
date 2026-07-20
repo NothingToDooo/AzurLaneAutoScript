@@ -1,5 +1,6 @@
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast, override
 
+from module.base.button import Button
 from module.base.timer import Timer
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
 from module.exception import CampaignEnd
@@ -14,6 +15,7 @@ from .campaign_runtime_profile import (
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
     RuntimeOperation,
+    RuntimeSessionOutcome,
 )
 
 if TYPE_CHECKING:
@@ -53,7 +55,6 @@ class _HardRuntimeHost(Protocol):
     config: _HardConfig
     device: _HardDevice
     map: _HardMap
-    ENTRANCE: object
     equipment_has_take_on: bool
 
     def goto(
@@ -93,7 +94,7 @@ def _strings(options: Mapping[str, RuntimeTuningValue], name: str) -> tuple[str,
 class CampaignClearModeExecutor(RuntimeExecutorInstance):
     """封装困难关卡的结束语义、Boss 清理和装备回收流程。"""
 
-    __slots__ = ("_expected_end_value",)
+    __slots__ = ("_entrance", "_expected_end_value")
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.HARD_MODE)
@@ -106,6 +107,7 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
             message = "hard clear mode expected_end must be 'in_stage'"
             raise CampaignRuntimeProfileError(message)
         self._expected_end_value = "in_stage"
+        self._entrance: Button | None = None
         super().__init__(
             {RuntimeExecutorKind.HARD_MODE},
             methods={
@@ -117,6 +119,29 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
                 }
             },
         )
+
+    def prepare_attempt(self, entrance: Button) -> None:
+        if not isinstance(entrance, Button):
+            message = "hard clear mode attempt requires a Button entrance"
+            raise TypeError(message)
+        if self._entrance is not None:
+            message = "hard clear mode attempt entrance is already prepared"
+            raise CampaignRuntimeProfileError(message)
+        self._entrance = entrance
+
+    @override
+    def end_session(self, outcome: RuntimeSessionOutcome) -> None:
+        try:
+            super().end_session(outcome)
+        finally:
+            self._entrance = None
+
+    @override
+    def reset(self) -> None:
+        try:
+            super().reset()
+        finally:
+            self._entrance = None
 
     @staticmethod
     def _runtime_created(runtime: object) -> None:
@@ -147,13 +172,16 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
         host.clear_potential_boss()
         return False
 
-    @staticmethod
-    def _equipment_take_off_when_finished(runtime: object) -> bool:
+    def _equipment_take_off_when_finished(self, runtime: object) -> bool:
         host = _host(runtime)
         if host.config.FLEET_HARD_EQUIPMENT is None:
             return False
         if not host.equipment_has_take_on:
             return False
+        entrance = self._entrance
+        if entrance is None:
+            message = "hard clear mode equipment cleanup requires the prepared attempt entrance"
+            raise CampaignRuntimeProfileError(message)
 
         logger.info("equipment_take_off_when_finished")
         campaign_timer = Timer(2)
@@ -164,7 +192,7 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
             host.device.screenshot()
 
             if campaign_timer.reached() and host.is_in_stage():
-                host.device.click(host.ENTRANCE)
+                host.device.click(entrance)
                 campaign_timer.reset()
                 continue
 
