@@ -292,17 +292,19 @@ class _Observer:
 class _Driver:
     def __init__(self, outcome: Callable[[BattleAttempt], BattleOutcome]) -> None:
         self.outcome = outcome
-        self.calls: list[BattleAttempt] = []
+        self.calls: list[tuple[BattleAttempt, CampaignSessionState]] = []
 
     def issue_and_confirm(
         self,
         session: CampaignSession,
-        attempt: BattleAttempt,
+        state: CampaignSessionState,
         cancellation: CancellationSource,
     ) -> BattleOutcome:
         del session
         cancellation.raise_if_requested()
-        self.calls.append(attempt)
+        attempt = state.pending
+        assert attempt is not None
+        self.calls.append((attempt, state))
         return self.outcome(attempt)
 
 
@@ -718,6 +720,9 @@ def test_live_workflow_observes_issues_confirms_and_reduces_one_battle() -> None
     assert report.session_state.pending is None
     assert report.runs_completed == 1
     assert len(observer.calls) == len(driver.calls) == 1
+    attempt, issued_state = driver.calls[0]
+    assert issued_state.pending == attempt
+    assert issued_state.next_attempt_id == 1
 
 
 def test_live_workflow_reduces_no_target_without_faking_a_battle() -> None:
@@ -1549,16 +1554,6 @@ class _Runtime:
         self.calls.append(("flag", flag.value))
         return False
 
-    def execute_auto_search_battle(
-        self,
-        battle_index: int,
-        cancellation: CancellationSource,
-    ) -> BattleTarget:
-        cancellation.raise_if_requested()
-        self.calls.append(("auto_search", battle_index))
-        self.battle_count += self.confirmed_delta
-        return BattleTarget.ENEMY
-
     def brute_find_roadblocks(self, grid: _Grid, fleet: int | None = None) -> list[_Grid]:
         self.calls.append(("roadblocks", grid.label, fleet))
         return self.roadblocks
@@ -1600,6 +1595,20 @@ class _RuntimeSource:
         self.commits += 1
         return CommittedCampaignUnit(cast("CampaignMapRuntime", self.runtime), cancellation)
 
+    def execute(
+        self,
+        session: CampaignSession,
+        state: CampaignSessionState,
+        cancellation: CancellationSource,
+    ) -> BattleTarget:
+        del session
+        cancellation.raise_if_requested()
+        attempt = state.pending
+        assert attempt is not None
+        self.runtime.calls.append(("auto_search", state.battle_index, attempt))
+        self.runtime.battle_count += self.runtime.confirmed_delta
+        return BattleTarget.ENEMY
+
 
 def _attempt(intent: object) -> BattleAttempt:
     battle_intent = cast(
@@ -1607,6 +1616,18 @@ def _attempt(intent: object) -> BattleAttempt:
         intent,
     )
     return BattleAttempt(0, 0, 0, battle_intent)
+
+
+def _pending_state(session: CampaignSession, attempt: BattleAttempt) -> CampaignSessionState:
+    return replace(
+        session.initial_state(),
+        next_attempt_id=attempt.attempt_id + 1,
+        pending=attempt,
+    )
+
+
+def _adapter(source: _RuntimeSource) -> ExistingCampaignMapAdapter:
+    return ExistingCampaignMapAdapter(source, source)
 
 
 def test_map_adapter_observes_real_map_flags() -> None:
@@ -1619,7 +1640,7 @@ def test_map_adapter_observes_real_map_flags() -> None:
     )
     session = _session()
 
-    observation = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).observe(
+    observation = _adapter(_RuntimeSource(runtime)).observe(
         session,
         session.initial_state(),
         AbortToken(),
@@ -1637,12 +1658,13 @@ def test_map_adapter_filtered_enemy_preserves_priority_prefix_and_confirms_actio
             _Grid("2L", is_enemy=True),
         )
     )
-    session = _session()
-    attempt = _attempt(ClearFilteredEnemy(preserve=1))
+    intent = ClearFilteredEnemy(preserve=1)
+    session = _session(policies={0: StagePolicy((intent,))})
+    attempt = _attempt(intent)
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
+    outcome = _adapter(_RuntimeSource(runtime)).issue_and_confirm(
         session,
-        attempt,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1658,11 +1680,13 @@ def test_map_adapter_applies_siren_genre_and_hidden_candidate_contract() -> None
             _Grid("candidate"),
         )
     )
-    attempt = _attempt(ClearSiren(("CL",), include_hidden_candidates=True))
+    intent = ClearSiren(("CL",), include_hidden_candidates=True)
+    session = _session(policies={0: StagePolicy((intent,))})
+    attempt = _attempt(intent)
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
-        _session(),
-        attempt,
+    outcome = _adapter(_RuntimeSource(runtime)).issue_and_confirm(
+        session,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1678,11 +1702,13 @@ def test_map_adapter_honors_declared_enemy_sort_order() -> None:
             _Grid("near-fleet-2", is_enemy=True, cost_1=9, cost_2=2),
         )
     )
-    attempt = _attempt(ClearAnyEnemy(sort=("cost_2",)))
+    intent = ClearAnyEnemy(sort=("cost_2",))
+    session = _session(policies={0: StagePolicy((intent,))})
+    attempt = _attempt(intent)
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
-        _session(),
-        attempt,
+    outcome = _adapter(_RuntimeSource(runtime)).issue_and_confirm(
+        session,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1692,16 +1718,38 @@ def test_map_adapter_honors_declared_enemy_sort_order() -> None:
 
 def test_map_adapter_calls_explicit_auto_search_port() -> None:
     runtime = _Runtime((_Grid("enemy", is_enemy=True),))
+    source = _RuntimeSource(runtime)
+    session = _session()
     attempt = BattleAttempt(0, 0, 0, AutoSearchBattle())
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
-        _session(),
-        attempt,
+    outcome = _adapter(source).issue_and_confirm(
+        session,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
     assert outcome == BattleSucceeded(attempt, BattleTarget.ENEMY)
-    assert ("auto_search", 0) in runtime.calls
+    assert ("auto_search", 0, attempt) in runtime.calls
+    assert source.calls == 0
+    assert source.commits == 0
+
+
+def test_map_adapter_rejects_wrong_plan_state_before_runtime_access() -> None:
+    runtime = _Runtime((_Grid("siren", is_siren=True),))
+    source = _RuntimeSource(runtime)
+    session = _session()
+    attempt = _attempt(ClearSiren())
+
+    with pytest.raises(ValueError, match="pending attempt does not belong to the battle plan"):
+        _adapter(source).issue_and_confirm(
+            session,
+            _pending_state(session, attempt),
+            AbortToken(),
+        )
+
+    assert source.calls == 0
+    assert source.commits == 0
+    assert runtime.calls == []
 
 
 def test_map_adapter_returns_no_target_without_issuing_action() -> None:
@@ -1709,9 +1757,9 @@ def test_map_adapter_returns_no_target_without_issuing_action() -> None:
     session = _session()
     attempt = _attempt(DefaultBattle())
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
+    outcome = _adapter(_RuntimeSource(runtime)).issue_and_confirm(
         session,
-        attempt,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1724,9 +1772,9 @@ def test_map_adapter_does_not_fabricate_success_without_confirmation() -> None:
     session = _session()
     attempt = _attempt(DefaultBattle())
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
+    outcome = _adapter(_RuntimeSource(runtime)).issue_and_confirm(
         session,
-        attempt,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1737,11 +1785,12 @@ def test_map_adapter_does_not_fabricate_success_without_confirmation() -> None:
 def test_map_adapter_accepts_one_confirmation_even_when_action_raises() -> None:
     runtime = _Runtime((_Grid("1L", is_enemy=True),))
     runtime.action_error = RuntimeError("action failed after battle confirmation")
+    session = _session()
     attempt = _attempt(DefaultBattle())
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
-        _session(),
-        attempt,
+    outcome = _adapter(_RuntimeSource(runtime)).issue_and_confirm(
+        session,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1753,11 +1802,12 @@ def test_map_adapter_converts_closed_low_emotion_withdrawal_to_typed_interruptio
     runtime = _Runtime((_Grid("1L", is_enemy=True),), confirmed_delta=0)
     runtime.action_error = CampaignActionInterrupted(BattleInterruptionReason.GEMS_LOW_EMOTION)
     source = _RuntimeSource(runtime)
+    session = _session()
     attempt = _attempt(DefaultBattle())
 
-    outcome = ExistingCampaignMapAdapter(source).issue_and_confirm(
-        _session(),
-        attempt,
+    outcome = _adapter(source).issue_and_confirm(
+        session,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1767,10 +1817,12 @@ def test_map_adapter_converts_closed_low_emotion_withdrawal_to_typed_interruptio
 
 def test_map_adapter_rejects_more_than_one_confirmation() -> None:
     runtime = _Runtime((_Grid("1L", is_enemy=True),), confirmed_delta=2)
-    adapter = ExistingCampaignMapAdapter(_RuntimeSource(runtime))
+    adapter = _adapter(_RuntimeSource(runtime))
+    session = _session()
+    attempt = _attempt(DefaultBattle())
 
     with pytest.raises(CampaignMapAdapterError, match="changed battle_count by 2"):
-        adapter.issue_and_confirm(_session(), _attempt(DefaultBattle()), AbortToken())
+        adapter.issue_and_confirm(session, _pending_state(session, attempt), AbortToken())
 
 
 @pytest.mark.parametrize(
@@ -1787,11 +1839,22 @@ def test_map_adapter_dispatches_every_boss_strategy_explicitly(
     executor: str,
 ) -> None:
     runtime = _Runtime((_Grid("B", is_boss=True),))
-    attempt = _attempt(ClearBoss(strategy))
+    intent = ClearBoss(strategy)
+    if strategy in (BossStrategy.MAP_SEARCH, BossStrategy.BRUTE_FORCE):
+        roadblock = ClearBossRoadblock(strategy)
+        policy = StagePolicy((roadblock, intent))
+        attempt = BattleAttempt(0, 0, 1, intent)
+    else:
+        policy = StagePolicy((intent,))
+        attempt = _attempt(intent)
+    session = _session(
+        waves=(SpawnWave(battle=0, boss=1),),
+        policies={0: policy},
+    )
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
-        _session(),
-        attempt,
+    outcome = _adapter(_RuntimeSource(runtime)).issue_and_confirm(
+        session,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1802,11 +1865,23 @@ def test_map_adapter_dispatches_every_boss_strategy_explicitly(
 def test_map_adapter_issues_boss_roadblock_as_enemy_not_boss() -> None:
     runtime = _Runtime((_Grid("B", is_boss=True, is_accessible=False), _Grid("1L", is_enemy=True)))
     runtime.roadblocks = [runtime.map[1]]
-    attempt = _attempt(ClearBossRoadblock(BossStrategy.BRUTE_FORCE))
+    intent = ClearBossRoadblock(BossStrategy.BRUTE_FORCE)
+    session = _session(
+        waves=(SpawnWave(battle=0, enemy=1, boss=1),),
+        policies={
+            0: StagePolicy(
+                (
+                    intent,
+                    ClearBoss(BossStrategy.BRUTE_FORCE),
+                )
+            )
+        },
+    )
+    attempt = _attempt(intent)
 
-    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
-        _session(),
-        attempt,
+    outcome = _adapter(_RuntimeSource(runtime)).issue_and_confirm(
+        session,
+        _pending_state(session, attempt),
         AbortToken(),
     )
 
@@ -1820,7 +1895,7 @@ def test_map_adapter_checks_cancellation_before_observer_io() -> None:
     cancellation.request("stop before scan")
 
     with pytest.raises(AbortRequested, match="stop before scan"):
-        ExistingCampaignMapAdapter(_RuntimeSource(runtime)).observe(
+        _adapter(_RuntimeSource(runtime)).observe(
             _session(),
             _session().initial_state(),
             cancellation,

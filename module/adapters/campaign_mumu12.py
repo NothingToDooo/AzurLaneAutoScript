@@ -3,6 +3,11 @@ from dataclasses import dataclass, replace
 from functools import partial
 from typing import TYPE_CHECKING, Final, Literal, Self, cast
 
+from module.adapters.campaign_auto_search_mumu12 import (
+    Mumu12AutoSearchRuntime,
+    Mumu12CampaignAutoSearchExecutor,
+    Mumu12CommittedAutoSearchUnit,
+)
 from module.adapters.campaign_live import (
     CampaignMapRuntime,
     CommittedCampaignUnit,
@@ -42,7 +47,6 @@ from module.combat.emotion import Emotion
 from module.config.config import AzurLaneConfig, name_to_function
 from module.content.battle_policy import BattleFlag
 from module.content.campaign_session import (
-    BattleTarget,
     CampaignRunVariant,
     CampaignSession,
     CampaignSessionState,
@@ -85,7 +89,6 @@ from module.gameplay.campaign_live import (
     CampaignMapAchievementReached,
 )
 from module.gameplay.encounter import HardBattleOutcome, HardSettings
-from module.handler.assets import AUTO_SEARCH_MAP_OPTION_ON
 from module.hard import assets as hard_assets
 from module.map.map_base import CampaignMap
 from module.ocr.ocr import Digit, DigitCounter
@@ -467,7 +470,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
     """固定运行类型；关卡差异只来自已编译 definition，不生成 Campaign 子类。"""
 
     definition: CampaignStageDefinition
-    session_state: CampaignSessionState | None
     session_variant: CampaignRunVariant
     fleet_destination: object | None
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
@@ -502,7 +504,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
             self.grid_class = camera_grid_class
         self._runtime_profile.apply_config(config)
         self.ENEMY_FILTER = definition.enemy_filter
-        self.session_state = None
         self.session_variant = CampaignRunVariant.NORMAL
         self.fleet_destination = None
         self._gems_behavior = None
@@ -968,7 +969,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         if self._runtime_profile_session_active:
             message = "campaign runtime profile session is already active"
             raise CampaignRuntimeProfileError(message)
-        self.session_state = state
         self.session_variant = variant
         self.map_is_clear_mode = variant is CampaignRunVariant.LOOP
         self._runtime_profile.begin_session(RuntimeSessionContext(variant, battle_index, entry_kind))
@@ -1004,7 +1004,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         if state.variant is not self.session_variant:
             message = "campaign runtime resume variant must match the active runtime"
             raise ValueError(message)
-        self.session_state = state
         self.battle_count = state.battle_index
 
     def finish_runtime_session(self, outcome: RuntimeSessionOutcome) -> None:
@@ -1053,89 +1052,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
 
     def handle_map_stop(self) -> None:
         """地图成就只产生事实；task disable/关卡推进由 typed workflow 提交。"""
-
-    def _pause_auto_search(self, cancellation: CancellationSource) -> None:
-        cancellation.raise_if_requested()
-        if not self.is_auto_search_running():
-            return
-        self.device.click(AUTO_SEARCH_MAP_OPTION_ON)
-        for _ in range(20):
-            cancellation.raise_if_requested()
-            self.device.screenshot()
-            if not self.is_auto_search_running():
-                return
-            self.device.sleep(0.2)
-        message = "auto-search did not reach a paused map safe point"
-        raise CampaignRuntimeEvidenceError(message)
-
-    def _visible_targets(self, cancellation: CancellationSource) -> tuple[int, int, int]:
-        cancellation.raise_if_requested()
-        self.full_scan()
-        cancellation.raise_if_requested()
-        self.find_path_initial()
-        grids = tuple(self.map)
-        enemy = sum(grid.is_enemy and not grid.is_siren and not grid.is_boss for grid in grids)
-        siren = sum(grid.is_siren for grid in grids)
-        boss = sum(grid.is_boss for grid in grids)
-        return enemy, siren, boss
-
-    def _expected_visible_after(self, target: BattleTarget) -> tuple[int, int, int]:
-        state = self.session_state
-        if state is None:
-            message = "auto-search battle requires a campaign session state"
-            raise CampaignRuntimeEvidenceError(message)
-        remaining = state.remaining.clear(target)
-        next_index = state.battle_index + 1
-        variant = (
-            self.definition.map.normal
-            if self.session_variant is CampaignRunVariant.NORMAL
-            else self.definition.map.loop
-        )
-        if next_index < len(variant.spawn_waves):
-            remaining = remaining.add_wave(variant.spawn_waves[next_index])
-        return remaining.enemy, remaining.siren, remaining.boss
-
-    def execute_auto_search_battle(
-        self,
-        battle_index: int,
-        cancellation: CancellationSource,
-    ) -> BattleTarget:
-        """推进一次游戏自律 battle，并以暂停后的地图差分闭合实际目标。"""
-
-        state = self.session_state
-        if state is None or state.battle_index != battle_index:
-            message = "auto-search battle does not match the active campaign safe point"
-            raise CampaignRuntimeEvidenceError(message)
-        before = self.battle_count
-        ended = False
-        try:
-            cancellation.raise_if_requested()
-            self.auto_search_execute_a_battle()
-        except CampaignEnd:
-            ended = True
-
-        confirmed = self.battle_count - before
-        if ended and confirmed == 0 and state.remaining.boss == 1:
-            self.battle_count += 1
-            return BattleTarget.BOSS
-        if confirmed != 1:
-            message = f"one auto-search action changed battle_count by {confirmed}, expected exactly one"
-            raise CampaignRuntimeEvidenceError(message)
-
-        self._pause_auto_search(cancellation)
-        observed = self._visible_targets(cancellation)
-        available = (
-            (BattleTarget.ENEMY, state.remaining.enemy),
-            (BattleTarget.SIREN, state.remaining.siren),
-            (BattleTarget.BOSS, state.remaining.boss),
-        )
-        matched = tuple(
-            target for target, count in available if count and self._expected_visible_after(target) == observed
-        )
-        if len(matched) != 1:
-            message = f"auto-search battle target is ambiguous: observed={observed}, candidates={matched}"
-            raise CampaignRuntimeEvidenceError(message)
-        return matched[0]
 
     def execute_hard_attempt(self, entrance: Button, cancellation: CancellationSource) -> None:
         """完成一次困难图结算；hard clear-mode 的一次 attempt 是最小可恢复业务单元。"""
@@ -1767,6 +1683,17 @@ class Mumu12CampaignRuntimeProvider:
         )
         return Mumu12CommittedBattleProgramUnit(port, unit_cancellation)
 
+    def commit_auto_search_unit(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> Mumu12CommittedAutoSearchUnit:
+        runtime, unit_cancellation = self._commit_active_runtime(session, cancellation)
+        return Mumu12CommittedAutoSearchUnit(
+            cast("Mumu12AutoSearchRuntime", runtime),
+            unit_cancellation,
+        )
+
     def commit_active_unit(
         self,
         session: CampaignSession,
@@ -2046,10 +1973,12 @@ def build_mumu12_campaign_dependencies(
     """组装 Campaign factory 所需的 session source 与单 battle live workflow。"""
 
     provider = Mumu12CampaignRuntimeProvider(config, device)
+    auto_search = Mumu12CampaignAutoSearchExecutor(provider)
     programs = Mumu12CampaignBattleProgramExecutor(provider)
     gems_fleets = Mumu12GemsFleetReplacementExecutor(provider)
     workflow = build_existing_campaign_map_workflow(
         provider,
+        auto_search,
         CampaignLiveServices(
             activator=provider,
             guards=provider,

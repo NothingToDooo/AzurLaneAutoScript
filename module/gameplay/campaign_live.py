@@ -14,6 +14,7 @@ from module.content.campaign_session import (
     BattleInterruptionReason,
     BattleOutcome,
     BattleSucceeded,
+    BattleTarget,
     CampaignRunVariant,
     CampaignSession,
     CampaignSessionState,
@@ -71,9 +72,18 @@ class CampaignBattleIntentDriver(Protocol):
     def issue_and_confirm(
         self,
         session: CampaignSession,
-        attempt: BattleAttempt,
+        state: CampaignSessionState,
         cancellation: CancellationSource,
     ) -> BattleOutcome: ...
+
+
+class CampaignAutoSearchBattleExecutor(Protocol):
+    def execute(
+        self,
+        session: CampaignSession,
+        state: CampaignSessionState,
+        cancellation: CancellationSource,
+    ) -> BattleTarget: ...
 
 
 class CampaignBattleProgramExecutor(Protocol):
@@ -687,7 +697,11 @@ class LiveCampaignWorkflow(CampaignWorkflow):
             return self._report(session, decision.state, CampaignStopReason.BLOCKED)
 
         cancellation.raise_if_requested()
-        outcome = self._driver.issue_and_confirm(session, decision.command, cancellation)
+        outcome = self._driver.issue_and_confirm(
+            session,
+            decision.state,
+            cancellation,
+        )
         if not isinstance(outcome, BattleSucceeded | BattleFailed | NoBattleTarget | BattleInterrupted):
             message = "CampaignBattleIntentDriver.issue_and_confirm() must return a BattleOutcome"
             raise TypeError(message)
