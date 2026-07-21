@@ -13,6 +13,7 @@ from module.logger import logger
 from module.map.camera import Camera, FullScanOptions
 from module.map.fleet_turn import FleetTurnController, FleetTurnEvent, FleetTurnRules
 from module.map.map_grids import SelectedGrids
+from module.map.map_spawn_gap import MapSpawnGapPredictor, MapSpawnProgress
 from module.map.utils import location_ensure, match_movable
 
 if TYPE_CHECKING:
@@ -52,6 +53,7 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - å¾
     fleet_ammo = 5
     ammo_count = 3
     _turn_controller: FleetTurnController
+    _spawn_gap_predictor: MapSpawnGapPredictor
 
     @staticmethod
     def _require_fleet_location(location: FleetLocation | None) -> GridLocation:
@@ -679,10 +681,15 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - å¾
                 grid.wipe_out()
 
     def _track_movable_missing_count(self, *, siren: bool) -> int:
-        _, missing = self.map.missing_get(
-            self.battle_count, self.mystery_count, self.siren_count, self.carrier_count, mode="normal"
+        snapshot = self._spawn_gap_predictor.estimate(
+            MapSpawnProgress(
+                battle_count=self.battle_count,
+                mystery_count=self.mystery_count,
+                siren_count=self.siren_count,
+                carrier_count=self.carrier_count,
+            )
         )
-        return missing["siren"] if siren else missing["enemy"]
+        return snapshot.missing["siren"] if siren else snapshot.missing["enemy"]
 
     def _track_movable_predict_missing(
         self,
@@ -940,6 +947,7 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - å¾
             fortress=self.config.MAP_HAS_FORTRESS,
             bouncing_enemy=self.config.MAP_HAS_BOUNCING_ENEMY,
         )
+        self._spawn_gap_predictor = MapSpawnGapPredictor(self.map)
         self._turn_controller = FleetTurnController(
             FleetTurnRules(
                 movable_enemy=self.config.MAP_HAS_MOVABLE_ENEMY,

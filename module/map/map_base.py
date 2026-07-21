@@ -23,7 +23,7 @@ type FortressItem = GridInfo | str
 type FortressGroup = FortressItem | tuple[FortressItem, ...] | list[FortressItem] | SelectedGrids[GridInfo]
 
 
-class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、寻路与缺口推断。
+class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、拓扑与寻路状态。
     def __init__(self, name: str | None = None) -> None:
         self.name = name
         self.grid_class: type[GridInfo] = GridInfo
@@ -706,104 +706,6 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、�
             covered = [(grid_location[0] + upper[0], grid_location[1] + upper[1]) for upper in location]
         covered = [self[upper] for upper in covered if upper in self]
         return SelectedGrids(covered)
-
-    def _get_spawn_missing(self, battle_count: int) -> dict[str, int]:
-        try:
-            return self.spawn_data_stack[battle_count].copy()
-        except IndexError:
-            return self.spawn_data_stack[-1].copy()
-
-    def _apply_seen_grid_missing(self, missing: dict[str, int]) -> None:
-        for grid in self:
-            for attr in ["enemy", "mystery", "siren", "boss"]:
-                if getattr(grid, "is_" + attr):
-                    missing[attr] -= 1
-
-    def _apply_dynamic_enemy_missing(self, missing: dict[str, int]) -> None:
-        missing["enemy"] += len(self.fortress_data[0]) - self.select(is_fortress=True).count
-        for route in self.bouncing_enemy_data:
-            if not route.select(may_bouncing_enemy=True):
-                # 弹跳敌人已被清理，重新补一个敌人缺口。
-                missing["enemy"] += 1
-
-    def _get_may_missing(self, mode: GridMode) -> dict[str, int]:
-        may = {"enemy": 0, "mystery": 0, "siren": 0, "boss": 0, "carrier": 0}
-        for upper in self.map_covered:
-            if (upper.may_enemy or mode == "movable") and not upper.is_enemy:
-                may["enemy"] += 1
-            if upper.may_mystery and not upper.is_mystery:
-                may["mystery"] += 1
-            if (upper.may_siren or mode == "movable") and not upper.is_siren:
-                may["siren"] += 1
-            if upper.may_boss and not upper.is_boss:
-                may["boss"] += 1
-            if upper.may_carrier:
-                may["carrier"] += 1
-        return may
-
-    def missing_get(
-        self,
-        battle_count: int,
-        mystery_count: int = 0,
-        siren_count: int = 0,
-        carrier_count: int = 0,
-        mode: GridMode = "normal",
-    ) -> tuple[dict[str, int], dict[str, int]]:
-        missing = self._get_spawn_missing(battle_count)
-        missing["enemy"] -= battle_count - siren_count
-        missing["mystery"] -= mystery_count
-        missing["siren"] -= siren_count
-        missing["carrier"] = (
-            carrier_count - self.select(is_enemy=True, may_enemy=False).count if mode == "carrier" else 0
-        )
-        self._apply_seen_grid_missing(missing)
-        self._apply_dynamic_enemy_missing(missing)
-        may = self._get_may_missing(mode)
-
-        logger.attr(
-            "enemy_missing",
-            ", ".join([f"{k[:2].upper()}:{str(v).rjust(2)}" for k, v in missing.items() if k != "battle"]),
-        )
-        logger.attr("enemy_may____", ", ".join([f"{k[:2].upper()}:{str(v).rjust(2)}" for k, v in may.items()]))
-        return may, missing
-
-    def missing_is_none(
-        self,
-        battle_count: int,
-        mystery_count: int = 0,
-        siren_count: int = 0,
-        carrier_count: int = 0,
-        mode: GridMode = "normal",
-    ) -> bool:
-        if self.poor_map_data:
-            return False
-
-        may, missing = self.missing_get(battle_count, mystery_count, siren_count, carrier_count, mode)
-
-        return all(missing[key] == 0 for key in may)
-
-    def missing_predict(
-        self,
-        battle_count: int,
-        mystery_count: int = 0,
-        siren_count: int = 0,
-        carrier_count: int = 0,
-        mode: GridMode = "normal",
-    ) -> None:
-        if self.poor_map_data:
-            return
-
-        may, missing = self.missing_get(battle_count, mystery_count, siren_count, carrier_count, mode)
-
-        # 推断。
-        for upper in self.map_covered:
-            for attr in ["enemy", "mystery", "siren", "boss"]:
-                if getattr(upper, "may_" + attr) and missing[attr] > 0 and missing[attr] == may[attr]:
-                    logger.info(f"Predict {location2node(self._require_grid_location(upper))} to be {attr}")
-                    setattr(upper, "is_" + attr, True)
-            if carrier_count and upper.may_carrier and missing["carrier"] > 0 and missing["carrier"] == may["carrier"]:
-                logger.info(f"Predict {location2node(self._require_grid_location(upper))} to be enemy")
-                upper.is_enemy = True
 
     def select(self, **kwargs: object) -> SelectedGrids[GridInfo]:
         result = []

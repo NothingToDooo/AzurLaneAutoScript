@@ -2,6 +2,7 @@ import pytest
 
 from module.map import fleet as fleet_module
 from module.map.fleet import Fleet
+from module.map.map_spawn_gap import MapSpawnGapSnapshot, MapSpawnProgress
 
 _Location = tuple[int, int]
 _MaybeLocation = _Location | tuple[()]
@@ -88,9 +89,6 @@ class _Map:
     def to_selected(self, locations: list[_Location]) -> _Selected:
         return _Selected([self.grids[location] for location in locations])
 
-    def missing_get(self, *_args: object, **_kwargs: object) -> tuple[None, dict[str, int]]:
-        return None, self.missing
-
     def grid_covered(self, grid: _Grid, **_kwargs: object) -> _Selected:
         if self.covered_result:
             return self.covered_result
@@ -125,8 +123,18 @@ class _Fleet(Fleet):
         self.fleet_1_location = (0, 0)
         self.fleet_2_location = ()
         self.map.add_grid(self.fleet_1_location)
+        self._spawn_gap_predictor = _SpawnGapPredictor(self.map)
         self.movable_before = _Selected([])
         self.movable_before_normal = _Selected([])
+
+
+class _SpawnGapPredictor(fleet_module.MapSpawnGapPredictor):
+    def __init__(self, map_: _Map) -> None:
+        self._test_map = map_
+
+    def estimate(self, progress: MapSpawnProgress) -> MapSpawnGapSnapshot:
+        del progress
+        return MapSpawnGapSnapshot(possible={}, missing=self._test_map.missing)
 
 
 @pytest.fixture(autouse=True)

@@ -15,6 +15,7 @@ from module.map.assets import MAP_PREPARATION
 from module.map.map_base import CampaignMap, location2node
 from module.map.map_observer import InSightRequest
 from module.map.map_operation import MapOperation
+from module.map.map_spawn_gap import MapSpawnGapPredictor, MapSpawnProgress
 from module.map.map_swipe import STANDARD_MAP_SWIPE_SERVICE, MapSwipeRequest, MapSwipeService
 from module.map.utils import location_ensure, random_direction
 from module.map_detection.grid import Grid
@@ -72,6 +73,7 @@ class Camera(MapOperation):
     _prev_view: View | None = None
     _prev_swipe: Point | None = None
     _map_swipe_service: MapSwipeService = STANDARD_MAP_SWIPE_SERVICE
+    _spawn_gap_predictor: MapSpawnGapPredictor
 
     def _standard_map_swipe(self, vector: Point, *, box: Area) -> bool:
         """按浮点格子向量在 box 坐标区域内滑动，返回相机是否移动。"""
@@ -495,6 +497,13 @@ class Camera(MapOperation):
         """按扫描队列、必扫格子、计数快照和模式扫描整张地图。"""
         if options is None:
             options = FullScanOptions()
+        progress = MapSpawnProgress(
+            battle_count=options.battle_count,
+            mystery_count=options.mystery_count,
+            siren_count=options.siren_count,
+            carrier_count=options.carrier_count,
+            mode=options.mode,
+        )
         logger.info(f"Full scan start, mode={options.mode}")
         self.map.reset_fleet()
 
@@ -503,13 +512,7 @@ class Camera(MapOperation):
             queue = queue.add(options.must_scan)
 
         while len(queue) > 0:
-            if self.map.missing_is_none(
-                options.battle_count,
-                options.mystery_count,
-                options.siren_count,
-                options.carrier_count,
-                options.mode,
-            ):
+            if self._spawn_gap_predictor.scan_complete(progress):
                 if options.must_scan and queue.count != queue.delete(options.must_scan).count:
                     logger.info("Continue scanning.")
                 else:
@@ -526,13 +529,7 @@ class Camera(MapOperation):
 
             queue = queue[1:]
 
-        self.map.missing_predict(
-            options.battle_count,
-            options.mystery_count,
-            options.siren_count,
-            options.carrier_count,
-            options.mode,
-        )
+        self._spawn_gap_predictor.infer_covered_spawns(progress)
         self.map.show()
 
     def in_sight(self, location: GridInfo | str | Point, sight: tuple[int, int, int, int] | None = None) -> None:
