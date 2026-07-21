@@ -522,19 +522,6 @@ def test_minitouch_release_preserves_every_failure_and_clears_local_state() -> N
     assert "_minitouch_builder" not in controller.__dict__
 
 
-def test_release_during_wait_only_releases_capture() -> None:
-    calls: list[str] = []
-    device = object.__new__(Device)
-    vars(device)["_runtime"] = SimpleNamespace(
-        capture=SimpleNamespace(release=lambda: calls.append("capture")),
-        controller=SimpleNamespace(release=lambda: calls.append("controller")),
-    )
-
-    device.release_during_wait()
-
-    assert calls == ["capture"]
-
-
 def test_runtime_rejects_mismatched_service_sessions() -> None:
     session = _DeviceSessionDouble()
     mumu_runtime = _MumuRuntimeDouble(_DeviceSessionDouble())

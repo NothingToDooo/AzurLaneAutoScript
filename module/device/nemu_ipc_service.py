@@ -455,9 +455,6 @@ class NemuIpcCapture:
             del_cached_property(self, "nemu_ipc")
             logger.info("nemu_ipc released")
 
-    def nemu_ipc_release(self) -> None:
-        self.release()
-
     def screenshot_nemu_ipc(self) -> ImageArray:
         source = self.nemu_ipc.screenshot()
         image = np.empty((*source.shape[:2], 3), dtype=np.uint8)

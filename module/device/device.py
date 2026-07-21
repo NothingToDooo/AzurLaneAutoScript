@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
     from module.device.contracts import AppControllerService, CaptureService, ControllerService, MumuRuntimeService
     from module.device.control import ButtonTarget
-    from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase
+    from module.device.platform.emulator_base import EmulatorInstanceBase
 
 
 def show_function_call() -> None:
@@ -53,7 +53,7 @@ def show_function_call() -> None:
     logger.info("Function calls:" + "".join(func_list))
 
 
-class Device(Screenshot, Control, Connection):  # ruff:ignore[too-many-public-methods] - 设备服务门面。
+class Device(Screenshot, Control, Connection):
     stuck_long_wait_list: ClassVar[tuple[str, ...]] = ("BATTLE_STATUS_S", "PAUSE", "LOGIN_CHECK")
 
     def __init__(self, config: AzurLaneConfig) -> None:
@@ -105,10 +105,6 @@ class Device(Screenshot, Control, Connection):  # ruff:ignore[too-many-public-me
         return self.runtime.app_controller
 
     @property
-    def emulator_manager(self) -> EmulatorManagerBase:
-        return self.mumu_runtime.emulator_manager
-
-    @property
     def emulator_instance(self) -> EmulatorInstanceBase | None:
         return self.mumu_runtime.emulator_instance
 
@@ -116,23 +112,8 @@ class Device(Screenshot, Control, Connection):  # ruff:ignore[too-many-public-me
     def emulator_instance(self, value: EmulatorInstanceBase | None) -> None:
         self.mumu_runtime.__dict__["emulator_instance"] = value
 
-    def find_emulator_instance(self, serial: str) -> EmulatorInstanceBase | None:
-        return self.mumu_runtime.find_emulator_instance(serial)
-
     def emulator_start(self) -> bool:
         return self.mumu_runtime.emulator_start()
-
-    def emulator_stop(self) -> bool:
-        return self.mumu_runtime.emulator_stop()
-
-    def emulator_start_watch(self) -> bool:
-        return self.mumu_runtime.emulator_start_watch()
-
-    def check_mumu_app_keep_alive(self) -> bool:
-        return self.mumu_runtime.check_mumu_app_keep_alive()
-
-    def check_mumu_bridge_network(self) -> bool:
-        return self.mumu_runtime.check_mumu_bridge_network()
 
     def _check_after_connected(self) -> None:
         self.mumu_runtime.check_after_connected()
@@ -142,12 +123,6 @@ class Device(Screenshot, Control, Connection):  # ruff:ignore[too-many-public-me
 
     def screenshot_nemu_ipc(self) -> ImageArray:
         return self.capture.screenshot()
-
-    def nemu_ipc_release(self) -> None:
-        self.capture.release()
-
-    def app_current(self) -> str:
-        return self.app_controller.current()
 
     def app_is_running(self) -> bool:
         return self.app_controller.is_running()
@@ -188,9 +163,6 @@ class Device(Screenshot, Control, Connection):  # ruff:ignore[too-many-public-me
             super().screenshot()
 
         return self.image
-
-    def release_during_wait(self) -> None:
-        self.capture.release()
 
     def get_orientation(self) -> int:
         """屏幕方向变化时触发底层回调。"""
@@ -240,20 +212,6 @@ class Device(Screenshot, Control, Connection):  # ruff:ignore[too-many-public-me
 
     def click_record_clear(self) -> None:
         self.click_record.clear()
-
-    def click_record_remove(self, button: ButtonTarget | str) -> int:
-        """移除所有匹配记录并返回移除数量。"""
-        removed = 0
-        maxlen = self.click_record.maxlen
-        limit = maxlen if maxlen is not None else len(self.click_record)
-        for _ in range(limit):
-            try:
-                self.click_record.remove(str(button))
-                removed += 1
-            except ValueError:
-                break
-
-        return removed
 
     def click_record_check(self) -> bool:
         """点击模式异常重复时抛出 GameTooManyClickError。"""
