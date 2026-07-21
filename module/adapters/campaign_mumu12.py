@@ -556,9 +556,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         transition_override = self._map_transition_ui.combat_end_override(self)
         if transition_override is not None:
             return transition_override
-        return CampaignEngine._expected_end(self, expected)  # ruff:ignore[private-member-access] - 固定调用引擎基线。
+        return CampaignEngine.navigation_expected_end(self, expected)
 
-    def _expected_end(self, expected: str) -> CombatEnd | None:
+    def navigation_expected_end(self, expected: str) -> CombatEnd | None:
         behavior = self._hard_behavior
         if behavior is not None:
             return behavior.expected_end(expected)

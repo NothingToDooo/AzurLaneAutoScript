@@ -98,34 +98,35 @@ class CampaignMapView(Protocol):
     def __iter__(self) -> Iterator[CampaignGrid]: ...
 
 
-class CampaignFleetRuntime(Protocol):
-    def clear_chosen_enemy(self, grid: CampaignGrid, expected: str = "") -> object: ...
-
-
-class CampaignMapRuntime(CampaignFleetRuntime, Protocol):
-    map: CampaignMapView
-    battle_count: int
-
+class CampaignNavigation(Protocol):
     @property
-    def fleet_1(self) -> CampaignFleetRuntime: ...
+    def boss_index(self) -> int: ...
 
-    @property
-    def fleet_boss(self) -> CampaignFleetRuntime: ...
+    def activate(self, index: int) -> bool: ...
 
-    @property
-    def fleet_boss_index(self) -> int: ...
+    def activate_boss(self) -> bool: ...
 
-    def full_scan(self) -> object: ...
+    def rebuild_paths(self) -> None: ...
 
-    def find_path_initial(self) -> object: ...
-
-    def read_battle_flag(self, flag: BattleFlag) -> bool: ...
-
-    def brute_find_roadblocks(
+    def find_roadblocks(
         self,
         grid: CampaignGrid,
         fleet: int | None = None,
     ) -> Iterable[CampaignGrid]: ...
+
+
+class CampaignMapRuntime(Protocol):
+    map: CampaignMapView
+    battle_count: int
+
+    @property
+    def navigation(self) -> CampaignNavigation: ...
+
+    def full_scan(self) -> object: ...
+
+    def read_battle_flag(self, flag: BattleFlag) -> bool: ...
+
+    def clear_chosen_enemy(self, grid: CampaignGrid, expected: str = "") -> object: ...
 
 
 class CampaignMapRuntimeSource(Protocol):
@@ -190,7 +191,6 @@ class _SelectedBattle:
     target: CampaignGrid | None
     cleared: BattleTarget
     expected: str
-    executor: CampaignFleetRuntime | None = None
 
 
 class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleIntentDriver):
@@ -220,7 +220,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         cancellation.raise_if_requested()
         runtime.full_scan()
         cancellation.raise_if_requested()
-        runtime.find_path_initial()
+        runtime.navigation.rebuild_paths()
         grids = tuple(runtime.map)
         return BattlefieldObservation(
             battle_index=state.battle_index,
@@ -521,14 +521,10 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     ) -> CampaignMapRuntime:
         cancellation.raise_if_requested()
         runtime = self._runtimes.active_runtime(session, cancellation)
-        for method_name in (
-            "full_scan",
-            "find_path_initial",
-            "clear_chosen_enemy",
-            "brute_find_roadblocks",
-            "read_battle_flag",
-        ):
+        for method_name in ("full_scan", "clear_chosen_enemy", "read_battle_flag"):
             _require_method(runtime, method_name, field_name="campaign map runtime")
+        for method_name in ("activate", "activate_boss", "rebuild_paths", "find_roadblocks"):
+            _require_method(runtime.navigation, method_name, field_name="campaign navigation")
         return runtime
 
     @staticmethod
@@ -577,7 +573,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         if boss is None:
             return NoBattleTarget(attempt)
         cancellation.raise_if_requested()
-        roadblocks = runtime.brute_find_roadblocks(boss, fleet=runtime.fleet_boss_index)
+        roadblocks = runtime.navigation.find_roadblocks(boss, fleet=runtime.navigation.boss_index)
         target = next(
             iter(_ordered(grid for grid in roadblocks if _ordinary_enemy(grid) and grid.is_accessible)),
             None,
@@ -586,12 +582,12 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
             return NoBattleTarget(attempt)
         if strategy is BossStrategy.MAP_SEARCH:
             cancellation.raise_if_requested()
-            executor = runtime.fleet_1
+            runtime.navigation.activate(1)
         elif strategy is BossStrategy.BRUTE_FORCE:
-            executor = runtime
+            pass
         else:
             assert_never(strategy)
-        selected = _SelectedBattle(target, BattleTarget.ENEMY, "", executor)
+        selected = _SelectedBattle(target, BattleTarget.ENEMY, "")
         return self._issue(runtime, attempt, selected, cancellation)
 
     def _clear_boss(
@@ -603,15 +599,15 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     ) -> BattleOutcome:
         cancellation.raise_if_requested()
         if strategy in (BossStrategy.FLEET_BOSS, BossStrategy.BRUTE_FORCE):
-            executor = runtime.fleet_boss
+            runtime.navigation.activate_boss()
         elif strategy is BossStrategy.FLEET_1:
-            executor = runtime.fleet_1
+            runtime.navigation.activate(1)
         elif strategy is BossStrategy.MAP_SEARCH:
-            executor = runtime
+            pass
         else:
             assert_never(strategy)
         target = self._first(runtime, lambda grid: grid.is_boss and grid.is_accessible)
-        selected = _SelectedBattle(target, BattleTarget.BOSS, "boss", executor)
+        selected = _SelectedBattle(target, BattleTarget.BOSS, "boss")
         return self._issue(runtime, attempt, selected, cancellation)
 
     @staticmethod
@@ -623,13 +619,12 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     ) -> BattleOutcome:
         if selected.target is None:
             return NoBattleTarget(attempt)
-        executor = runtime if selected.executor is None else selected.executor
         before = runtime.battle_count
         action_error: Exception | None = None
         interruption: CampaignActionInterrupted | None = None
         try:
             cancellation.raise_if_requested()
-            executor.clear_chosen_enemy(selected.target, expected=selected.expected)
+            runtime.clear_chosen_enemy(selected.target, expected=selected.expected)
         except CampaignActionInterrupted as error:
             interruption = error
         except Exception as error:  # ruff:ignore[blind-except] - battle_count 可证明异常前动作已经完成。

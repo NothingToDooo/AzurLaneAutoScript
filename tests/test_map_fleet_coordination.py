@@ -1,5 +1,7 @@
-from typing import TYPE_CHECKING, override
+import itertools
+from typing import TYPE_CHECKING, Literal, cast, override
 
+from module.map.fleet_navigation import FleetNavigationSnapshot
 from module.map.map import Map
 from module.map.map_grids import RoadGrids, SelectedGrids
 from module.map_detection.grid_info import GridInfo
@@ -7,7 +9,8 @@ from module.map_detection.grid_info import GridInfo
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from module.map.type_alias import GridLocation
+    from module.map.fleet_navigation import FleetNavigationController
+    from module.map.type_alias import FleetLocation, GridLocation
 
 
 class _Config:
@@ -52,49 +55,56 @@ class _MapState:
         return self.layout[location]
 
 
-class _CoordinationCampaign(Map):
-    config: _Config
-    map: _MapState
+class _Navigation:
+    def __init__(self, campaign: _CoordinationCampaign) -> None:
+        self._campaign = campaign
+        self._fleet_1: FleetLocation = (0, 0)
+        self._fleet_2: FleetLocation = (1, 0)
+        self._current_index: Literal[1, 2] = 1
 
-    def __init__(self, grids: list[GridInfo]) -> None:
-        self.config = _Config()
-        self.map = _MapState(grids)
-        self.fleet_current_index = 1
-        self.fleet_1_location: GridLocation = (0, 0)
-        self.fleet_2_location: GridLocation = (1, 0)
-        self.battle_count = 0
-        self.events: list[tuple[object, ...]] = []
-        self.path_projections: list[tuple[int, bool | None]] = []
-        self.rescue_target: GridInfo | None = None
-        self.rescue_blocker: GridInfo | None = None
-        self._base_costs = {grid.location: (grid.cost_1, grid.cost_2) for grid in grids}
-        self._project_paths(record=False)
+    @property
+    def snapshot(self) -> FleetNavigationSnapshot:
+        return FleetNavigationSnapshot(
+            fleet_1=self._fleet_1,
+            fleet_2=self._fleet_2,
+            submarine=(),
+            current_index=self._current_index,
+            shown_index=self._current_index,
+        )
 
-    def _project_paths(self, *, record: bool) -> None:
-        blocker_present = self.rescue_blocker.is_enemy if self.rescue_blocker is not None else None
-        for grid in self.map.layout:
-            cost_1, cost_2 = self._base_costs[grid.location]
-            if grid is self.rescue_target and blocker_present is False:
-                cost_2 = 1
-            grid.cost_1 = cost_1
-            grid.cost_2 = cost_2
-            grid.cost = cost_1 if self.fleet_current_index == 1 else cost_2
-        if record:
-            self.path_projections.append((self.fleet_current_index, blocker_present))
+    @property
+    def current_index(self) -> Literal[1, 2]:
+        return self._current_index
 
-    @override
-    def find_path_initial(self) -> None:
-        self._project_paths(record=True)
+    @property
+    def boss_index(self) -> Literal[1, 2]:
+        return 2
 
-    @override
-    def fleet_ensure(self, index: int) -> bool:
-        changed = index != self.fleet_current_index
-        self.events.append(("activate", index))
-        self.fleet_current_index = index
-        self.find_path_initial()
-        return changed
+    def seed_surface(self, *, fleet_1: FleetLocation, fleet_2: FleetLocation = ()) -> None:
+        self._fleet_1 = fleet_1
+        self._fleet_2 = fleet_2
 
-    @override
+    def record_fleet_2(self, location: GridLocation) -> None:
+        self._fleet_2 = location
+
+    def activate(self, index: int) -> bool:
+        target = self._normalize_index(index)
+        if target == self._current_index:
+            return False
+        self._campaign.events.append(("activate", target))
+        self._current_index = target
+        self.rebuild_paths()
+        return True
+
+    @staticmethod
+    def _normalize_index(index: int | str) -> Literal[1, 2]:
+        if index in {1, "1"}:
+            return 1
+        if index in {2, "2"}:
+            return 2
+        message = f"invalid fleet index: {index}"
+        raise ValueError(message)
+
     def goto(
         self,
         location: GridInfo | str | GridLocation,
@@ -106,20 +116,100 @@ class _CoordinationCampaign(Map):
         del step_optimize, turning_optimize
         assert isinstance(location, GridInfo)
         assert location.location is not None
-        self.events.append(("goto", self.fleet_current_index, location.location, expected))
-        if self.fleet_current_index == 1:
-            self.fleet_1_location = location.location
+        self._campaign.events.append(("goto", self._current_index, location.location, expected))
+        if self._current_index == 1:
+            self._fleet_1 = location.location
         else:
-            self.fleet_2_location = location.location
+            self._fleet_2 = location.location
+
+    def rebuild_paths(self) -> None:
+        self._campaign.project_paths(record=True)
+
+    def is_at(self, grid: GridInfo, fleet: int | None = None) -> bool:
+        index = self._current_index if fleet is None else fleet
+        location = self._fleet_1 if index == 1 else self._fleet_2
+        return location == grid.location
+
+    def is_accessible(self, grid: GridInfo, fleet: int | str | None = None) -> bool:
+        index = self._current_index if fleet is None else self._normalize_index(fleet)
+        backup = self._current_index
+        if index != backup:
+            self._current_index = index
+            self.rebuild_paths()
+        try:
+            return grid.is_accessible
+        finally:
+            if self._current_index != backup:
+                self._current_index = backup
+                self.rebuild_paths()
+
+    def find_roadblocks(self, grid: GridInfo, fleet: int | None = None) -> SelectedGrids[GridInfo]:
+        index = self._current_index if fleet is None else self._normalize_index(fleet)
+        backup = self._current_index
+        if index != backup:
+            self._current_index = index
+            self.rebuild_paths()
+        try:
+            if grid.is_accessible:
+                return SelectedGrids([])
+            enemies = self._campaign.map.layout.select(is_enemy=True)
+            for repeat in range(1, enemies.count + 1):
+                for selection in itertools.combinations(enemies, repeat):
+                    try:
+                        for blocker in selection:
+                            blocker.is_enemy = False
+                        self.rebuild_paths()
+                        accessible = grid.is_accessible
+                    finally:
+                        for blocker in selection:
+                            blocker.is_enemy = True
+                        self.rebuild_paths()
+                    if accessible:
+                        return SelectedGrids(list(selection))
+            return SelectedGrids([])
+        finally:
+            if self._current_index != backup:
+                self._current_index = backup
+                self.rebuild_paths()
+
+
+class _CoordinationCampaign(Map):
+    config: _Config
+    map: _MapState
+
+    def __init__(self, grids: list[GridInfo]) -> None:
+        self.config = _Config()
+        self.map = _MapState(grids)
+        self.battle_count = 0
+        self.events: list[tuple[object, ...]] = []
+        self.path_projections: list[tuple[int, bool | None]] = []
+        self.rescue_target: GridInfo | None = None
+        self.rescue_blocker: GridInfo | None = None
+        self._base_costs = {grid.location: (grid.cost_1, grid.cost_2) for grid in grids}
+        self.navigation = cast("FleetNavigationController", _Navigation(self))
+        self.project_paths(record=False)
+
+    def project_paths(self, *, record: bool) -> None:
+        blocker_present = self.rescue_blocker.is_enemy if self.rescue_blocker is not None else None
+        for grid in self.map.layout:
+            cost_1, cost_2 = self._base_costs[grid.location]
+            if grid is self.rescue_target and blocker_present is False:
+                cost_2 = 1
+            grid.cost_1 = cost_1
+            grid.cost_2 = cost_2
+            grid.cost = cost_1 if self.navigation.current_index == 1 else cost_2
+        if record:
+            self.path_projections.append((self.navigation.current_index, blocker_present))
 
     @override
     def clear_chosen_enemy(self, grid: GridInfo, expected: str = "") -> bool:
         assert grid.location is not None
-        self.events.append(("clear", self.fleet_current_index, grid.location, expected))
-        if self.fleet_current_index == 1:
-            self.fleet_1_location = grid.location
+        current_index = self.navigation.current_index
+        self.events.append(("clear", current_index, grid.location, expected))
+        if current_index == 1:
+            self.navigation.seed_surface(fleet_1=grid.location, fleet_2=self.navigation.snapshot.fleet_2)
         else:
-            self.fleet_2_location = grid.location
+            self.navigation.record_fleet_2(grid.location)
         grid.is_enemy = False
         grid.is_siren = False
         grid.is_boss = False
@@ -135,7 +225,7 @@ class _CoordinationCampaign(Map):
         skip_first_update: bool = True,
     ) -> list[GridLocation]:
         del reverse, preset, swipe_limit, skip_first_update
-        self.events.append(("ensure_edge_insight", self.fleet_current_index))
+        self.events.append(("ensure_edge_insight", self.navigation.current_index))
         return []
 
 
@@ -175,8 +265,8 @@ def test_step_on_uses_fleet_2_path_and_move_then_restores_fleet_1() -> None:
         ("goto", 2, (2, 0), ""),
         ("activate", 1),
     ]
-    assert campaign.fleet_2_location == (2, 0)
-    assert campaign.fleet_current_index == 1
+    assert campaign.navigation.snapshot.fleet_2 == (2, 0)
+    assert campaign.navigation.current_index == 1
 
 
 def test_step_on_uses_fleet_1_to_clear_a_blocked_fleet_2_route() -> None:
@@ -193,7 +283,7 @@ def test_step_on_uses_fleet_1_to_clear_a_blocked_fleet_2_route() -> None:
     assert applied
     assert campaign.path_projections == [(2, None), (1, None)]
     assert campaign.events == [("clear", 1, (3, 0), "")]
-    assert campaign.fleet_current_index == 1
+    assert campaign.navigation.current_index == 1
 
 
 def test_break_siren_caught_clears_with_fleet_2_then_restores_fleet_1() -> None:
@@ -213,7 +303,7 @@ def test_break_siren_caught_clears_with_fleet_2_then_restores_fleet_1() -> None:
         ("activate", 1),
     ]
     assert not caught.is_caught_by_siren
-    assert campaign.fleet_current_index == 1
+    assert campaign.navigation.current_index == 1
 
 
 def test_rescue_finds_the_fleet_2_blocker_but_clears_it_with_fleet_1() -> None:
@@ -236,7 +326,7 @@ def test_rescue_finds_the_fleet_2_blocker_but_clears_it_with_fleet_1() -> None:
         (1, True),
     ]
     assert campaign.events == [("clear", 1, (2, 0), "")]
-    assert campaign.fleet_current_index == 1
+    assert campaign.navigation.current_index == 1
 
 
 def test_protect_selects_by_fleet_2_cost_but_clears_with_active_fleet_1() -> None:
@@ -252,4 +342,4 @@ def test_protect_selects_by_fleet_2_cost_but_clears_with_active_fleet_1() -> Non
 
     assert applied
     assert campaign.events == [("clear", 1, (2, 0), "siren")]
-    assert campaign.fleet_current_index == 1
+    assert campaign.navigation.current_index == 1

@@ -37,6 +37,10 @@ class _StrategyView(Protocol):
     def update(self, image: ImageArray) -> None: ...
 
 
+class _StrategyNavigation(Protocol):
+    def rebuild_paths(self) -> None: ...
+
+
 class Mumu12StrategyRuntime(Protocol):
     @property
     def map(self) -> _StrategyMap: ...
@@ -49,6 +53,9 @@ class Mumu12StrategyRuntime(Protocol):
 
     @property
     def view(self) -> _StrategyView: ...
+
+    @property
+    def navigation(self) -> _StrategyNavigation: ...
 
     def strategy_open(self) -> None: ...
 
@@ -77,8 +84,6 @@ class Mumu12StrategyRuntime(Protocol):
     def appear(self, button: Button, *, offset: tuple[int, int]) -> bool: ...
 
     def handle_popup_confirm(self, name: str, /) -> bool: ...
-
-    def find_path_initial(self) -> None: ...
 
 
 class Mumu12StrategyActionDriver:
@@ -180,7 +185,7 @@ class Mumu12StrategyActionDriver:
         target_grid.is_enemy = True
         target_grid.may_enemy = True
         source_grid.is_enemy = False
-        self._runtime.find_path_initial()
+        self._runtime.navigation.rebuild_paths()
 
     def _select_air_strike_target(self, grid: Grid, cancellation: CancellationSource) -> None:
         interval = Timer(5, count=10)

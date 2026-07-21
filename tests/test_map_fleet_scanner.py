@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
 from module.map.fleet import Fleet
+from module.map.fleet_navigation import FleetNavigationSnapshot
 from module.map.map_base import CampaignMap
 from module.map.map_grids import SelectedGrids
 from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
@@ -69,6 +70,29 @@ class _RecordingMovableTracker(MovableEnemyTracker):
         self.calls.append((runtime, request, siren))
 
 
+class _Navigation:
+    def __init__(self, fleet_1: tuple[int, int], fleet_2: tuple[int, int] | tuple[()] = ()) -> None:
+        self._fleet_1 = fleet_1
+        self._fleet_2 = fleet_2
+
+    @property
+    def current_location(self) -> tuple[int, int]:
+        return self._fleet_1
+
+    @property
+    def snapshot(self) -> FleetNavigationSnapshot:
+        return FleetNavigationSnapshot(
+            fleet_1=self._fleet_1,
+            fleet_2=self._fleet_2,
+            submarine=(),
+            current_index=1,
+            shown_index=1,
+        )
+
+    def record_fleet_2(self, location: tuple[int, int]) -> None:
+        self._fleet_2 = location
+
+
 class _NestedFullScanFleet(Fleet):
     def __init__(self) -> None:
         self.map = CampaignMap("nested-full-scan-test")
@@ -82,14 +106,12 @@ class _NestedFullScanFleet(Fleet):
         self.scan_requests.append(request)
 
 
-class _StandardFullScanFleet(Fleet):
+class _StandardFullScanFleet:
     def __init__(self) -> None:
         self.map = CampaignMap("standard-full-scan-test")
         self.map.map_data = "ME MS"
         self.map_scanner_rules = MapScannerRules(decoy_enemy=True, fleet_2_enabled=True)
-        self.fleet_current_index = 1
-        self.fleet_1_location = (0, 0)
-        self.fleet_2_location = ()
+        self.navigation = _Navigation((0, 0))
         self.map[(0, 0)].is_fleet = True
         self.map[(0, 0)].is_current_fleet = True
         self.map[(0, 0)].is_enemy = True
@@ -171,10 +193,10 @@ def test_standard_full_scan_uses_effective_decoy_request_and_refreshes_fleet_pro
         )
     )
 
-    scanner.full_scan(fleet, request)
+    scanner.full_scan(cast("MapScannerRuntime", fleet), request)
 
     assert request.progress.mode == "normal"
     assert calls == [(fleet, request.with_mode("decoy"))]
-    assert fleet.fleet_2_location == (1, 0)
+    assert fleet.navigation.snapshot.fleet_2 == (1, 0)
     assert fleet.map[(0, 0)].is_enemy is False
     assert fleet.map[(1, 0)].is_siren is False

@@ -8,9 +8,10 @@ from module.map.map_spawn_gap import MapSpawnProgress
 from module.map.utils import location_ensure, match_movable
 
 if TYPE_CHECKING:
+    from module.map.fleet_navigation import FleetNavigationSnapshot
     from module.map.map_base import CampaignMap
     from module.map.map_spawn_gap import MapSpawnGapPredictor
-    from module.map.type_alias import FleetLocation, GridLocation, GridMode
+    from module.map.type_alias import GridLocation, GridMode
     from module.map_detection.grid_info import GridInfo
     from module.map_detection.view import View
 
@@ -76,14 +77,22 @@ class FullScanContext(Protocol):
     def ensure_edge_insight(self, *, skip_first_update: bool = True) -> list[GridLocation]: ...
 
 
+class ScannerFleetNavigation(Protocol):
+    @property
+    def snapshot(self) -> FleetNavigationSnapshot: ...
+
+    @property
+    def current_location(self) -> GridLocation: ...
+
+    def record_fleet_2(self, location: GridLocation) -> None: ...
+
+
 class MovableTrackerContext(Protocol):
     map: CampaignMap
     map_spawn_gap_predictor: MapSpawnGapPredictor
-    fleet_1_location: FleetLocation
-    fleet_2_location: FleetLocation
 
     @property
-    def fleet_current(self) -> FleetLocation: ...
+    def navigation(self) -> ScannerFleetNavigation: ...
 
 
 class MapScannerRuntime(FullScanContext, MovableTrackerContext, Protocol):
@@ -148,7 +157,7 @@ class MovableEnemyTracker:
             before=self._locations(before),
             spawn=self._locations(spawn),
             after=self._locations(after),
-            fleets=[self._require_fleet_location(runtime.fleet_current)] if request.enemy_cleared else [],
+            fleets=[runtime.navigation.current_location] if request.enemy_cleared else [],
             fleet_step=step,
         )
         matched_before_grids = runtime.map.layout.to_selected(matched_before)
@@ -170,18 +179,11 @@ class MovableEnemyTracker:
         elif missing == 0:
             logger.info(f"Movable enemy tracking drop: {diff}")
 
-        self._mark_matched(matched_after_grids, current=runtime.fleet_current)
+        self._mark_matched(matched_after_grids, current=runtime.navigation.current_location)
 
     @staticmethod
     def _locations(grids: SelectedGrids[GridInfo]) -> list[GridLocation]:
         return [location_ensure(grid) for grid in grids]
-
-    @staticmethod
-    def _require_fleet_location(location: FleetLocation) -> GridLocation:
-        if len(location) != 2:
-            msg = "舰队缺少地图位置"
-            raise RuntimeError(msg)
-        return location
 
     @staticmethod
     def _context(
@@ -241,15 +243,17 @@ class MovableEnemyTracker:
         after: SelectedGrids[GridInfo],
         siren: bool,
     ) -> SelectedGrids[GridInfo]:
-        current = MovableEnemyTracker._require_fleet_location(runtime.fleet_current)
+        navigation = runtime.navigation
+        current = navigation.current_location
+        surface = navigation.snapshot
         layout = runtime.map.layout
         covered = layout.covered_by(layout[current], offsets=[(0, -2)])
-        for location in (runtime.fleet_1_location, runtime.fleet_2_location):
+        for location in (surface.fleet_1, surface.fleet_2):
             if location:
                 covered = covered.add(layout.covered_by(layout[location], offsets=[(0, -1)]))
 
         if request.rules.normal_enemy and not request.rules.enemy_template:
-            for location in (runtime.fleet_1_location, runtime.fleet_2_location):
+            for location in (surface.fleet_1, surface.fleet_2):
                 if location:
                     covered = covered.add(layout.covered_by(layout[location], offsets=[(1, 0)]))
 
@@ -273,7 +277,7 @@ class MovableEnemyTracker:
         def restore_projection() -> None:
             if request.rules.wall:
                 runtime.map.topology.rebuild(wall=True, portal=request.rules.portal)
-            runtime.map.pathfinder.project(runtime.fleet_current, has_ambush=request.rules.ambush)
+            runtime.map.pathfinder.project(runtime.navigation.current_location, has_ambush=request.rules.ambush)
 
         with cleanup_scope(
             restore_projection,
@@ -298,7 +302,7 @@ class MovableEnemyTracker:
             grid.is_enemy = True
 
     @staticmethod
-    def _mark_matched(matched_after: SelectedGrids[GridInfo], *, current: FleetLocation) -> None:
+    def _mark_matched(matched_after: SelectedGrids[GridInfo], *, current: GridLocation) -> None:
         for grid in matched_after:
             if grid.location != current:
                 grid.is_movable = True
@@ -355,13 +359,16 @@ class StandardCampaignMapScanner:
 
     @staticmethod
     def _refresh_fleet_projection(runtime: MapScannerRuntime) -> None:
-        if runtime.map_scanner_rules.fleet_2_enabled and not runtime.fleet_2_location:
+        navigation = runtime.navigation
+        surface = navigation.snapshot
+        if runtime.map_scanner_rules.fleet_2_enabled and not surface.fleet_2:
             fleets = runtime.map.layout.select(is_fleet=True, is_current_fleet=False)
             if fleets.count:
                 logger.info(f"Predict fleet_2 to be {fleets[0]}")
-                runtime.fleet_2_location = location_ensure(fleets[0])
+                navigation.record_fleet_2(location_ensure(fleets[0]))
+                surface = navigation.snapshot
 
-        for location in (runtime.fleet_1_location, runtime.fleet_2_location):
+        for location in (surface.fleet_1, surface.fleet_2):
             if location and location in runtime.map:
                 grid = runtime.map[location]
                 if grid.may_boss and grid.is_caught_by_siren:

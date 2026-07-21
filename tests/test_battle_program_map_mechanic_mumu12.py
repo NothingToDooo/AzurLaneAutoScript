@@ -51,15 +51,26 @@ class _Layout:
         return SelectedGrids(selected)
 
 
+class _Navigation:
+    def __init__(self, runtime: _Runtime) -> None:
+        self._runtime = runtime
+
+    def rebuild_paths(self) -> None:
+        self._runtime.events.append("rebuild_paths")
+        if self._runtime.rebuild_paths_error is not None:
+            raise self._runtime.rebuild_paths_error
+
+
 class _Runtime:
     def __init__(self, grids: list[GridInfo]) -> None:
         self.events: list[object] = []
         self.map = _Map(grids)
         self.cancellation: _Cancellation | None = None
         self.full_scan_error: BaseException | None = None
-        self.find_path_error: BaseException | None = None
+        self.rebuild_paths_error: BaseException | None = None
         self.bouncing_error: BaseException | None = None
         self.bouncing_result = False
+        self.navigation = _Navigation(self)
 
     def clear_mechanism(self, grids: SelectedGrids[GridInfo] | None = None) -> bool:
         candidates = (
@@ -79,11 +90,6 @@ class _Runtime:
         self.events.append("full_scan")
         if self.full_scan_error is not None:
             raise self.full_scan_error
-
-    def find_path_initial(self) -> None:
-        self.events.append("find_path_initial")
-        if self.find_path_error is not None:
-            raise self.find_path_error
 
     def clear_bouncing_enemy(self) -> bool:
         self.events.append("clear_bouncing_enemy")
@@ -119,12 +125,12 @@ def test_triggers_each_requested_mechanism_and_refreshes_its_projection() -> Non
         "cancellation",
         ("clear_mechanism", [(0, 0), (1, 0)]),
         "full_scan",
-        "find_path_initial",
+        "rebuild_paths",
         "cancellation",
         "cancellation",
         ("clear_mechanism", [(1, 0)]),
         "full_scan",
-        "find_path_initial",
+        "rebuild_paths",
         "cancellation",
     ]
 
@@ -144,19 +150,19 @@ def test_cancellation_after_mechanism_commit_waits_for_projection_refresh() -> N
         "cancellation",
         ("clear_mechanism", [(0, 0)]),
         "full_scan",
-        "find_path_initial",
+        "rebuild_paths",
         "cancellation",
     ]
 
 
-@pytest.mark.parametrize("failure_stage", ["full_scan", "find_path_initial"])
+@pytest.mark.parametrize("failure_stage", ["full_scan", "rebuild_paths"])
 def test_mechanism_refresh_failure_is_not_reported_as_success(failure_stage: str) -> None:
     runtime = _Runtime([_grid(A1, mechanism=True)])
     error = RuntimeError(f"{failure_stage} failed")
     if failure_stage == "full_scan":
         runtime.full_scan_error = error
     else:
-        runtime.find_path_error = error
+        runtime.rebuild_paths_error = error
 
     with pytest.raises(RuntimeError, match=f"{failure_stage} failed") as raised:
         _driver(runtime).trigger_mechanisms((A1,), _cancellation(runtime))
@@ -178,7 +184,7 @@ def test_mechanism_refresh_failure_is_not_reported_as_success(failure_stage: str
             "cancellation",
             ("clear_mechanism", [(0, 0)]),
             "full_scan",
-            "find_path_initial",
+            "rebuild_paths",
         ]
 
 

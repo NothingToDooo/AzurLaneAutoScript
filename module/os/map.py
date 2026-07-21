@@ -266,7 +266,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 logger.info("No EMP debuff on current fleet")
                 return trial > 0
 
-            current = self.get_fleet_current_index()
+            current = self._active_hp_fleet_index()
             logger.hr(f"Solve EMP debuff on fleet {current}")
             self.globe_goto(self.zone_nearest_azur_port(self.zone))
 

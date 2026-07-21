@@ -1,16 +1,16 @@
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
-import module.map.fleet as fleet_module
 from module.map.fleet import Fleet
+from module.map.fleet_navigation_ui import CampaignFleetMovementUi
 from module.map.fleet_turn import FleetTurnController, FleetTurnRules
 from module.map.map_base import CampaignMap
 from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
-from module.map.map_scanner import MovableEnemySnapshot
 from module.map_detection.grid import Grid
 
 if TYPE_CHECKING:
     from module.base.type_alias import Point
     from module.combat.combat import CombatEnd
+    from module.map.fleet_navigation import FleetNavigationController
     from module.map.map_observer import MapObserverRuntime
     from module.map.type_alias import GridLocation
     from module.map_detection.grid_info import GridInfo
@@ -60,6 +60,11 @@ class _RecordingObserver:
         return False
 
 
+class _Navigation:
+    current_index = 1
+    shown_index = 1
+
+
 class _CombatFleet(Fleet):
     config: _Config
 
@@ -73,7 +78,8 @@ class _CombatFleet(Fleet):
         self.battle_count = 0
         self.fleet_ammo = 5
         self.siren_count = 0
-        self._hp = {self.fleet_current_index: [1.0]}
+        self.navigation = cast("FleetNavigationController", _Navigation())
+        self._hp = {1: [1.0]}
 
     @override
     def combat_appear(self) -> bool:
@@ -105,17 +111,8 @@ class _CombatFleet(Fleet):
         return _LocalGrid()
 
     def run_combat_at(self, location: GridLocation) -> None:
-        state = self._goto_state(
-            fleet_module._GotoRequest(  # ruff:ignore[private-member-access] - 构造真实导航状态以测试战斗观测顺序。
-                location=location,
-                expected="combat",
-                portal_destination=None,
-                may_submarine_icon=False,
-                movable_snapshot=MovableEnemySnapshot(),
-            ),
-            _LocalGrid(),
-        )
-        self._goto_handle_combat(state)
+        outcome = CampaignFleetMovementUi(self, self._map_observer).navigation_handle_combat("combat", location)
+        assert outcome is not None
 
 
 def test_combat_observer_receives_and_mutates_the_exact_destination_grid() -> None:

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import pytest
 
 from module.adapters.battle_program_fleet_mumu12 import Mumu12FleetActionDriver
@@ -15,30 +17,48 @@ class _Cancellation:
         pass
 
 
+@dataclass(frozen=True, slots=True)
+class _NavigationSnapshot:
+    fleet_1: tuple[int, int] | tuple[()]
+    fleet_2: tuple[int, int] | tuple[()]
+    current_index: int
+
+
+class _Navigation:
+    def __init__(self, runtime: _Runtime) -> None:
+        self._runtime = runtime
+        self.fleet_1: tuple[int, int] | tuple[()] = (1, 0)
+        self.fleet_2: tuple[int, int] | tuple[()] = (2, 0)
+        self.current_index = 1
+
+    @property
+    def snapshot(self) -> _NavigationSnapshot:
+        return _NavigationSnapshot(self.fleet_1, self.fleet_2, self.current_index)
+
+    def activate(self, index: int) -> bool:
+        changed = self.current_index != index
+        self.current_index = index
+        return changed
+
+    def goto(self, _grid: GridInfo, expected: str = "") -> None:
+        self._runtime.events.append(("move", expected))
+        location = self._runtime.goto_locations.pop(0) if self._runtime.goto_locations else (0, 0)
+        if self.current_index == 1:
+            self.fleet_1 = location
+        else:
+            self.fleet_2 = location
+
+
 class _Runtime:
     def __init__(self) -> None:
         self.map = {(0, 0): GridInfo()}
-        self.fleet_current_index = 1
-        self.fleet_1_location = (1, 0)
-        self.fleet_2_location = (2, 0)
         self.goto_locations: list[tuple[int, int]] = []
         self.events: list[tuple[str, object]] = []
-
-    def fleet_ensure(self, fleet: int) -> bool:
-        self.fleet_current_index = fleet
-        return True
+        self.navigation = _Navigation(self)
 
     def clear_chosen_enemy(self, _grid: GridInfo, expected: str = "") -> bool:
         self.events.append(("clear", expected))
         return True
-
-    def goto(self, _grid: GridInfo, expected: str = "") -> None:
-        self.events.append(("move", expected))
-        location = self.goto_locations.pop(0) if self.goto_locations else (0, 0)
-        if self.fleet_current_index == 1:
-            self.fleet_1_location = location
-        else:
-            self.fleet_2_location = location
 
     def pick_up_ammo(self, _grid: GridInfo) -> bool:
         self.events.append(("pickup_ammo", None))
@@ -84,7 +104,7 @@ def test_fortress_move_uses_the_runtime_combat_fortress_expectation() -> None:
 
 def test_move_is_idempotent_when_the_fleet_is_already_at_destination() -> None:
     runtime = _Runtime()
-    runtime.fleet_1_location = (A1.x, A1.y)
+    runtime.navigation.fleet_1 = (A1.x, A1.y)
     driver = Mumu12FleetActionDriver(runtime)
 
     moved = driver.move(

@@ -16,12 +16,13 @@ from module.handler.mystery_item import (
     MysteryKind,
     MysteryResult,
 )
-from module.map.fleet import Fleet
+from module.map.fleet_navigation_ui import CampaignFleetMovementUi
+from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER
 from module.os.fleet import OSFleet
 
 if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
-    from module.map.fleet import _GotoState
+    from module.map.fleet import Fleet
     from module.map_detection.grid import Grid
 
 
@@ -166,18 +167,15 @@ def test_fleet_records_handled_mystery_but_only_increments_count_when_requested(
         handled_buttons.append(button)
         return result
 
-    fleet = SimpleNamespace(mystery_count=4, handle_mystery=handle_mystery)
-    state = SimpleNamespace(grid=object(), result="nothing", result_mystery="")
+    runtime = SimpleNamespace(mystery_count=4, handle_mystery=handle_mystery)
+    movement = CampaignFleetMovementUi(cast("Fleet", runtime), STANDARD_CAMPAIGN_MAP_OBSERVER)
+    grid = cast("Grid", object())
 
-    Fleet._goto_handle_mystery(  # ruff:ignore[private-member-access] - isolates state transition
-        cast("Fleet", fleet),
-        cast("_GotoState", state),
-    )
+    kind = movement.navigation_handle_mystery(grid)
 
-    assert handled_buttons == [state.grid]
-    assert fleet.mystery_count == expected_count
-    assert state.result == "mystery"
-    assert state.result_mystery == "get_item"
+    assert handled_buttons == [grid]
+    assert runtime.mystery_count == expected_count
+    assert kind == "get_item"
 
 
 @pytest.mark.parametrize(

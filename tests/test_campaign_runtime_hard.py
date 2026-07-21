@@ -80,12 +80,9 @@ class _Config:
             setattr(self, name, value)
 
 
-class _Runtime:
-    def __init__(self, map_: _Map | None = None) -> None:
-        self.config = _Config()
-        self.map = _Map() if map_ is None else map_
+class _Navigation:
+    def __init__(self) -> None:
         self.goto_calls: list[tuple[object, str, bool | None, bool | None]] = []
-        self.potential_boss_calls = 0
 
     def goto(
         self,
@@ -96,6 +93,14 @@ class _Runtime:
         turning_optimize: bool | None = None,
     ) -> None:
         self.goto_calls.append((location, expected, step_optimize, turning_optimize))
+
+
+class _Runtime:
+    def __init__(self, map_: _Map | None = None) -> None:
+        self.config = _Config()
+        self.map = _Map() if map_ is None else map_
+        self.navigation = _Navigation()
+        self.potential_boss_calls = 0
 
     def clear_potential_boss(self) -> bool:
         self.potential_boss_calls += 1
@@ -183,7 +188,7 @@ def test_clear_boss_combines_candidates_and_chooses_lowest_weight_then_cost() ->
     with pytest.raises(CampaignEnd, match=r"BOSS Clear\."):
         _executor(_manager()).clear_boss(runtime)
 
-    assert runtime.goto_calls == [(possible, "boss", False, False)]
+    assert runtime.navigation.goto_calls == [(possible, "boss", False, False)]
     assert runtime.potential_boss_calls == 0
 
 
@@ -193,7 +198,7 @@ def test_clear_boss_falls_back_to_all_spawn_points() -> None:
     result = _executor(_manager()).clear_boss(runtime)
 
     assert result is False
-    assert runtime.goto_calls == []
+    assert runtime.navigation.goto_calls == []
     assert runtime.potential_boss_calls == 1
 
 

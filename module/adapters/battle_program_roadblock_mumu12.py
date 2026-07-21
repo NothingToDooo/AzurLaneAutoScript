@@ -24,15 +24,20 @@ class _RoadblockMap(Protocol):
     def __getitem__(self, item: tuple[int, int], /) -> GridInfo: ...
 
 
-class Mumu12RoadblockRuntime(Protocol):
-    @property
-    def map(self) -> _RoadblockMap: ...
-
-    def brute_find_roadblocks(
+class _RoadblockNavigation(Protocol):
+    def find_roadblocks(
         self,
         grid: GridInfo,
         fleet: int | None = None,
     ) -> SelectedGrids[GridInfo]: ...
+
+
+class Mumu12RoadblockRuntime(Protocol):
+    @property
+    def map(self) -> _RoadblockMap: ...
+
+    @property
+    def navigation(self) -> _RoadblockNavigation: ...
 
 
 class _RoadblockReadModel(Protocol):
@@ -61,7 +66,7 @@ class Mumu12RoadblockPlanner:
         cancellation.raise_if_requested()
         target_grid = self._grid(target)
         cancellation.raise_if_requested()
-        blockers = self._runtime.brute_find_roadblocks(target_grid, fleet=path_fleet)
+        blockers = self._runtime.navigation.find_roadblocks(target_grid, fleet=path_fleet)
 
         cells: list[CellId] = []
         seen: set[CellId] = set()

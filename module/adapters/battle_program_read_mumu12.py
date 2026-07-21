@@ -87,6 +87,28 @@ class _ProgramMap(Protocol):
     def __iter__(self) -> Iterator[_ProgramGrid]: ...
 
 
+class _ProgramNavigationSnapshot(Protocol):
+    @property
+    def fleet_1(self) -> tuple[int, int] | tuple[()]: ...
+
+    @property
+    def fleet_2(self) -> tuple[int, int] | tuple[()]: ...
+
+    @property
+    def current_index(self) -> int: ...
+
+
+class _ProgramNavigation(Protocol):
+    @property
+    def snapshot(self) -> _ProgramNavigationSnapshot: ...
+
+    @property
+    def fleet_step(self) -> int: ...
+
+    @property
+    def boss_index(self) -> int: ...
+
+
 class Mumu12ProgramReadSource(Protocol):
     """从当前引擎读取 BattleProgram 所需事实的最小表面。"""
 
@@ -106,25 +128,13 @@ class Mumu12ProgramReadSource(Protocol):
     def battle_count(self) -> int: ...
 
     @property
-    def fleet_step(self) -> int: ...
+    def navigation(self) -> _ProgramNavigation: ...
 
     @property
     def mystery_count(self) -> int: ...
 
     @property
-    def fleet_boss_index(self) -> int: ...
-
-    @property
     def configured_boss_fleet(self) -> int: ...
-
-    @property
-    def fleet_current_index(self) -> int: ...
-
-    @property
-    def fleet_1_location(self) -> tuple[int, int] | tuple[()] | None: ...
-
-    @property
-    def fleet_2_location(self) -> tuple[int, int] | tuple[()] | None: ...
 
 
 class BattleProgramReadModel(Protocol):
@@ -379,6 +389,8 @@ class Mumu12BattleProgramReadModel:
     def status(self, cancellation: CancellationSource) -> ProgramStatusSnapshot:
         cancellation.raise_if_requested()
         source = self._source
+        navigation = source.navigation
+        navigation_snapshot = navigation.snapshot
         single_fleet_override = self._program_state.use_single_fleet_override(cancellation)
         if single_fleet_override is not None and type(single_fleet_override) is not bool:
             message = "runtime program state use_single_fleet_override() must return bool or None"
@@ -412,13 +424,13 @@ class Mumu12BattleProgramReadModel:
         return ProgramStatusSnapshot(
             frozenset(flags),
             self._integer(source.battle_count, "battle_count"),
-            self._integer(source.fleet_step, "fleet_step"),
+            self._integer(navigation.fleet_step, "navigation.fleet_step"),
             self._integer(source.mystery_count, "mystery_count"),
-            self._fleet_index(source.fleet_boss_index, "fleet_boss_index"),
+            self._fleet_index(navigation.boss_index, "navigation.boss_index"),
             self._fleet_index(source.configured_boss_fleet, "configured_boss_fleet"),
-            self._fleet_index(source.fleet_current_index, "fleet_current_index"),
-            self._location(source.fleet_1_location, "fleet_1_location"),
-            self._location(source.fleet_2_location, "fleet_2_location"),
+            self._fleet_index(navigation_snapshot.current_index, "navigation.snapshot.current_index"),
+            self._location(navigation_snapshot.fleet_1, "navigation.snapshot.fleet_1"),
+            self._location(navigation_snapshot.fleet_2, "navigation.snapshot.fleet_2"),
         )
 
     @staticmethod
@@ -474,7 +486,10 @@ class Mumu12BattleProgramReadModel:
             raise BattleProgramMumu12AdapterError(message)
         cancellation.raise_if_requested()
         return ProgramBattleSelectionContext(
-            executor_fleet=self._fleet_index(source.fleet_current_index, "fleet_current_index"),
+            executor_fleet=self._fleet_index(
+                source.navigation.snapshot.current_index,
+                "navigation.snapshot.current_index",
+            ),
             enemy_priority=enemy_priority,
             clear_all=clear_all,
             movable_normal_enemy=movable_normal_enemy,

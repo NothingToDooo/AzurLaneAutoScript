@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from module.adapters.battle_program_read_mumu12 import (
@@ -57,12 +57,26 @@ class _Definition:
     enemy_filter: str = "1L > 1M"
 
 
+@dataclass(frozen=True, slots=True)
+class _NavigationSnapshot:
+    fleet_1: tuple[int, int] | tuple[()] = (0, 0)
+    fleet_2: tuple[int, int] | tuple[()] = (1, 0)
+    current_index: int = 2
+
+
+@dataclass(slots=True)
+class _Navigation:
+    snapshot: _NavigationSnapshot = field(default_factory=_NavigationSnapshot)
+    fleet_step: int = 0
+    boss_index: int = 1
+
+
 @dataclass(slots=True)
 class _Source:
     map: tuple[_Grid, ...]
     config: _Config
     definition: _Definition
-    fleet_current_index: int = 2
+    navigation: _Navigation = field(default_factory=_Navigation)
 
 
 def _read_model(grid: _Grid) -> Mumu12BattleProgramReadModel:

@@ -1,9 +1,12 @@
 from dataclasses import dataclass
-from typing import override
+from typing import TYPE_CHECKING, cast, override
 
 from module.map.map import Map
 from module.map.map_grids import SelectedGrids
 from module.map_detection.grid_info import GridInfo
+
+if TYPE_CHECKING:
+    from module.map.fleet_navigation import FleetNavigationController
 
 
 @dataclass(slots=True)
@@ -45,6 +48,15 @@ class _MapState:
         self.layout = _MapLayout(grids)
 
 
+class _Navigation:
+    def __init__(self, events: list[tuple[str, ...]]) -> None:
+        self._events = events
+
+    def activate_boss(self) -> bool:
+        self._events.append(("activate_boss",))
+        return True
+
+
 class _Campaign(Map):
     map: _MapState
 
@@ -53,16 +65,14 @@ class _Campaign(Map):
         self.successful_grid = successful_grid
         self.battle_count = 0
         self.attempts: list[tuple[str, str]] = []
-
-    @property
-    @override
-    def fleet_boss(self) -> _Campaign:
-        return self
+        self.events: list[tuple[str, ...]] = []
+        self.navigation = cast("FleetNavigationController", _Navigation(self.events))
 
     @override
     def clear_chosen_enemy(self, grid: GridInfo, expected: str = "") -> bool:
         assert isinstance(grid, _Grid)
         self.attempts.append((grid.name, expected))
+        self.events.append(("clear", grid.name, expected))
         if grid is self.successful_grid:
             self.battle_count += 1
             return True
@@ -77,6 +87,7 @@ def test_clear_potential_boss_sorts_once_before_trying_candidates() -> None:
     assert campaign.clear_potential_boss() is True
 
     assert campaign.attempts == [("wrong", ""), ("correct", "")]
+    assert campaign.events == [("activate_boss",), ("clear", "wrong", ""), ("clear", "correct", "")]
     assert campaign.battle_count == 1
     assert campaign.map.layout.sort_calls == [("weight", "cost")]
 
@@ -88,4 +99,5 @@ def test_clear_potential_boss_expects_boss_for_single_candidate() -> None:
     assert campaign.clear_potential_boss() is True
 
     assert campaign.attempts == [("boss", "boss")]
+    assert campaign.events == [("activate_boss",), ("clear", "boss", "boss")]
     assert campaign.battle_count == 1

@@ -21,6 +21,10 @@ class _MapMechanicMap(Protocol):
     def layout(self) -> _MapMechanicLayout: ...
 
 
+class _MapMechanicNavigation(Protocol):
+    def rebuild_paths(self) -> None: ...
+
+
 class Mumu12MapMechanicRuntime(Protocol):
     @property
     def map(self) -> _MapMechanicMap: ...
@@ -29,7 +33,8 @@ class Mumu12MapMechanicRuntime(Protocol):
 
     def full_scan(self) -> None: ...
 
-    def find_path_initial(self) -> None: ...
+    @property
+    def navigation(self) -> _MapMechanicNavigation: ...
 
     def clear_bouncing_enemy(self) -> bool: ...
 
@@ -58,7 +63,7 @@ class Mumu12MapMechanicDriver:
                 applied = True
                 # 游戏内动作已经提交，必须先把本地地图推进到一致状态，再响应取消。
                 self._runtime.full_scan()
-                self._runtime.find_path_initial()
+                self._runtime.navigation.rebuild_paths()
                 cancellation.raise_if_requested()
                 continue
             return applied or changed

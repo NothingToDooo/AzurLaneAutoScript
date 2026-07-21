@@ -60,6 +60,14 @@ class _Device:
         self.calls.append(("sleep", seconds))
 
 
+class _Navigation:
+    def __init__(self, calls: list[str]) -> None:
+        self._calls = calls
+
+    def rebuild_paths(self) -> None:
+        self._calls.append("rebuild_paths")
+
+
 class _Runtime:
     def __init__(
         self,
@@ -77,6 +85,7 @@ class _Runtime:
         self.ends_campaign = ends_campaign
         self.running = list(running)
         self.calls: list[str] = []
+        self.navigation = _Navigation(self.calls)
 
     def auto_search_execute_a_battle(self) -> None:
         self.calls.append("execute")
@@ -93,9 +102,6 @@ class _Runtime:
 
     def full_scan(self) -> None:
         self.calls.append("full_scan")
-
-    def find_path_initial(self) -> None:
-        self.calls.append("find_path_initial")
 
 
 class _UnitSource:
@@ -203,7 +209,7 @@ def test_auto_search_closes_enemy_from_explicit_state_and_definition() -> None:
 
     assert target is BattleTarget.ENEMY
     assert source.calls == 1
-    assert runtime.calls == ["execute", "running", "full_scan", "find_path_initial"]
+    assert runtime.calls == ["execute", "running", "full_scan", "rebuild_paths"]
 
 
 def test_auto_search_uses_explicit_loop_variant_for_next_wave() -> None:

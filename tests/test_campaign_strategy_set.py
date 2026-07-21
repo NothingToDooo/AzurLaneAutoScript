@@ -14,6 +14,7 @@ from module.device.device import Device
 from module.handler.strategy import StrategyHandler
 from module.handler.strategy_set import StrategySetRequest, StrategySetRuntime
 from module.map.fleet import Fleet
+from module.map.fleet_navigation_ui import CampaignSubmarineMovementUi
 
 
 class _RecordingStrategySetService:
@@ -62,10 +63,6 @@ class _SubmarineGotoRuntime(Fleet):
     def strategy_submarine_move_enter(self, *, skip_first_screenshot: bool = True) -> None:
         del skip_first_screenshot
         self.events.append("enter")
-
-    def _submarine_goto(self, location: object) -> bool:
-        self.events.append(("goto", location))
-        return True
 
     def strategy_submarine_move_confirm(self, *, skip_first_screenshot: bool = True) -> None:
         del skip_first_screenshot
@@ -174,20 +171,22 @@ def test_declarative_runtime_installs_real_profile_strategy_observers(
     assert trace == expected_trace
 
 
-def test_submarine_goto_strategy_refresh_uses_the_same_observed_public_path() -> None:
+def test_submarine_navigation_finish_uses_the_same_observed_strategy_path() -> None:
     runtime = _SubmarineGotoRuntime()
     observed: list[StrategySetRequest] = []
     runtime._strategy_set_service = build_campaign_strategy_set_service(  # ruff:ignore[private-member-access] - verifies Fleet's production call path.
         (_ObserverSource(CampaignStrategySetObserverContributor(lambda _runtime, request: observed.append(request))),)
     )
 
-    assert runtime.submarine_goto("A1")
+    movement_ui = CampaignSubmarineMovementUi(runtime)
+    movement_ui.navigation_submarine_open()
+    movement_ui.navigation_submarine_confirm()
+    movement_ui.navigation_submarine_finish()
 
     request = StrategySetRequest(sub_view=False)
     assert runtime.events == [
         "open",
         "enter",
-        ("goto", "A1"),
         "confirm",
         ("standard", request),
         "close",

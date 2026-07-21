@@ -286,11 +286,14 @@ def test_declarative_runtime_owns_boss_fleet_across_sequential_profiles_and_hard
     )
 
     assert normal_7_1.configured_boss_fleet == 2
-    assert normal_7_1.fleet_boss_index == 2
+    normal_7_1.map_data_init(normal_7_1.MAP)
+    assert normal_7_1.navigation.boss_index == 2
     assert normal_8_1.configured_boss_fleet == 1
-    assert normal_8_1.fleet_boss_index == 1
+    normal_8_1.map_data_init(normal_8_1.MAP)
+    assert normal_8_1.navigation.boss_index == 1
     assert hard_7_1.configured_boss_fleet == 2
-    assert hard_7_1.fleet_boss_index == 2
+    hard_7_1.map_data_init(hard_7_1.MAP)
+    assert hard_7_1.navigation.boss_index == 2
 
 
 def test_declarative_runtime_without_boss_tuning_uses_the_stateless_config_derivation() -> None:
@@ -307,7 +310,8 @@ def test_declarative_runtime_without_boss_tuning_uses_the_stateless_config_deriv
     )
 
     assert runtime.configured_boss_fleet == 2
-    assert runtime.fleet_boss_index == 2
+    runtime.map_data_init(runtime.MAP)
+    assert runtime.navigation.boss_index == 2
 
 
 def test_declarative_runtime_wires_t4_map_observer_to_the_real_fortress_grid() -> None:
@@ -446,7 +450,7 @@ def test_expected_end_keeps_hard_override_outside_typed_transition() -> None:
     transition = _ExpectedEndTransitionProbe(lambda: True)
     runtime = _expected_end_runtime(hard, transition)
 
-    result = DeclarativeCampaignMapRuntime._expected_end(runtime, "no_searching")  # ruff:ignore[private-member-access]
+    result = DeclarativeCampaignMapRuntime.navigation_expected_end(runtime, "no_searching")
 
     assert result == "in_stage"
     assert hard.calls == ["no_searching"]
@@ -460,7 +464,7 @@ def test_normal_expected_end_uses_typed_transition_callback() -> None:
     transition = _ExpectedEndTransitionProbe(callback)
     runtime = _expected_end_runtime(None, transition)
 
-    result = DeclarativeCampaignMapRuntime._expected_end(runtime, "no_searching")  # ruff:ignore[private-member-access]
+    result = DeclarativeCampaignMapRuntime.navigation_expected_end(runtime, "no_searching")
 
     assert result is callback
     assert transition.calls == 1
@@ -477,9 +481,9 @@ def test_expected_end_delegates_to_campaign_engine_after_typed_transition_miss(
         baseline_calls.append(expected)
         return "with_searching"
 
-    monkeypatch.setattr(campaign_adapters.CampaignEngine, "_expected_end", baseline)
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "navigation_expected_end", baseline)
 
-    result = DeclarativeCampaignMapRuntime._expected_end(runtime, "no_searching")  # ruff:ignore[private-member-access]
+    result = DeclarativeCampaignMapRuntime.navigation_expected_end(runtime, "no_searching")
 
     assert result == "with_searching"
     assert baseline_calls == ["no_searching"]
@@ -547,13 +551,13 @@ def test_real_hard_runtime_wires_and_applies_the_manager_behavior(
         baseline_calls.append(expected)
         return "with_searching"
 
-    monkeypatch.setattr(campaign_adapters.CampaignEngine, "_expected_end", baseline)
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "navigation_expected_end", baseline)
 
     assert runtime._hard_behavior is runtime._runtime_profile.executor_instance(  # ruff:ignore[private-member-access] - 必须复用 manager 编译出的同一实例。
         RuntimeExecutorKind.HARD_MODE
     )
     assert runtime.config.MAP_HAS_AMBUSH is False
-    assert runtime._expected_end("no_searching") == "in_stage"  # ruff:ignore[private-member-access] - 验证真实 runtime 优先级。
+    assert runtime.navigation_expected_end("no_searching") == "in_stage"
     assert transition.calls == 0
     assert baseline_calls == []
 

@@ -16,24 +16,34 @@ class _FleetActionMap(Protocol):
     def __getitem__(self, item: tuple[int, int], /) -> GridInfo: ...
 
 
+class _FleetActionNavigationSnapshot(Protocol):
+    @property
+    def fleet_1(self) -> tuple[int, int] | tuple[()]: ...
+
+    @property
+    def fleet_2(self) -> tuple[int, int] | tuple[()]: ...
+
+    @property
+    def current_index(self) -> int: ...
+
+
+class _FleetActionNavigation(Protocol):
+    @property
+    def snapshot(self) -> _FleetActionNavigationSnapshot: ...
+
+    def activate(self, index: int) -> bool: ...
+
+    def goto(self, grid: GridInfo, /, expected: str = "") -> None: ...
+
+
 class Mumu12FleetActionRuntime(Protocol):
     @property
     def map(self) -> _FleetActionMap: ...
 
     @property
-    def fleet_current_index(self) -> int: ...
-
-    @property
-    def fleet_1_location(self) -> tuple[int, int] | tuple[()] | None: ...
-
-    @property
-    def fleet_2_location(self) -> tuple[int, int] | tuple[()] | None: ...
-
-    def fleet_ensure(self, fleet: int, /) -> bool: ...
+    def navigation(self) -> _FleetActionNavigation: ...
 
     def clear_chosen_enemy(self, grid: GridInfo, /, expected: str = "") -> bool: ...
-
-    def goto(self, grid: GridInfo, /, expected: str = "") -> None: ...
 
     def pick_up_ammo(self, grid: GridInfo, /) -> bool: ...
 
@@ -53,11 +63,11 @@ class Mumu12FleetActionDriver:
     def activate(self, fleet: FleetIndex, cancellation: CancellationSource) -> bool:
         self._validate_fleet(fleet)
         cancellation.raise_if_requested()
-        if self._runtime.fleet_current_index == fleet:
+        if self._runtime.navigation.snapshot.current_index == fleet:
             return False
-        self._runtime.fleet_ensure(fleet)
-        if self._runtime.fleet_current_index != fleet:
-            message = f"fleet_ensure({fleet}) did not select the requested fleet"
+        self._runtime.navigation.activate(fleet)
+        if self._runtime.navigation.snapshot.current_index != fleet:
+            message = f"navigation.activate({fleet}) did not select the requested fleet"
             raise BattleProgramMumu12AdapterError(message)
         return True
 
@@ -91,7 +101,7 @@ class Mumu12FleetActionDriver:
 
         for _ in range(_MOVE_ATTEMPT_LIMIT):
             cancellation.raise_if_requested()
-            self._runtime.goto(grid, expected=runtime_expected)
+            self._runtime.navigation.goto(grid, expected=runtime_expected)
             current = self._fleet_location(fleet)
             if current == destination_location:
                 return True
@@ -129,7 +139,7 @@ class Mumu12FleetActionDriver:
         if kind is MapItemKind.FLARE:
             grid.is_flare = True
         origin = self._fleet_location(fleet)
-        self._runtime.goto(grid)
+        self._runtime.navigation.goto(grid)
         if kind is MapItemKind.LIGHT_HOUSE:
             cancellation.raise_if_requested()
             self._runtime.ensure_no_info_bar()
@@ -155,8 +165,9 @@ class Mumu12FleetActionDriver:
 
     def _fleet_location(self, fleet: FleetIndex) -> tuple[int, int]:
         self._validate_fleet(fleet)
-        value = self._runtime.fleet_1_location if fleet == 1 else self._runtime.fleet_2_location
-        if value is None or len(value) != 2:
+        snapshot = self._runtime.navigation.snapshot
+        value = snapshot.fleet_1 if fleet == 1 else snapshot.fleet_2
+        if len(value) != 2:
             message = f"fleet_{fleet} has no active map location"
             raise BattleProgramMumu12AdapterError(message)
         return value

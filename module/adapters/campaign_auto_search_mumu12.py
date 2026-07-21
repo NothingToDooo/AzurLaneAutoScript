@@ -30,18 +30,23 @@ class Mumu12AutoSearchGrid(Protocol):
     is_boss: bool
 
 
+class _AutoSearchNavigation(Protocol):
+    def rebuild_paths(self) -> None: ...
+
+
 class Mumu12AutoSearchRuntime(Protocol):
     battle_count: int
     device: Device
     map: Iterable[Mumu12AutoSearchGrid]
+
+    @property
+    def navigation(self) -> _AutoSearchNavigation: ...
 
     def auto_search_execute_a_battle(self) -> object: ...
 
     def is_auto_search_running(self) -> bool: ...
 
     def full_scan(self) -> object: ...
-
-    def find_path_initial(self) -> object: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +162,7 @@ class Mumu12CampaignAutoSearchExecutor:
         cancellation.raise_if_requested()
         runtime.full_scan()
         cancellation.raise_if_requested()
-        runtime.find_path_initial()
+        runtime.navigation.rebuild_paths()
         grids = tuple(runtime.map)
         enemy = sum(grid.is_enemy and not grid.is_siren and not grid.is_boss for grid in grids)
         siren = sum(grid.is_siren for grid in grids)

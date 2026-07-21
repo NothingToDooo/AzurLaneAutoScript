@@ -33,10 +33,7 @@ class _HardMap(Protocol):
     def layout(self) -> _HardMapLayout: ...
 
 
-class _HardRuntimeHost(Protocol):
-    config: _HardConfig
-    map: _HardMap
-
+class _HardNavigation(Protocol):
     def goto(
         self,
         location: object,
@@ -45,6 +42,14 @@ class _HardRuntimeHost(Protocol):
         step_optimize: bool | None = None,
         turning_optimize: bool | None = None,
     ) -> None: ...
+
+
+class _HardRuntimeHost(Protocol):
+    config: _HardConfig
+    map: _HardMap
+
+    @property
+    def navigation(self) -> _HardNavigation: ...
 
     def clear_potential_boss(self) -> bool: ...
 
@@ -85,7 +90,7 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
             grids = grids.sort("weight", "cost")
             logger.info(f"Grids: {grids}")
             # 困难模式直接点击 Boss 格，不启用路径与转向优化。
-            host.goto(grids[0], expected="boss", step_optimize=False, turning_optimize=False)
+            host.navigation.goto(grids[0], expected="boss", step_optimize=False, turning_optimize=False)
             raise CampaignEnd(HARD_BOSS_CLEAR_MESSAGE)
 
         logger.warning("BOSS not detected, trying all boss spawn point.")

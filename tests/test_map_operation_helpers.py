@@ -1,10 +1,11 @@
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
 from module.base.button import Button
 from module.exception import CampaignEnd
 from module.map import assets as map_assets
+from module.map.fleet_navigation_ui import CampaignFleetSwitchUi
 from module.map.map_operation import MapOperation
 
 if TYPE_CHECKING:
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
         MapTransitionRuntime,
         MapTransitionUi,
     )
+    from module.map.fleet import Fleet
 
 
 type _Call = (
@@ -186,16 +188,6 @@ class _MapOperationTransitionContext(MapOperation):
         raise AssertionError
 
     @override
-    def get_fleet_show_index(self) -> int:
-        del self
-        return 1
-
-    @override
-    def get_fleet_current_index(self) -> int:
-        del self
-        return 1
-
-    @override
     def handle_popup_confirm(
         self,
         name: str = "",
@@ -294,11 +286,12 @@ def test_handle_map_preparation_accepts_final_percentage_jump() -> None:
     assert operation.handle_map_preparation() is True
 
 
-def test_fleet_set_uses_injected_map_transition_service() -> None:
+def test_fleet_switch_ui_uses_injected_map_transition_service() -> None:
     transition = _MapTransitionProbe(stage_return_results=(False,))
     operation = _MapOperationTransitionContext(transition)
+    switch_ui = CampaignFleetSwitchUi(cast("Fleet", operation), transition)
 
-    assert not operation.fleet_set(1)
+    assert not switch_ui.navigation_handle_switch_interruption()
     assert transition.stage_return_calls == [operation]
 
 

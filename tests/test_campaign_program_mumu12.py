@@ -1,4 +1,4 @@
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -49,17 +49,26 @@ class _Config:
     MAP_HAS_MOVABLE_NORMAL_ENEMY = False
 
 
+@dataclass(frozen=True, slots=True)
+class _NavigationSnapshot:
+    fleet_1: tuple[int, int] | tuple[()] = (0, 0)
+    fleet_2: tuple[int, int] | tuple[()] = ()
+    current_index: int = 1
+
+
+class _Navigation:
+    snapshot = _NavigationSnapshot()
+    fleet_step = 0
+    boss_index = 1
+
+
 class _Runtime:
     map_is_clear_mode = True
     config = _Config()
     battle_count = 0
-    fleet_step = 0
     mystery_count = 0
-    fleet_boss_index = 1
     configured_boss_fleet = 1
-    fleet_current_index = 1
-    fleet_1_location = (0, 0)
-    fleet_2_location = ()
+    navigation = _Navigation()
 
     def __init__(self) -> None:
         self.single_fleet_state_reads = 0

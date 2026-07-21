@@ -56,19 +56,24 @@ class _Map:
         return self._by_location[item]
 
 
-class _Runtime:
-    def __init__(self, grids: tuple[GridInfo, ...], blockers: tuple[GridInfo, ...] = ()) -> None:
-        self.map = _Map(grids)
+class _Navigation:
+    def __init__(self, blockers: tuple[GridInfo, ...]) -> None:
         self.blockers = blockers
-        self.brute_calls: list[tuple[tuple[int, int] | None, int | None]] = []
+        self.find_calls: list[tuple[tuple[int, int] | None, int | None]] = []
 
-    def brute_find_roadblocks(
+    def find_roadblocks(
         self,
         grid: GridInfo,
         fleet: int | None = None,
     ) -> SelectedGrids[GridInfo]:
-        self.brute_calls.append((grid.location, fleet))
+        self.find_calls.append((grid.location, fleet))
         return SelectedGrids(self.blockers)
+
+
+class _Runtime:
+    def __init__(self, grids: tuple[GridInfo, ...], blockers: tuple[GridInfo, ...] = ()) -> None:
+        self.map = _Map(grids)
+        self.navigation = _Navigation(blockers)
 
 
 class _Reads:
@@ -167,7 +172,7 @@ def test_find_blockers_uses_explicit_path_fleet_and_returns_cell_ids() -> None:
     blockers = planner.find_blockers(A1, 2, _Cancellation())
 
     assert blockers == (B1, C1)
-    assert runtime.brute_calls == [((0, 0), 2)]
+    assert runtime.navigation.find_calls == [((0, 0), 2)]
 
 
 def test_find_blockers_honors_cancellation_before_runtime_io() -> None:
@@ -177,7 +182,7 @@ def test_find_blockers_honors_cancellation_before_runtime_io() -> None:
     with pytest.raises(RuntimeError, match="cancelled"):
         planner.find_blockers(A1, 1, _Cancellation(requested=True))
 
-    assert runtime.brute_calls == []
+    assert runtime.navigation.find_calls == []
 
 
 def test_find_blockers_rejects_target_outside_active_map() -> None:
@@ -186,7 +191,7 @@ def test_find_blockers_rejects_target_outside_active_map() -> None:
     with pytest.raises(BattleProgramMumu12AdapterError, match="outside the active map: B1"):
         planner.find_blockers(B1, 1, _Cancellation())
 
-    assert runtime.brute_calls == []
+    assert runtime.navigation.find_calls == []
 
 
 def test_select_target_rejects_road_cell_outside_active_map() -> None:

@@ -3,6 +3,7 @@ from typing import cast
 import pytest
 
 from module.map import map_scanner as scanner_module
+from module.map.fleet_navigation import FleetNavigationSnapshot
 from module.map.map_scanner import (
     MovableEnemyRules,
     MovableEnemySnapshot,
@@ -120,21 +121,38 @@ class _Map:
         return self.grids[location]
 
 
+class _Navigation:
+    def __init__(self, fleet_1: _Location, fleet_2: _MaybeLocation = ()) -> None:
+        self._fleet_1 = fleet_1
+        self._fleet_2 = fleet_2
+
+    @property
+    def current_location(self) -> _Location:
+        return self._fleet_1
+
+    @property
+    def snapshot(self) -> FleetNavigationSnapshot:
+        return FleetNavigationSnapshot(
+            fleet_1=self._fleet_1,
+            fleet_2=self._fleet_2,
+            submarine=(),
+            current_index=1,
+            shown_index=1,
+        )
+
+    def record_fleet_2(self, location: _Location) -> None:
+        self._fleet_2 = location
+
+
 class _MovableRuntime:
     map: _Map
-    fleet_1_location: _MaybeLocation
-    fleet_2_location: _MaybeLocation
+    navigation: _Navigation
 
     def __init__(self) -> None:
         self.map = _Map()
-        self.fleet_1_location = (0, 0)
-        self.fleet_2_location = ()
-        self.map.add_grid(self.fleet_1_location)
+        self.navigation = _Navigation((0, 0))
+        self.map.add_grid(self.navigation.current_location)
         self.map_spawn_gap_predictor = _SpawnGapPredictor(self.map)
-
-    @property
-    def fleet_current(self) -> _MaybeLocation:
-        return self.fleet_1_location
 
 
 class _SpawnGapPredictor(MapSpawnGapPredictor):
@@ -222,7 +240,7 @@ def test_track_movable_predicts_missing_siren(monkeypatch: pytest.MonkeyPatch) -
     assert predicted.is_siren is True
     assert predicted.is_enemy is True
     assert predicted.is_movable is True
-    assert runtime.map.path_project_calls[-1] == (runtime.fleet_current, False)
+    assert runtime.map.path_project_calls[-1] == (runtime.navigation.current_location, False)
 
 
 def test_track_movable_restores_wall_and_fleet_path_after_projection_failure(
@@ -247,4 +265,4 @@ def test_track_movable_restores_wall_and_fleet_path_after_projection_failure(
         {"wall": False, "portal": True},
         {"wall": True, "portal": True},
     ]
-    assert runtime.map.path_project_calls[-1] == (runtime.fleet_current, False)
+    assert runtime.map.path_project_calls[-1] == (runtime.navigation.current_location, False)

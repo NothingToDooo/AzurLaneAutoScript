@@ -1518,13 +1518,28 @@ class _Grid:
         return self.label
 
 
-class _Fleet:
-    def __init__(self, runtime: _Runtime, name: str) -> None:
-        self.runtime = runtime
-        self.name = name
+class _Navigation:
+    boss_index = 2
 
-    def clear_chosen_enemy(self, grid: _Grid, expected: str = "") -> object:
-        return self.runtime.clear(self.name, grid, expected)
+    def __init__(self, runtime: _Runtime) -> None:
+        self._runtime = runtime
+        self.current_index = 1
+
+    def activate(self, index: int) -> bool:
+        changed = self.current_index != index
+        self.current_index = index
+        self._runtime.calls.append(("activate", index))
+        return changed
+
+    def activate_boss(self) -> bool:
+        return self.activate(self.boss_index)
+
+    def rebuild_paths(self) -> None:
+        self._runtime.calls.append("rebuild_paths")
+
+    def find_roadblocks(self, grid: _Grid, fleet: int | None = None) -> list[_Grid]:
+        self._runtime.calls.append(("roadblocks", grid.label, fleet))
+        return self._runtime.roadblocks
 
 
 class _Runtime:
@@ -1535,36 +1550,14 @@ class _Runtime:
         self.action_error: Exception | None = None
         self.roadblocks: list[_Grid] = []
         self.calls: list[object] = []
-        self._fleet_1 = _Fleet(self, "fleet_1")
-        self._fleet_boss = _Fleet(self, "fleet_boss")
-
-    @property
-    def fleet_1(self) -> _Fleet:
-        self.calls.append("select_fleet_1")
-        return self._fleet_1
-
-    @property
-    def fleet_boss(self) -> _Fleet:
-        self.calls.append("select_fleet_boss")
-        return self._fleet_boss
-
-    @property
-    def fleet_boss_index(self) -> int:
-        return 2
+        self.navigation = _Navigation(self)
 
     def full_scan(self) -> None:
         self.calls.append("full_scan")
 
-    def find_path_initial(self) -> None:
-        self.calls.append("find_path_initial")
-
     def read_battle_flag(self, flag: BattleFlag) -> bool:
         self.calls.append(("flag", flag.value))
         return False
-
-    def brute_find_roadblocks(self, grid: _Grid, fleet: int | None = None) -> list[_Grid]:
-        self.calls.append(("roadblocks", grid.label, fleet))
-        return self.roadblocks
 
     def clear_chosen_enemy(self, grid: _Grid, expected: str = "") -> object:
         return self.clear("map", grid, expected)
@@ -1655,7 +1648,7 @@ def test_map_adapter_observes_real_map_flags() -> None:
     )
 
     assert observation == BattlefieldObservation(battle_index=0, enemy=1, siren=1, boss=1)
-    assert runtime.calls[:2] == ["full_scan", "find_path_initial"]
+    assert runtime.calls[:2] == ["full_scan", "rebuild_paths"]
 
 
 def test_map_adapter_filtered_enemy_preserves_priority_prefix_and_confirms_action() -> None:
@@ -1834,17 +1827,17 @@ def test_map_adapter_rejects_more_than_one_confirmation() -> None:
 
 
 @pytest.mark.parametrize(
-    ("strategy", "executor"),
+    ("strategy", "activated_fleet"),
     [
-        (BossStrategy.FLEET_BOSS, "fleet_boss"),
-        (BossStrategy.FLEET_1, "fleet_1"),
-        (BossStrategy.MAP_SEARCH, "map"),
-        (BossStrategy.BRUTE_FORCE, "fleet_boss"),
+        (BossStrategy.FLEET_BOSS, 2),
+        (BossStrategy.FLEET_1, 1),
+        (BossStrategy.MAP_SEARCH, None),
+        (BossStrategy.BRUTE_FORCE, 2),
     ],
 )
 def test_map_adapter_dispatches_every_boss_strategy_explicitly(
     strategy: BossStrategy,
-    executor: str,
+    activated_fleet: int | None,
 ) -> None:
     runtime = _Runtime((_Grid("B", is_boss=True),))
     intent = ClearBoss(strategy)
@@ -1867,7 +1860,11 @@ def test_map_adapter_dispatches_every_boss_strategy_explicitly(
     )
 
     assert outcome == BattleSucceeded(attempt, BattleTarget.BOSS)
-    assert ("clear", executor, "B", "boss") in runtime.calls
+    if activated_fleet is None:
+        assert not any(isinstance(call, tuple) and call[0] == "activate" for call in runtime.calls)
+    else:
+        assert ("activate", activated_fleet) in runtime.calls
+    assert ("clear", "map", "B", "boss") in runtime.calls
 
 
 def test_map_adapter_issues_boss_roadblock_as_enemy_not_boss() -> None:

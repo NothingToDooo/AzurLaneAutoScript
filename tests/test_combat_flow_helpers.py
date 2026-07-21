@@ -3,12 +3,14 @@ from typing import TYPE_CHECKING, override
 
 import numpy as np
 
-from module.combat import combat
+from module.combat import auto_search_combat, combat
 from module.combat.auto_search_combat import AutoSearchCombat
 from module.combat.combat_result_ui import STANDARD_COMBAT_RESULT_UI
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+
+    import pytest
 
     from module.base.button import Button, MatchOffset
     from module.base.timer import Timer
@@ -46,7 +48,7 @@ class _EmergencyRepairContext(combat.Combat):
             HpControl_RepairUseSingleThreshold=0.2,
             HpControl_RepairUseMultiThreshold=0.5,
         )
-        self._hp = {self.fleet_current_index: hp}
+        self._hp = {1: hp}
         self.appearing = set(appearing)
         self.confirm = confirm
         self.device = _FakeDevice()
@@ -378,6 +380,30 @@ class _AutoSearchResultContext(AutoSearchCombat):
         return self._handle_auto_search_status_confirm(exp_info=False)
 
 
+class _AutoSearchNavigationProbe:
+    def __init__(self, *, changed: bool, current_index: int, shown_index: int) -> None:
+        self.changed = changed
+        self.current_index = current_index
+        self.shown_index = shown_index
+        self.observe_calls = 0
+
+    def observe_active(self) -> bool:
+        self.observe_calls += 1
+        return self.changed
+
+
+class _AutoSearchFleetWatchContext(AutoSearchCombat):
+    navigation: _AutoSearchNavigationProbe
+
+    def __init__(self, navigation: _AutoSearchNavigationProbe) -> None:
+        self.navigation = navigation
+        self.level_reads: list[bool] = []
+
+    @override
+    def lv_get(self, *, after_battle: bool = False) -> None:
+        self.level_reads.append(after_battle)
+
+
 class _CombatOrchestrationContext(combat.Combat):
     config: SimpleNamespace
 
@@ -562,3 +588,34 @@ def test_auto_search_status_confirm_uses_injected_result_ui() -> None:
     assert handler.handle_status_confirm() == (True, True)
     assert probe.calls == [handler]
     assert handler.exp_info_hook_calls == 0
+
+
+def test_auto_search_fleet_watch_refreshes_levels_after_passive_switch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr(auto_search_combat.logger, "info", messages.append)
+    navigation = _AutoSearchNavigationProbe(changed=True, current_index=1, shown_index=2)
+    handler = _AutoSearchFleetWatchContext(navigation)
+
+    assert handler.auto_search_watch_fleet(checked=True)
+
+    assert navigation.observe_calls == 1
+    assert handler.level_reads == [False]
+    assert messages == ["Fleet: 2, fleet_current_index: 1"]
+
+
+def test_auto_search_fleet_watch_records_stable_fleet_only_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr(auto_search_combat.logger, "info", messages.append)
+    navigation = _AutoSearchNavigationProbe(changed=False, current_index=2, shown_index=1)
+    handler = _AutoSearchFleetWatchContext(navigation)
+
+    checked = handler.auto_search_watch_fleet()
+    assert handler.auto_search_watch_fleet(checked=checked)
+
+    assert navigation.observe_calls == 2
+    assert handler.level_reads == [True]
+    assert messages == ["Fleet: 1, fleet_current_index: 2"]

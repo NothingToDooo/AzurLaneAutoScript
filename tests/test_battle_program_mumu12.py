@@ -232,6 +232,13 @@ class _VisualGrid:
         return True
 
 
+@dataclass(frozen=True, slots=True)
+class _NavigationSnapshot:
+    fleet_1: tuple[int, int] | tuple[()]
+    fleet_2: tuple[int, int] | tuple[()]
+    current_index: int
+
+
 class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRuntime 测试协议。
     def __init__(self, grids: list[GridInfo] | None = None) -> None:
         self.events: list[object] = []
@@ -241,12 +248,7 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
         self.map_is_clear_mode = False
         self.battle_count = 0
         self.mystery_count = 3
-        self.fleet_step = 2
-        self.fleet_boss_index = 2
         self.configured_boss_fleet = 2
-        self.fleet_current_index = 1
-        self.fleet_1_location: tuple[int, int] = (0, 0)
-        self.fleet_2_location: tuple[int, int] = (1, 0)
         self.battle_delta = 1
         self.raise_after_battle = False
         self.ammo_available = True
@@ -262,33 +264,15 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
         self.mob_move_cancel_error: BaseException | None = None
         self.air_target_error: BaseException | None = None
         self.mob_target_error: BaseException | None = None
-        self.fleet_ensure_error: BaseException | None = None
-        self.fleet_ensure_changes_selection = True
-        self.fleet_ensure_location: tuple[int, int] | None = None
-        self.goto_changes_location = True
+        self.navigation_activate_error: BaseException | None = None
+        self.navigation_activate_changes_selection = True
+        self.navigation_activate_location: tuple[int, int] | None = None
+        self.navigation_goto_changes_location = True
         self.clear_mystery_changes_projection = True
         self.camera = (0, 0)
         self.device = _Device(cast("list[str]", self.events))
         self.view = _View(cast("list[str]", self.events))
-
-    @property
-    def fleet_current(self) -> tuple[int, int]:
-        return self.fleet_1_location if self.fleet_current_index == 1 else self.fleet_2_location
-
-    @property
-    def fleet_1(self) -> _Runtime:
-        message = "fleet_1 side-effecting getter must not be used by BattleProgram"
-        raise AssertionError(message)
-
-    @property
-    def fleet_2(self) -> _Runtime:
-        message = "fleet_2 side-effecting getter must not be used by BattleProgram"
-        raise AssertionError(message)
-
-    @property
-    def fleet_boss(self) -> _Runtime:
-        message = "fleet_boss side-effecting getter must not be used by BattleProgram"
-        raise AssertionError(message)
+        self.navigation = _Navigation(self)
 
     def _hostile(self) -> GridInfo | None:
         return next((grid for grid in self.map.layout if grid.is_enemy or grid.is_siren or grid.is_boss), None)
@@ -306,11 +290,12 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
         return True
 
     def clear_chosen_enemy(self, grid: GridInfo, expected: str = "") -> bool:
-        self.events.append(("clear_chosen_enemy", grid.location, expected, self.fleet_current_index))
-        if self.fleet_current_index == 1:
-            self.fleet_1_location = cast("tuple[int, int]", grid.location)
+        index = self.navigation.current_index
+        self.events.append(("clear_chosen_enemy", grid.location, expected, index))
+        if index == 1:
+            self.navigation.fleet_1 = cast("tuple[int, int]", grid.location)
         else:
-            self.fleet_2_location = cast("tuple[int, int]", grid.location)
+            self.navigation.fleet_2 = cast("tuple[int, int]", grid.location)
         return self._settle(grid)
 
     def clear_enemy(self, **criteria: object) -> bool:
@@ -330,10 +315,6 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
         enemies = [grid for grid in self.map.layout if grid.is_enemy and not grid.is_boss]
         return self._settle(enemies[preserve] if len(enemies) > preserve else None)
 
-    def brute_find_roadblocks(self, _grid: GridInfo, fleet: int | None = None) -> SelectedGrids[GridInfo]:
-        self.events.append(("brute_find_roadblocks", fleet))
-        return SelectedGrids([grid for grid in self.map.layout if grid.is_enemy and not grid.is_boss])
-
     def clear_roadblocks(self, _roads: object, **selection: object) -> bool:
         self.events.append(("clear_roadblocks", selection))
         return self._settle()
@@ -349,39 +330,6 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
     def clear_grids_for_faster(self, _grids: object, **selection: object) -> bool:
         self.events.append(("clear_grids_for_faster", selection))
         return self._settle()
-
-    def fleet_at(self, grid: GridInfo, fleet: int | None = None) -> bool:
-        index = self.fleet_current_index if fleet is None else fleet
-        location = self.fleet_1_location if index == 1 else self.fleet_2_location
-        return grid.location == location
-
-    def check_accessibility(self, grid: GridInfo, fleet: int | str | None = None) -> bool:
-        self.events.append(("check_accessibility", grid.location, fleet))
-        return grid.is_accessible
-
-    def fleet_ensure(self, index: int) -> bool:
-        changed = index != self.fleet_current_index
-        self.events.append(("fleet_ensure", index))
-        if self.fleet_ensure_error is not None:
-            raise self.fleet_ensure_error
-        if self.fleet_ensure_changes_selection:
-            self.fleet_current_index = index
-        if self.fleet_ensure_location is not None:
-            if index == 1:
-                self.fleet_1_location = self.fleet_ensure_location
-            else:
-                self.fleet_2_location = self.fleet_ensure_location
-        return changed
-
-    def goto(self, grid: GridInfo, expected: str = "") -> None:
-        self.events.append(("goto", grid.location, expected, self.fleet_current_index))
-        if self.goto_changes_location:
-            if self.fleet_current_index == 1:
-                self.fleet_1_location = cast("tuple[int, int]", grid.location)
-            else:
-                self.fleet_2_location = cast("tuple[int, int]", grid.location)
-        if grid.is_enemy or grid.is_siren or grid.is_boss:
-            self._settle(grid)
 
     def fleet_2_push_forward(self) -> bool:
         self.events.append("push_forward")
@@ -438,9 +386,6 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
 
     def full_scan(self) -> None:
         self.events.append("full_scan")
-
-    def find_path_initial(self) -> None:
-        self.events.append("find_path_initial")
 
     def strategy_open(self) -> None:
         self.events.append("strategy_open")
@@ -499,6 +444,52 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
     @staticmethod
     def handle_popup_confirm(_name: str) -> bool:
         return False
+
+
+class _Navigation:
+    fleet_step = 2
+    boss_index = 2
+
+    def __init__(self, runtime: _Runtime) -> None:
+        self._runtime = runtime
+        self.fleet_1: tuple[int, int] | tuple[()] = (0, 0)
+        self.fleet_2: tuple[int, int] | tuple[()] = (1, 0)
+        self.current_index = 1
+
+    @property
+    def snapshot(self) -> _NavigationSnapshot:
+        return _NavigationSnapshot(self.fleet_1, self.fleet_2, self.current_index)
+
+    def activate(self, index: int) -> bool:
+        changed = index != self.current_index
+        self._runtime.events.append(("navigation.activate", index))
+        if self._runtime.navigation_activate_error is not None:
+            raise self._runtime.navigation_activate_error
+        if self._runtime.navigation_activate_changes_selection:
+            self.current_index = index
+        if self._runtime.navigation_activate_location is not None:
+            if index == 1:
+                self.fleet_1 = self._runtime.navigation_activate_location
+            else:
+                self.fleet_2 = self._runtime.navigation_activate_location
+        return changed
+
+    def goto(self, grid: GridInfo, expected: str = "") -> None:
+        self._runtime.events.append(("navigation.goto", grid.location, expected, self.current_index))
+        if self._runtime.navigation_goto_changes_location:
+            if self.current_index == 1:
+                self.fleet_1 = cast("tuple[int, int]", grid.location)
+            else:
+                self.fleet_2 = cast("tuple[int, int]", grid.location)
+        if grid.is_enemy or grid.is_siren or grid.is_boss:
+            self._runtime._settle(grid)  # ruff:ignore[private-member-access] - fake navigation closes the runtime battle.
+
+    def rebuild_paths(self) -> None:
+        self._runtime.events.append("navigation.rebuild_paths")
+
+    def find_roadblocks(self, _grid: GridInfo, fleet: int | None = None) -> SelectedGrids[GridInfo]:
+        self._runtime.events.append(("navigation.find_roadblocks", fleet))
+        return SelectedGrids([grid for grid in self._runtime.map.layout if grid.is_enemy and not grid.is_boss])
 
 
 def _grid(  # ruff:ignore[too-many-arguments] - 测试网格显式暴露互斥识别事实。
@@ -677,17 +668,32 @@ def test_battle_count_read_does_not_query_dynamic_program_state() -> None:
     assert cancellation.checks == 1
 
 
+def test_read_status_keeps_profile_boss_override_distinct_from_effective_navigation() -> None:
+    runtime = _Runtime([_grid(A1)])
+    runtime.configured_boss_fleet = 2
+    runtime.navigation.boss_index = 1
+
+    status = Mumu12BattleProgramReadModel(
+        runtime,
+        _ProgramState(),
+        CampaignProgramCapabilityReader(),
+    ).status(_cancel())
+
+    assert status.fleet_boss_index == 1
+    assert status.configured_boss_fleet == 2
+
+
 def test_alternate_fleet_accessibility_uses_precomputed_path_without_switching_runtime() -> None:
     target = _grid(D1)
     target.cost = 1
     target.cost_1 = 1
     target.cost_2 = 9999
     runtime = _Runtime([_grid(A1), _grid(B1), target])
-    runtime.fleet_current_index = 1
+    runtime.navigation.current_index = 1
     before_costs = (target.cost, target.cost_1, target.cost_2)
 
     assert not _port(runtime).is_cell_accessible_for_fleet(D1, FleetRole.FLEET_2, _cancel())
-    assert runtime.fleet_current_index == 1
+    assert runtime.navigation.current_index == 1
     assert runtime.events == []
     assert (target.cost, target.cost_1, target.cost_2) == before_costs
 
@@ -700,20 +706,20 @@ def test_fleet_driver_activates_by_index_without_side_effecting_getters_or_switc
     assert driver.clear_target(2, C1, EncounterExpectation.ENEMY, _cancel())
 
     assert runtime.events == [
-        ("fleet_ensure", 2),
+        ("navigation.activate", 2),
         ("clear_chosen_enemy", (C1.x, C1.y), "", 2),
     ]
 
 
 def test_fleet_driver_rejects_a_failed_selection_postcondition() -> None:
     runtime = _Runtime()
-    runtime.fleet_ensure_changes_selection = False
+    runtime.navigation_activate_changes_selection = False
     driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(BattleProgramMumu12AdapterError, match="did not select"):
         driver.activate(2, _cancel())
 
-    assert runtime.events == [("fleet_ensure", 2)]
+    assert runtime.events == [("navigation.activate", 2)]
 
 
 def test_fleet_driver_checks_cancellation_before_selection_io() -> None:
@@ -752,27 +758,27 @@ def test_fleet_driver_rejects_invalid_cells_before_activation(
 
 def test_fleet_move_measures_displacement_after_activation_refresh() -> None:
     runtime = _Runtime()
-    runtime.fleet_ensure_location = (C1.x, C1.y)
-    runtime.goto_changes_location = False
+    runtime.navigation_activate_location = (C1.x, C1.y)
+    runtime.navigation_goto_changes_location = False
     driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     moved = driver.move(2, C1, EncounterExpectation.ANY, _cancel())
 
     assert not moved
-    assert runtime.events == [("fleet_ensure", 2)]
+    assert runtime.events == [("navigation.activate", 2)]
 
 
 def test_map_item_is_not_marked_when_fleet_activation_fails() -> None:
     target = _grid(C1)
     runtime = _Runtime([_grid(A1), _grid(B1), target])
-    runtime.fleet_ensure_error = RuntimeError("selection failed")
+    runtime.navigation_activate_error = RuntimeError("selection failed")
     driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(RuntimeError, match="selection failed"):
         driver.pickup_map_item(2, C1, MapItemKind.FLARE, _cancel())
 
     assert not target.is_flare
-    assert runtime.events == [("fleet_ensure", 2)]
+    assert runtime.events == [("navigation.activate", 2)]
 
 
 def test_boss_accessibility_checks_every_boss_for_the_requested_fleet() -> None:
@@ -844,7 +850,7 @@ def test_boss_accessibility_checks_every_boss_for_the_requested_fleet() -> None:
                 advances_wave=False,
             ),
             [
-                ("brute_find_roadblocks", 2),
+                ("navigation.find_roadblocks", 2),
                 ("clear_chosen_enemy", (A1.x, A1.y), "", 1),
             ],
         ),
@@ -853,7 +859,7 @@ def test_boss_accessibility_checks_every_boss_for_the_requested_fleet() -> None:
             [_grid(A1, boss=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.BOSS),
             [
-                ("fleet_ensure", 2),
+                ("navigation.activate", 2),
                 ("clear_chosen_enemy", (A1.x, A1.y), "boss", 2),
             ],
         ),
@@ -949,7 +955,7 @@ def test_all_boss_strategies_issue_one_confirmed_boss_action(
     assert runtime.battle_count == 1
     expected_events: list[object] = []
     if expected_fleet != 1:
-        expected_events.append(("fleet_ensure", expected_fleet))
+        expected_events.append(("navigation.activate", expected_fleet))
     expected_events.append(("clear_chosen_enemy", (A1.x, A1.y), "boss", expected_fleet))
     assert runtime.events == expected_events
 
@@ -991,7 +997,7 @@ def test_boss_selection_uses_the_executor_fleet_path_cost() -> None:
 
     assert result == program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.BOSS)
     assert runtime.events == [
-        ("fleet_ensure", 2),
+        ("navigation.activate", 2),
         ("clear_chosen_enemy", (B1.x, B1.y), "boss", 2),
     ]
 
@@ -1008,7 +1014,7 @@ def test_boss_roadblock_selection_uses_the_clearing_fleet_path_cost() -> None:
     fleet_1_choice.cost_1 = 1
     fleet_1_choice.cost_2 = 10
     runtime = _Runtime([fleet_2_choice, fleet_1_choice, _grid(D1, boss=True)])
-    runtime.fleet_current_index = 2
+    runtime.navigation.current_index = 2
 
     result = _port(runtime).execute_battle(ClearBossRoadblock(BossStrategy.MAP_SEARCH), _cancel())
 
@@ -1017,8 +1023,8 @@ def test_boss_roadblock_selection_uses_the_clearing_fleet_path_cost() -> None:
         advances_wave=False,
     )
     assert runtime.events == [
-        ("brute_find_roadblocks", 2),
-        ("fleet_ensure", 1),
+        ("navigation.find_roadblocks", 2),
+        ("navigation.activate", 1),
         ("clear_chosen_enemy", (C1.x, C1.y), "", 1),
     ]
 
@@ -1109,7 +1115,7 @@ def test_every_fleet_mechanic_action_has_a_fixed_projection() -> None:
         _port(runtime).execute_mechanic(MoveFleet(0, C1, FleetRole.ACTIVE), _cancel()),
         MechanicApplied,
     )
-    assert runtime.events == [("goto", (C1.x, C1.y), "", 1)]
+    assert runtime.events == [("navigation.goto", (C1.x, C1.y), "", 1)]
 
     runtime = _Runtime()
     runtime.map.layout[B1.x, B1.y].weight = 5
@@ -1131,8 +1137,8 @@ def test_every_fleet_mechanic_action_has_a_fixed_projection() -> None:
         MechanicApplied,
     )
     assert runtime.events == [
-        ("fleet_ensure", 2),
-        ("goto", (C1.x, C1.y), "", 2),
+        ("navigation.activate", 2),
+        ("navigation.goto", (C1.x, C1.y), "", 2),
     ]
 
     runtime = _Runtime()
@@ -1182,8 +1188,8 @@ def test_best_candidate_uses_the_requested_fleet_path_cost() -> None:
 
     assert isinstance(result, MechanicApplied)
     assert runtime.events == [
-        ("fleet_ensure", 2),
-        ("goto", (C1.x, C1.y), "", 2),
+        ("navigation.activate", 2),
+        ("navigation.goto", (C1.x, C1.y), "", 2),
     ]
 
 
@@ -1200,7 +1206,7 @@ def test_best_candidate_does_not_dispatch_an_unreachable_fleet_move() -> None:
     )
 
     assert isinstance(result, MechanicNotApplied)
-    assert runtime.fleet_current_index == 1
+    assert runtime.navigation.current_index == 1
     assert runtime.events == []
 
 
@@ -1218,7 +1224,7 @@ def test_fleet_clear_target_uses_requested_fleet_accessibility_before_switching(
 
     assert result == MechanicSettled(program_model.ProgramBattleTarget.ENEMY)
     assert runtime.events == [
-        ("fleet_ensure", 2),
+        ("navigation.activate", 2),
         ("clear_chosen_enemy", (C1.x, C1.y), "", 2),
     ]
 
@@ -1234,7 +1240,7 @@ def test_fleet_clear_target_does_not_switch_to_an_inaccessible_fleet() -> None:
     )
 
     assert isinstance(result, MechanicNotApplied)
-    assert runtime.fleet_current_index == 1
+    assert runtime.navigation.current_index == 1
     assert runtime.events == []
 
 
@@ -1258,7 +1264,7 @@ def test_fleet_clear_selected_target_uses_first_matching_accessible_candidate() 
 
     assert result == MechanicSettled(program_model.ProgramBattleTarget.SIREN)
     assert runtime.events == [
-        ("fleet_ensure", 2),
+        ("navigation.activate", 2),
         ("clear_chosen_enemy", (D1.x, D1.y), "siren", 2),
     ]
 
@@ -1294,7 +1300,7 @@ def test_every_pickup_mechanic_action_has_a_fixed_projection() -> None:
         _port(runtime).execute_mechanic(PickupMapItem(0, MapItemKind.FLARE, C1), _cancel()),
         MechanicApplied,
     )
-    assert runtime.events == [("goto", (C1.x, C1.y), "", 1)]
+    assert runtime.events == [("navigation.goto", (C1.x, C1.y), "", 1)]
     assert runtime.map.layout[C1.x, C1.y].is_flare
 
 
@@ -1309,7 +1315,7 @@ def test_pickup_ammo_selects_a_reachable_target_before_activating_requested_flee
 
     assert isinstance(result, MechanicApplied)
     assert runtime.ammo_target == (C1.x, C1.y)
-    assert runtime.events == [("fleet_ensure", 2), "pickup_ammo"]
+    assert runtime.events == [("navigation.activate", 2), "pickup_ammo"]
 
 
 def test_pickup_ammo_does_not_activate_a_fleet_without_a_reachable_target() -> None:
@@ -1339,8 +1345,8 @@ def test_pickup_map_item_uses_requested_fleet_accessibility() -> None:
     assert isinstance(result, MechanicApplied)
     assert target.is_flare
     assert runtime.events == [
-        ("fleet_ensure", 2),
-        ("goto", (C1.x, C1.y), "", 2),
+        ("navigation.activate", 2),
+        ("navigation.goto", (C1.x, C1.y), "", 2),
     ]
 
 
@@ -1356,7 +1362,7 @@ def test_pickup_map_item_does_not_mark_or_switch_for_an_inaccessible_fleet() -> 
 
     assert isinstance(result, MechanicNotApplied)
     assert not target.is_flare
-    assert runtime.fleet_current_index == 1
+    assert runtime.navigation.current_index == 1
     assert runtime.events == []
 
 
@@ -1391,8 +1397,8 @@ def test_every_map_interaction_mechanic_action_has_a_fixed_projection() -> None:
         MechanicApplied,
     )
     assert runtime.events == [
-        ("goto", (C1.x, C1.y), "", 1),
-        ("goto", (D1.x, D1.y), "", 1),
+        ("navigation.goto", (C1.x, C1.y), "", 1),
+        ("navigation.goto", (D1.x, D1.y), "", 1),
     ]
 
     runtime = _Runtime()
@@ -1438,7 +1444,7 @@ def test_clear_all_mystery_uses_active_fleet_cost() -> None:
     target.cost_1 = 9999
     target.cost_2 = 1
     runtime = _Runtime([_grid(A1), _grid(B1), target])
-    runtime.fleet_current_index = 2
+    runtime.navigation.current_index = 2
 
     result = _port(runtime).execute_mechanic(ClearAllMystery(0, nearby=True), _cancel())
 
@@ -1472,7 +1478,7 @@ def test_standalone_mechanic_actions_have_fixed_projections() -> None:
         "strategy_open",
         "mob_move_enter",
         "view_update",
-        "find_path_initial",
+        "navigation.rebuild_paths",
         ("strategy_close", False),
     ]
 
@@ -1548,7 +1554,7 @@ def test_enemy_move_cancellation_after_confirmation_keeps_committed_state() -> N
         "strategy_open",
         "mob_move_enter",
         "view_update",
-        "find_path_initial",
+        "navigation.rebuild_paths",
         ("strategy_close", False),
     ]
 
@@ -1626,7 +1632,7 @@ def test_confirmed_enemy_move_updates_map_before_close_failure() -> None:
 
     assert not source.is_enemy
     assert target.is_enemy
-    assert runtime.events[-2:] == ["find_path_initial", ("strategy_close", False)]
+    assert runtime.events[-2:] == ["navigation.rebuild_paths", ("strategy_close", False)]
 
 
 def test_strategy_primary_cancel_and_close_failures_are_all_preserved() -> None:
