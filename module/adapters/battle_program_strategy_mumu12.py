@@ -37,7 +37,7 @@ class _StrategyView(Protocol):
     def update(self, image: ImageArray) -> None: ...
 
 
-class _StrategySource(Protocol):
+class Mumu12StrategyRuntime(Protocol):
     @property
     def map(self) -> _StrategyMap: ...
 
@@ -86,7 +86,7 @@ class Mumu12StrategyActionDriver:
 
     __slots__ = ("_runtime",)
 
-    def __init__(self, runtime: _StrategySource) -> None:
+    def __init__(self, runtime: Mumu12StrategyRuntime) -> None:
         self._runtime = runtime
 
     def air_strike(self, target: CellId, cancellation: CancellationSource) -> bool:

@@ -14,7 +14,10 @@ from module.adapters.campaign_program_capabilities import (
     CampaignProgramCapabilities,
     CampaignProgramCapabilityReader,
 )
-from module.adapters.campaign_program_mumu12 import build_mumu12_battle_program_port
+from module.adapters.campaign_program_mumu12 import (
+    Mumu12BattleProgramRuntime,
+    build_mumu12_battle_program_port,
+)
 from module.content import battle_program as program_model
 from module.content.battle_policy import (
     AllConditions,
@@ -84,7 +87,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from module.adapters.battle_program_mumu12 import Mumu12BattleProgramPort
-    from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
     from module.application import CancellationSource
 
 
@@ -532,7 +534,7 @@ def _port(
 ) -> Mumu12BattleProgramPort:
     if state is None:
         state = _ProgramState()
-    action_runtime = cast("DeclarativeCampaignMapRuntime", runtime)
+    action_runtime = cast("Mumu12BattleProgramRuntime", runtime)
     return build_mumu12_battle_program_port(
         action_runtime,
         state,
@@ -681,7 +683,7 @@ def test_alternate_fleet_accessibility_uses_precomputed_path_without_switching_r
 
 def test_fleet_driver_activates_by_index_without_side_effecting_getters_or_switch_to() -> None:
     runtime = _Runtime([_grid(A1), _grid(B1), _grid(C1, enemy=True)])
-    driver = Mumu12FleetActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     assert not driver.activate(1, _cancel())
     assert driver.clear_target(2, C1, EncounterExpectation.ENEMY, _cancel())
@@ -695,7 +697,7 @@ def test_fleet_driver_activates_by_index_without_side_effecting_getters_or_switc
 def test_fleet_driver_rejects_a_failed_selection_postcondition() -> None:
     runtime = _Runtime()
     runtime.fleet_ensure_changes_selection = False
-    driver = Mumu12FleetActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(BattleProgramMumu12AdapterError, match="did not select"):
         driver.activate(2, _cancel())
@@ -705,7 +707,7 @@ def test_fleet_driver_rejects_a_failed_selection_postcondition() -> None:
 
 def test_fleet_driver_checks_cancellation_before_selection_io() -> None:
     runtime = _Runtime()
-    driver = Mumu12FleetActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
     cancellation = cast("CancellationSource", _Cancellation(requested=True))
 
     with pytest.raises(RequestedCancellation):
@@ -729,7 +731,7 @@ def test_fleet_driver_rejects_invalid_cells_before_activation(
     arguments: tuple[object, ...],
 ) -> None:
     runtime = _Runtime()
-    driver = Mumu12FleetActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(BattleProgramMumu12AdapterError, match="outside the active map"):
         getattr(driver, method_name)(*arguments, _cancel())
@@ -741,7 +743,7 @@ def test_fleet_move_measures_displacement_after_activation_refresh() -> None:
     runtime = _Runtime()
     runtime.fleet_ensure_location = (C1.x, C1.y)
     runtime.goto_changes_location = False
-    driver = Mumu12FleetActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     moved = driver.move(2, C1, EncounterExpectation.ANY, _cancel())
 
@@ -753,7 +755,7 @@ def test_map_item_is_not_marked_when_fleet_activation_fails() -> None:
     target = _grid(C1)
     runtime = _Runtime([_grid(A1), _grid(B1), target])
     runtime.fleet_ensure_error = RuntimeError("selection failed")
-    driver = Mumu12FleetActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12FleetActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(RuntimeError, match="selection failed"):
         driver.pickup_map_item(2, C1, MapItemKind.FLARE, _cancel())
@@ -1477,7 +1479,7 @@ def test_strategy_driver_does_not_mutate_map_without_the_mob_move_capability() -
     target = _grid(B1)
     runtime = _Runtime([source, target])
     runtime.mob_move_available = False
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     applied = driver.move_enemy(A1, B1, _cancel())
 
@@ -1493,7 +1495,7 @@ def test_strategy_driver_does_not_mutate_map_without_the_mob_move_capability() -
 
 def test_strategy_driver_checks_cancellation_before_device_io() -> None:
     runtime = _Runtime([_grid(C1)])
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
     cancellation = cast("CancellationSource", _Cancellation(requested=True))
 
     with pytest.raises(RequestedCancellation):
@@ -1504,7 +1506,7 @@ def test_strategy_driver_checks_cancellation_before_device_io() -> None:
 
 def test_air_strike_cancellation_in_target_mode_cancels_and_closes() -> None:
     runtime = _Runtime([_grid(C1)])
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
     cancellation = cast("CancellationSource", _Cancellation(raise_on_check=3))
 
     with pytest.raises(RequestedCancellation):
@@ -1522,7 +1524,7 @@ def test_enemy_move_cancellation_after_confirmation_keeps_committed_state() -> N
     source = _grid(A1, enemy=True)
     target = _grid(B1)
     runtime = _Runtime([source, target])
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
     cancellation = cast("CancellationSource", _Cancellation(raise_on_check=6))
 
     with pytest.raises(RequestedCancellation):
@@ -1543,7 +1545,7 @@ def test_enemy_move_cancellation_after_confirmation_keeps_committed_state() -> N
 def test_strategy_open_failure_does_not_run_cleanup() -> None:
     runtime = _Runtime([_grid(C1)])
     runtime.strategy_open_error = RuntimeError("open failed")
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(RuntimeError, match="open failed"):
         driver.air_strike(C1, _cancel())
@@ -1554,7 +1556,7 @@ def test_strategy_open_failure_does_not_run_cleanup() -> None:
 def test_air_strike_selection_failure_cancels_target_mode_and_closes_strategy() -> None:
     runtime = _Runtime([_grid(C1)])
     runtime.air_target_error = RuntimeError("target recognition failed")
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(RuntimeError, match="target recognition failed"):
         driver.air_strike(C1, _cancel())
@@ -1573,7 +1575,7 @@ def test_unconfirmed_enemy_move_failure_does_not_mutate_map_and_runs_cleanup() -
     target = _grid(B1)
     runtime = _Runtime([source, target])
     runtime.mob_target_error = RuntimeError("origin recognition failed")
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(RuntimeError, match="origin recognition failed"):
         driver.move_enemy(A1, B1, _cancel())
@@ -1595,7 +1597,7 @@ def test_air_strike_close_failure_is_not_reported_as_success_or_noop(*, availabl
     runtime = _Runtime([_grid(C1)])
     runtime.air_strike_available = available
     runtime.strategy_close_error = RuntimeError("close failed")
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(RuntimeError, match="close failed"):
         driver.air_strike(C1, _cancel())
@@ -1606,7 +1608,7 @@ def test_confirmed_enemy_move_updates_map_before_close_failure() -> None:
     target = _grid(B1)
     runtime = _Runtime([source, target])
     runtime.strategy_close_error = RuntimeError("close failed")
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(RuntimeError, match="close failed"):
         driver.move_enemy(A1, B1, _cancel())
@@ -1624,7 +1626,7 @@ def test_strategy_primary_cancel_and_close_failures_are_all_preserved() -> None:
     runtime.air_target_error = primary
     runtime.air_strike_cancel_error = cancel
     runtime.strategy_close_error = close
-    driver = Mumu12StrategyActionDriver(cast("DeclarativeCampaignMapRuntime", runtime))
+    driver = Mumu12StrategyActionDriver(cast("Mumu12BattleProgramRuntime", runtime))
 
     with pytest.raises(BaseExceptionGroup) as captured:
         driver.air_strike(C1, _cancel())

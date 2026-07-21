@@ -8,6 +8,7 @@ from module.adapters.campaign_program_capabilities import (
     CampaignProgramCapabilityReader,
 )
 from module.adapters.campaign_program_mumu12 import (
+    Mumu12BattleProgramRuntime,
     Mumu12CampaignBattleProgramExecutor,
     Mumu12CommittedBattleProgramUnit,
     build_mumu12_battle_program_port,
@@ -36,7 +37,7 @@ from module.content.stage_rules import MapFeatures, RepeatableCompletion, StageR
 from module.gameplay.battle_program import BattleProgramReducer
 
 if TYPE_CHECKING:
-    from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
+    from module.adapters.battle_program_read_mumu12 import Mumu12ProgramReadSource
     from module.application import CancellationSource
 
 
@@ -115,7 +116,7 @@ class _Units:
     ) -> BattleProgramMode:
         del session
         self.active_calls += 1
-        runtime = cast("DeclarativeCampaignMapRuntime", self.runtime)
+        runtime = cast("Mumu12ProgramReadSource", self.runtime)
         return read_mumu12_battle_program_mode(
             runtime,
             self.runtime,
@@ -134,7 +135,7 @@ class _Units:
         gate.commit()
         if self.request_after_commit:
             cast("AbortToken", cancellation).request("defer until program checkpoint")
-        runtime = cast("DeclarativeCampaignMapRuntime", self.runtime)
+        runtime = cast("Mumu12BattleProgramRuntime", self.runtime)
         return Mumu12CommittedBattleProgramUnit(
             build_mumu12_battle_program_port(
                 runtime,

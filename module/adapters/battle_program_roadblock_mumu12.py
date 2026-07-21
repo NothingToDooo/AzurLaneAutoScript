@@ -24,7 +24,7 @@ class _RoadblockMap(Protocol):
     def __getitem__(self, item: tuple[int, int], /) -> GridInfo: ...
 
 
-class _RoadblockRuntime(Protocol):
+class Mumu12RoadblockRuntime(Protocol):
     @property
     def map(self) -> _RoadblockMap: ...
 
@@ -46,7 +46,7 @@ class Mumu12RoadblockPlanner:
 
     __slots__ = ("_reads", "_runtime")
 
-    def __init__(self, runtime: _RoadblockRuntime, reads: _RoadblockReadModel) -> None:
+    def __init__(self, runtime: Mumu12RoadblockRuntime, reads: _RoadblockReadModel) -> None:
         self._runtime = runtime
         self._reads = reads
 

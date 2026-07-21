@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass, replace
 from functools import partial
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final, Protocol, cast
 
 from module.adapters.campaign_auto_search_mumu12 import (
     Mumu12AutoSearchRuntime,
@@ -126,6 +126,7 @@ from module.war_archives.assets import OCR_DATA_KEY_CAMPAIGN, WAR_ARCHIVES_CAMPA
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from module.adapters.battle_program_read_mumu12 import RuntimeProgramState
     from module.application import CancellationSource
     from module.base.button import Button
     from module.combat.combat import CombatEnd
@@ -664,10 +665,138 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         """地图成就只产生事实；task disable/关卡推进由 typed workflow 提交。"""
 
 
+@dataclass(frozen=True, slots=True)
+class Mumu12CampaignMapAssembly:
+    runtime: DeclarativeCampaignMapRuntime
+    owner: Mumu12CampaignMapSessionOwner
+    program_state: RuntimeProgramState
+    program_capabilities: CampaignProgramCapabilityReader
+
+
+@dataclass(frozen=True, slots=True)
+class Mumu12CampaignHardAssembly:
+    runtime: DeclarativeCampaignMapRuntime
+    owner: Mumu12CampaignHardAttemptOwner
+
+
+class Mumu12CampaignMapAssemblyFactory(Protocol):
+    def build_map(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> Mumu12CampaignMapAssembly: ...
+
+
+class Mumu12CampaignHardAssemblyFactory(Protocol):
+    def build_hard(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> Mumu12CampaignHardAssembly: ...
+
+
+class DeclarativeCampaignRuntimeFactory:
+    """构造完整 runtime，并把唯一 profile lease 原子移交给对应 owner。"""
+
+    __slots__ = ("_runtime_builder",)
+
+    def __init__(
+        self,
+        runtime_builder: Callable[
+            [AzurLaneConfig, Device, CampaignStageDefinition],
+            DeclarativeCampaignMapRuntime,
+        ] = DeclarativeCampaignMapRuntime,
+    ) -> None:
+        if isinstance(runtime_builder, type) and not issubclass(runtime_builder, DeclarativeCampaignMapRuntime):
+            message = "campaign runtime builder must build DeclarativeCampaignMapRuntime"
+            raise TypeError(message)
+        if not callable(runtime_builder):
+            message = "campaign runtime builder must be callable"
+            raise TypeError(message)
+        self._runtime_builder = runtime_builder
+
+    def _build_runtime(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> DeclarativeCampaignMapRuntime:
+        runtime = self._runtime_builder(config, device, definition)
+        if not isinstance(runtime, DeclarativeCampaignMapRuntime):
+            message = "campaign runtime builder returned an invalid runtime"
+            raise TypeError(message)
+        return runtime
+
+    @staticmethod
+    def _require_hard_behavior(runtime: DeclarativeCampaignMapRuntime) -> None:
+        if not isinstance(
+            runtime._hard_behavior,  # ruff:ignore[private-member-access] - capability 必须在任何交互前验证。
+            CampaignClearModeExecutor,
+        ):
+            message = "hard campaign attempt requires the typed clear-mode behavior"
+            raise CampaignRuntimeProfileError(message)
+
+    def build_map(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> Mumu12CampaignMapAssembly:
+        runtime = self._build_runtime(config, device, definition)
+        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - factory 接管 runtime 构造的唯一 lease。
+        try:
+            owner = Mumu12CampaignMapSessionOwner(
+                runtime,
+                lease,
+                runtime._submarine_services.fresh_combat,  # ruff:ignore[private-member-access] - assembly 固化 profile hook。
+                runtime._map_initialization_service,  # ruff:ignore[private-member-access] - assembly 固化初始化服务。
+            )
+            return Mumu12CampaignMapAssembly(
+                runtime=runtime,
+                owner=owner,
+                program_state=runtime._runtime_profile,  # ruff:ignore[private-member-access] - product 只暴露窄 program state。
+                program_capabilities=runtime._program_capabilities,  # ruff:ignore[private-member-access] - product 只暴露已编译能力。
+            )
+        except BaseException as error:
+            preserve_cleanup_failure(
+                error,
+                lease.discard,
+                message="campaign map assembly and cleanup both failed",
+            )
+            raise
+
+    def build_hard(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> Mumu12CampaignHardAssembly:
+        runtime = self._build_runtime(config, device, definition)
+        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - factory 接管 runtime 构造的唯一 lease。
+        try:
+            self._require_hard_behavior(runtime)
+            owner = Mumu12CampaignHardAttemptOwner(runtime, lease)
+        except BaseException as error:
+            preserve_cleanup_failure(
+                error,
+                lease.discard,
+                message="hard campaign assembly and cleanup both failed",
+            )
+            raise
+        return Mumu12CampaignHardAssembly(runtime=runtime, owner=owner)
+
+
+_DECLARATIVE_CAMPAIGN_RUNTIME_FACTORY: Final = DeclarativeCampaignRuntimeFactory()
+
+
 @dataclass(slots=True)
 class _RuntimeHandle:
     runtime: DeclarativeCampaignMapRuntime
     owner: Mumu12CampaignMapSessionOwner
+    program_state: RuntimeProgramState
+    program_capabilities: CampaignProgramCapabilityReader
     cancellation: SafeUnitCancellation
     ownership: _RuntimeOwnership
 
@@ -676,10 +805,10 @@ class Mumu12CampaignRuntimeProvider:
     """一次 workflow turn 只暴露一个与 typed session 精确匹配的固定 runtime。"""
 
     __slots__ = (
+        "_assembly_factory",
         "_config",
         "_device",
         "_handle",
-        "_runtime_factory",
     )
 
     def __init__(
@@ -687,10 +816,7 @@ class Mumu12CampaignRuntimeProvider:
         config: AzurLaneConfig,
         device: Device,
         *,
-        runtime_factory: Callable[
-            [AzurLaneConfig, Device, CampaignStageDefinition],
-            DeclarativeCampaignMapRuntime,
-        ] = DeclarativeCampaignMapRuntime,
+        assembly_factory: Mumu12CampaignMapAssemblyFactory = _DECLARATIVE_CAMPAIGN_RUNTIME_FACTORY,
     ) -> None:
         if not isinstance(config, AzurLaneConfig):
             message = "campaign provider config must be an AzurLaneConfig"
@@ -698,15 +824,12 @@ class Mumu12CampaignRuntimeProvider:
         if not isinstance(device, Device):
             message = "campaign provider device must be a Device"
             raise TypeError(message)
-        if isinstance(runtime_factory, type) and not issubclass(runtime_factory, DeclarativeCampaignMapRuntime):
-            message = "campaign runtime factory must build DeclarativeCampaignMapRuntime"
-            raise TypeError(message)
-        if not callable(runtime_factory):
-            message = "campaign runtime factory must be callable"
+        if isinstance(assembly_factory, type) or not callable(getattr(assembly_factory, "build_map", None)):
+            message = "campaign assembly factory must implement build_map"
             raise TypeError(message)
         self._config = config
         self._device = device
-        self._runtime_factory = runtime_factory
+        self._assembly_factory = assembly_factory
         self._handle: _RuntimeHandle | None = None
 
     @staticmethod
@@ -797,30 +920,23 @@ class Mumu12CampaignRuntimeProvider:
         cancellation.raise_if_requested()
         definition = compose_campaign_attempt_definition(session.definition, job.difficulty)
         self._activate_config(job, definition)
-        runtime = self._runtime_factory(self._config, self._device, definition)
-        if not isinstance(runtime, DeclarativeCampaignMapRuntime):
-            message = "campaign runtime factory returned an invalid runtime"
-            raise TypeError(message)
-        owner = Mumu12CampaignMapSessionOwner(
-            runtime,
-            runtime._runtime_profile_lease,  # ruff:ignore[private-member-access] - runtime 构造的唯一 lease 由 session owner 接管。
-            runtime._submarine_services.fresh_combat,  # ruff:ignore[private-member-access] - owner 显式持有构造期编译的 fresh hook。
-            runtime._map_initialization_service,  # ruff:ignore[private-member-access] - owner 显式持有构造期编译的初始化阶段。
-        )
+        assembly = self._assembly_factory.build_map(self._config, self._device, definition)
         try:
-            unit_cancellation = self._refresh_runtime_cancellation(job, runtime, cancellation)
+            unit_cancellation = self._refresh_runtime_cancellation(job, assembly.runtime, cancellation)
         except BaseException as error:
             preserve_cleanup_failure(
                 error,
-                owner.discard,
+                assembly.owner.discard,
                 message="campaign runtime construction and cleanup both failed",
             )
             raise
         return _RuntimeHandle(
-            runtime,
-            owner,
-            unit_cancellation,
-            _PreparedRuntimeOwnership(job, session),
+            runtime=assembly.runtime,
+            owner=assembly.owner,
+            program_state=assembly.program_state,
+            program_capabilities=assembly.program_capabilities,
+            cancellation=unit_cancellation,
+            ownership=_PreparedRuntimeOwnership(job, session),
         )
 
     def _release_handle(self, outcome: RuntimeSessionOutcome) -> None:
@@ -1199,11 +1315,11 @@ class Mumu12CampaignRuntimeProvider:
             handle.ownership = _ActiveRuntimeOwnership(activated.session, activated.state)
             return activated.session
 
-    def _active_runtime_for(
+    def _active_handle_for(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
-    ) -> DeclarativeCampaignMapRuntime:
+    ) -> _RuntimeHandle:
         cancellation.raise_if_requested()
         handle = self._handle
         if (
@@ -1213,26 +1329,26 @@ class Mumu12CampaignRuntimeProvider:
         ):
             message = "requested campaign session is not the active MuMu12 runtime"
             raise CampaignRuntimeEvidenceError(message)
-        return handle.runtime
+        return handle
 
     def active_runtime(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
     ) -> CampaignMapRuntime:
-        runtime = self._active_runtime_for(session, cancellation)
-        return cast("CampaignMapRuntime", runtime)
+        handle = self._active_handle_for(session, cancellation)
+        return cast("CampaignMapRuntime", handle.runtime)
 
     def battle_program_mode(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
     ) -> BattleProgramMode:
-        runtime = self._active_runtime_for(session, cancellation)
+        handle = self._active_handle_for(session, cancellation)
         return read_mumu12_battle_program_mode(
-            runtime,
-            runtime._runtime_profile,  # ruff:ignore[private-member-access] - provider owns runtime program state.
-            runtime._program_capabilities,  # ruff:ignore[private-member-access] - provider owns runtime capabilities.
+            handle.runtime,
+            handle.program_state,
+            handle.program_capabilities,
             cancellation,
         )
 
@@ -1240,7 +1356,7 @@ class Mumu12CampaignRuntimeProvider:
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
-    ) -> tuple[DeclarativeCampaignMapRuntime, SafeUnitCancellation]:
+    ) -> _RuntimeHandle:
         cancellation.raise_if_requested()
         handle = self._handle
         if (
@@ -1251,30 +1367,30 @@ class Mumu12CampaignRuntimeProvider:
             message = "requested campaign session has no active safe unit"
             raise CampaignRuntimeEvidenceError(message)
         handle.cancellation.commit()
-        return handle.runtime, handle.cancellation
+        return handle
 
     def commit_battle_program_unit(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
     ) -> Mumu12CommittedBattleProgramUnit:
-        runtime, unit_cancellation = self._commit_active_runtime(session, cancellation)
+        handle = self._commit_active_runtime(session, cancellation)
         port = build_mumu12_battle_program_port(
-            runtime,
-            runtime._runtime_profile,  # ruff:ignore[private-member-access] - provider owns runtime program state.
-            runtime._program_capabilities,  # ruff:ignore[private-member-access] - provider owns runtime capabilities.
+            handle.runtime,
+            handle.program_state,
+            handle.program_capabilities,
         )
-        return Mumu12CommittedBattleProgramUnit(port, unit_cancellation)
+        return Mumu12CommittedBattleProgramUnit(port, handle.cancellation)
 
     def commit_auto_search_unit(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
     ) -> Mumu12CommittedAutoSearchUnit:
-        runtime, unit_cancellation = self._commit_active_runtime(session, cancellation)
+        handle = self._commit_active_runtime(session, cancellation)
         return Mumu12CommittedAutoSearchUnit(
-            cast("Mumu12AutoSearchRuntime", runtime),
-            unit_cancellation,
+            cast("Mumu12AutoSearchRuntime", handle.runtime),
+            handle.cancellation,
         )
 
     def commit_active_unit(
@@ -1282,10 +1398,10 @@ class Mumu12CampaignRuntimeProvider:
         session: CampaignSession,
         cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
-        runtime, unit_cancellation = self._commit_active_runtime(session, cancellation)
+        handle = self._commit_active_runtime(session, cancellation)
         return CommittedCampaignUnit(
-            cast("CampaignMapRuntime", runtime),
-            unit_cancellation,
+            cast("CampaignMapRuntime", handle.runtime),
+            handle.cancellation,
         )
 
     def commit_replacement_unit(
@@ -1378,24 +1494,15 @@ class _HardRuntimeHandle:
     entrance: Button
 
 
-def _require_hard_behavior(runtime: DeclarativeCampaignMapRuntime) -> None:
-    if not isinstance(
-        runtime._hard_behavior,  # ruff:ignore[private-member-access] - port 在交互前验证 runtime capability。
-        CampaignClearModeExecutor,
-    ):
-        message = "hard campaign attempt requires the typed clear-mode behavior"
-        raise CampaignRuntimeProfileError(message)
-
-
 class Mumu12HardCampaignPort:
     """用同一 declarative map runtime 执行困难图，不再加载 campaign Python module。"""
 
     __slots__ = (
+        "_assembly_factory",
         "_config",
         "_device",
         "_handle",
         "_remaining_reader",
-        "_runtime_factory",
         "_sessions",
     )
 
@@ -1405,10 +1512,7 @@ class Mumu12HardCampaignPort:
         device: Device,
         sessions: HardCampaignSessionSource,
         *,
-        runtime_factory: Callable[
-            [AzurLaneConfig, Device, CampaignStageDefinition],
-            DeclarativeCampaignMapRuntime,
-        ] = DeclarativeCampaignMapRuntime,
+        assembly_factory: Mumu12CampaignHardAssemblyFactory = _DECLARATIVE_CAMPAIGN_RUNTIME_FACTORY,
         remaining_reader: Callable[[Device], int] | None = None,
     ) -> None:
         if not isinstance(config, AzurLaneConfig):
@@ -1420,11 +1524,8 @@ class Mumu12HardCampaignPort:
         if not isinstance(sessions, HardCampaignSessionSource):
             message = "hard campaign port sessions must implement the hard campaign content contract"
             raise TypeError(message)
-        if isinstance(runtime_factory, type) and not issubclass(runtime_factory, DeclarativeCampaignMapRuntime):
-            message = "hard campaign runtime factory must build DeclarativeCampaignMapRuntime"
-            raise TypeError(message)
-        if not callable(runtime_factory):
-            message = "hard campaign runtime factory must be callable"
+        if isinstance(assembly_factory, type) or not callable(getattr(assembly_factory, "build_hard", None)):
+            message = "hard campaign assembly factory must implement build_hard"
             raise TypeError(message)
         if remaining_reader is not None and not callable(remaining_reader):
             message = "hard remaining reader must be callable"
@@ -1432,7 +1533,7 @@ class Mumu12HardCampaignPort:
         self._config = config
         self._device = device
         self._sessions = sessions
-        self._runtime_factory = runtime_factory
+        self._assembly_factory = assembly_factory
         self._remaining_reader = _read_hard_remaining if remaining_reader is None else remaining_reader
         self._handle: _HardRuntimeHandle | None = None
 
@@ -1466,32 +1567,25 @@ class Mumu12HardCampaignPort:
             Campaign_Mode=CampaignDifficulty.HARD.value,
         )
         self._device.config = self._config
-        runtime = self._runtime_factory(self._config, self._device, definition)
-        if not isinstance(runtime, DeclarativeCampaignMapRuntime):
-            message = "hard campaign runtime factory returned an invalid runtime"
-            raise TypeError(message)
-        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - owner 构造前由 port 保护唯一 READY lease。
+        assembly = self._assembly_factory.build_hard(self._config, self._device, definition)
         try:
-            owner = Mumu12CampaignHardAttemptOwner(runtime, lease)
-        except BaseException as error:
-            preserve_cleanup_failure(
-                error,
-                lease.discard,
-                message="hard campaign attempt owner construction and cleanup both failed",
+            assembly.runtime.device = cast(
+                "Device",
+                CancellationAwareMumu12Device(self._device, cancellation),
             )
-            raise
-        try:
-            _require_hard_behavior(runtime)
-            runtime.device = cast("Device", CancellationAwareMumu12Device(self._device, cancellation))
-            remaining, entrance = self._read_remaining_attempts(runtime, settings, cancellation)
+            remaining, entrance = self._read_remaining_attempts(
+                assembly.runtime,
+                settings,
+                cancellation,
+            )
         except BaseException as error:
             preserve_cleanup_failure(
                 error,
-                owner.release,
+                assembly.owner.release,
                 message="hard campaign attempt discovery and cleanup both failed",
             )
             raise
-        self._handle = _HardRuntimeHandle(runtime, owner, stage, entrance)
+        self._handle = _HardRuntimeHandle(assembly.runtime, assembly.owner, stage, entrance)
         return remaining
 
     def _read_remaining_attempts(

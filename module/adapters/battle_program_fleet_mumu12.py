@@ -16,7 +16,7 @@ class _FleetActionMap(Protocol):
     def __getitem__(self, item: tuple[int, int], /) -> GridInfo: ...
 
 
-class _FleetActionSource(Protocol):
+class Mumu12FleetActionRuntime(Protocol):
     @property
     def map(self) -> _FleetActionMap: ...
 
@@ -47,7 +47,7 @@ class Mumu12FleetActionDriver:
 
     __slots__ = ("_runtime",)
 
-    def __init__(self, runtime: _FleetActionSource) -> None:
+    def __init__(self, runtime: Mumu12FleetActionRuntime) -> None:
         self._runtime = runtime
 
     def activate(self, fleet: FleetIndex, cancellation: CancellationSource) -> bool:

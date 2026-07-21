@@ -16,7 +16,7 @@ class _FleetCoordinationMap(Protocol):
     def __getitem__(self, item: tuple[int, int], /) -> GridInfo: ...
 
 
-class _FleetCoordinationSource(Protocol):
+class Mumu12FleetCoordinationRuntime(Protocol):
     @property
     def map(self) -> _FleetCoordinationMap: ...
 
@@ -41,7 +41,7 @@ class Mumu12FleetCoordinationDriver:
 
     __slots__ = ("_runtime",)
 
-    def __init__(self, runtime: _FleetCoordinationSource) -> None:
+    def __init__(self, runtime: Mumu12FleetCoordinationRuntime) -> None:
         self._runtime = runtime
 
     def push_forward(self, cancellation: CancellationSource) -> bool:

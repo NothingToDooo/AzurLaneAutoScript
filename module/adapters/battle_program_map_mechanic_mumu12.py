@@ -16,7 +16,7 @@ class _MapMechanicMap(Protocol):
     def select(self, **criteria: object) -> SelectedGrids[GridInfo]: ...
 
 
-class _MapMechanicSource(Protocol):
+class Mumu12MapMechanicRuntime(Protocol):
     @property
     def map(self) -> _MapMechanicMap: ...
 
@@ -34,7 +34,7 @@ class Mumu12MapMechanicDriver:
 
     __slots__ = ("_runtime",)
 
-    def __init__(self, runtime: _MapMechanicSource) -> None:
+    def __init__(self, runtime: Mumu12MapMechanicRuntime) -> None:
         self._runtime = runtime
 
     def trigger_mechanisms(

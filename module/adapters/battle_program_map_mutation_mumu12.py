@@ -37,7 +37,7 @@ class _StageDefinition(Protocol):
     def map(self) -> _MapDefinition: ...
 
 
-class _MapMutationSource(Protocol):
+class Mumu12MapMutationRuntime(Protocol):
     @property
     def definition(self) -> _StageDefinition: ...
 
@@ -50,7 +50,7 @@ class Mumu12MapMutationDriver:
 
     __slots__ = ("_runtime",)
 
-    def __init__(self, runtime: _MapMutationSource) -> None:
+    def __init__(self, runtime: Mumu12MapMutationRuntime) -> None:
         self._runtime = runtime
 
     def mark_all_siren_candidates(self, cancellation: CancellationSource) -> None:

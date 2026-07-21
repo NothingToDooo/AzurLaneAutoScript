@@ -5,25 +5,37 @@ from module.adapters.battle_program_battle_action_mumu12 import (
     Mumu12BattleActionDependencies,
     Mumu12BattleActionExecutor,
 )
-from module.adapters.battle_program_fleet_coordination_mumu12 import Mumu12FleetCoordinationDriver
-from module.adapters.battle_program_fleet_mumu12 import Mumu12FleetActionDriver
-from module.adapters.battle_program_map_mechanic_mumu12 import Mumu12MapMechanicDriver
-from module.adapters.battle_program_map_mutation_mumu12 import Mumu12MapMutationDriver
+from module.adapters.battle_program_fleet_coordination_mumu12 import (
+    Mumu12FleetCoordinationDriver,
+    Mumu12FleetCoordinationRuntime,
+)
+from module.adapters.battle_program_fleet_mumu12 import Mumu12FleetActionDriver, Mumu12FleetActionRuntime
+from module.adapters.battle_program_map_mechanic_mumu12 import (
+    Mumu12MapMechanicDriver,
+    Mumu12MapMechanicRuntime,
+)
+from module.adapters.battle_program_map_mutation_mumu12 import (
+    Mumu12MapMutationDriver,
+    Mumu12MapMutationRuntime,
+)
 from module.adapters.battle_program_mechanic_action_mumu12 import (
     Mumu12MechanicActionDependencies,
     Mumu12MechanicActionExecutor,
 )
 from module.adapters.battle_program_mumu12 import Mumu12BattleProgramPort
-from module.adapters.battle_program_read_mumu12 import Mumu12BattleProgramReadModel, RuntimeProgramState
-from module.adapters.battle_program_roadblock_mumu12 import Mumu12RoadblockPlanner
+from module.adapters.battle_program_read_mumu12 import (
+    Mumu12BattleProgramReadModel,
+    Mumu12ProgramReadSource,
+    RuntimeProgramState,
+)
+from module.adapters.battle_program_roadblock_mumu12 import Mumu12RoadblockPlanner, Mumu12RoadblockRuntime
 from module.adapters.battle_program_selection_mumu12 import BattleTargetSelector
-from module.adapters.battle_program_strategy_mumu12 import Mumu12StrategyActionDriver
+from module.adapters.battle_program_strategy_mumu12 import Mumu12StrategyActionDriver, Mumu12StrategyRuntime
 from module.content.battle_program import BattleProgram, BattleProgramMode
 from module.content.campaign_session import CampaignSession, CampaignSessionState
 from module.gameplay.battle_program import BattleProgramExecution, BattleProgramInterpreter
 
 if TYPE_CHECKING:
-    from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
     from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
     from module.application import CancellationSource
 
@@ -48,8 +60,21 @@ class Mumu12BattleProgramUnitSource(Protocol):
     ) -> Mumu12CommittedBattleProgramUnit: ...
 
 
+class Mumu12BattleProgramRuntime(
+    Mumu12ProgramReadSource,
+    Mumu12FleetActionRuntime,
+    Mumu12FleetCoordinationRuntime,
+    Mumu12StrategyRuntime,
+    Mumu12MapMutationRuntime,
+    Mumu12MapMechanicRuntime,
+    Mumu12RoadblockRuntime,
+    Protocol,
+):
+    """BattleProgram 各 driver 所需 runtime 表面的组合。"""
+
+
 def build_mumu12_battle_program_port(
-    runtime: DeclarativeCampaignMapRuntime,
+    runtime: Mumu12BattleProgramRuntime,
     program_state: RuntimeProgramState,
     program_capabilities: CampaignProgramCapabilityReader,
 ) -> Mumu12BattleProgramPort:
@@ -86,7 +111,7 @@ def build_mumu12_battle_program_port(
 
 
 def read_mumu12_battle_program_mode(
-    runtime: DeclarativeCampaignMapRuntime,
+    runtime: Mumu12ProgramReadSource,
     program_state: RuntimeProgramState,
     program_capabilities: CampaignProgramCapabilityReader,
     cancellation: CancellationSource,
