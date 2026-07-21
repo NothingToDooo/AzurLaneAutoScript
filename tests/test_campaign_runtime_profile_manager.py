@@ -27,6 +27,7 @@ from module.content.runtime_profile import (
     RuntimeTuningKey,
 )
 from module.map.map_base import CampaignMap
+from module.map.map_layout import CampaignMapLayout
 from module.map_detection.grid import Grid
 from module.map_detection.grid_info import GridInfo
 
@@ -454,12 +455,12 @@ def test_map_and_camera_grid_ports_are_selected_independently() -> None:
             )
         ),
     )
-    compiled = CampaignMap("test")
+    grid_class = manager.map_grid_class
+    assert grid_class is _MapGrid
+    layout = CampaignMapLayout(grid_class=grid_class)
+    layout.initialize("A1")
 
-    manager.install_map_grid(compiled)
-
-    assert compiled.grid_class is _MapGrid
-    assert manager.map_grid_class is _MapGrid
+    assert isinstance(layout[(0, 0)], _MapGrid)
     assert manager.camera_grid_class is _CameraGrid
 
 

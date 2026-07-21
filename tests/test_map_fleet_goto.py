@@ -70,6 +70,7 @@ class _Cell:
 
 class _Map:
     def __init__(self) -> None:
+        self.layout = self
         self.path_results: dict[tuple[GridLocation, int, bool], list[GridLocation]] = {}
         self.find_path_calls: list[tuple[GridLocation, int, bool]] = []
         self.cells: dict[GridLocation, _Cell] = {}

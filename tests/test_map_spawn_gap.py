@@ -47,7 +47,7 @@ def test_estimate_accounts_for_progress_and_observed_spawns() -> None:
     map_[(2, 0)].is_mystery = True
     map_[(3, 0)].is_siren = True
     map_[(4, 0)].is_boss = True
-    map_.map_covered = ["B1"]
+    map_.layout.set_manual_coverage(["B1"])
     predictor = MapSpawnGapPredictor(map_)
 
     snapshot = predictor.estimate(MapSpawnProgress(battle_count=1))
@@ -84,7 +84,7 @@ def test_infer_covered_spawns_marks_only_forced_candidates() -> None:
         "ME MM MS MB ME",
         [{"battle": 0, "enemy": 1, "mystery": 1, "siren": 1, "boss": 1}],
     )
-    map_.map_covered = ["A1", "B1", "C1", "D1", "E1"]
+    map_.layout.set_manual_coverage(["A1", "B1", "C1", "D1", "E1"])
     predictor = MapSpawnGapPredictor(map_)
 
     predictor.infer_covered_spawns(MapSpawnProgress())
@@ -98,7 +98,7 @@ def test_infer_covered_spawns_marks_only_forced_candidates() -> None:
 
 def test_infer_covered_carrier_marks_the_only_candidate_as_enemy() -> None:
     map_ = _campaign_map("--", [{"battle": 0}])
-    map_.map_covered = ["A1"]
+    map_.layout.set_manual_coverage(["A1"])
 
     MapSpawnGapPredictor(map_).infer_covered_spawns(MapSpawnProgress(carrier_count=1, mode="carrier"))
 
@@ -107,7 +107,7 @@ def test_infer_covered_carrier_marks_the_only_candidate_as_enemy() -> None:
 
 def test_movable_mode_broadens_covered_enemy_and_siren_candidates() -> None:
     map_ = _campaign_map("--", [{"battle": 0}])
-    map_.map_covered = ["A1"]
+    map_.layout.set_manual_coverage(["A1"])
     predictor = MapSpawnGapPredictor(map_)
 
     normal = predictor.estimate(MapSpawnProgress())
@@ -119,7 +119,7 @@ def test_movable_mode_broadens_covered_enemy_and_siren_candidates() -> None:
 
 def test_poor_map_never_finishes_or_infers_covered_spawns() -> None:
     map_ = _campaign_map("ME", [{"battle": 0, "enemy": 1}])
-    map_.map_covered = ["A1"]
+    map_.layout.set_manual_coverage(["A1"])
     map_.poor_map_data = True
     predictor = MapSpawnGapPredictor(map_)
 
@@ -138,7 +138,7 @@ def test_full_scan_uses_one_progress_snapshot_for_completion_and_inference() -> 
     CampaignFullScanEngine().scan(
         camera,
         MapScanRequest(
-            queue=map_.to_selected(["A1"]),
+            queue=map_.layout.to_selected(["A1"]),
             progress=progress,
         ),
     )

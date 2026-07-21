@@ -3,16 +3,17 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
-from module.base.utils import location2node, node2location
+from module.base.utils import location2node
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
+from module.map.map_layout import CampaignMapLayout, parse_grid_text
 from module.map.map_pathfinder import CampaignPathfinder
 from module.map.map_topology import CampaignMapTopology
-from module.map.utils import camera_2d, location_ensure
+from module.map.utils import location_ensure
 from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Mapping, Sequence, ValuesView
+    from collections.abc import Iterable, Iterator, Mapping, Sequence
 
     from module.base.type_alias import Point
     from module.map.type_alias import GridLocation, GridMode
@@ -24,17 +25,14 @@ type FortressItem = GridInfo | str
 type FortressGroup = FortressItem | tuple[FortressItem, ...] | list[FortressItem] | SelectedGrids[GridInfo]
 
 
-class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与地图数据状态。
-    def __init__(self, name: str | None = None) -> None:
+class CampaignMap:
+    def __init__(self, name: str | None = None, *, layout: CampaignMapLayout | None = None) -> None:
         self.name = name
-        self.grid_class: type[GridInfo] = GridInfo
-        self.grids: dict[GridLocation, GridInfo] = {}
-        self.topology = CampaignMapTopology(self.grids)
-        self.pathfinder = CampaignPathfinder(self.grids, self.topology)
-        self._shape: GridLocation = (0, 0)
+        self.layout = CampaignMapLayout() if layout is None else layout
+        self.topology = CampaignMapTopology(self.layout.grids)
+        self.pathfinder = CampaignPathfinder(self.layout.grids, self.topology)
         self._map_data = ""
         self._map_data_loop = ""
-        self._weight_data = ""
         self._land_based_data: list[tuple[str, str]] = []
         self._maze_data: list[tuple[str, ...]] = []
         self.maze_round = 9
@@ -44,13 +42,9 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
         self._spawn_data_stack: list[dict[str, int]] = []
         self._spawn_data_loop: list[SpawnRule] = []
         self._spawn_data_use_loop = False
-        self._camera_data = SelectedGrids[GridInfo]([])
-        self._camera_data_spawn_point = SelectedGrids[GridInfo]([])
-        self._map_covered = SelectedGrids[GridInfo]([])
         self._ignore_prediction: list[tuple[GridLocation, dict[str, object]]] = []
         self.in_map_swipe_preset_data: GridLocation | None = None
         self.poor_map_data = False
-        self.camera_sight = (-3, -1, 3, 2)
 
     @staticmethod
     def _require_grid_location(grid: GridInfo) -> GridLocation:
@@ -60,51 +54,13 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
         return grid.location
 
     def __iter__(self) -> Iterator[GridInfo]:
-        return iter(self.grids.values())
+        return iter(self.layout)
 
     def __getitem__(self, item: Point) -> GridInfo:
-        location = location_ensure(item)
-        return self.grids[location]
+        return self.layout[item]
 
     def __contains__(self, item: object) -> bool:
-        if isinstance(item, np.ndarray):
-            if item.shape != (2,):
-                return False
-            values = cast("list[int]", np.asarray(item, dtype=int).tolist())
-            return (values[0], values[1]) in self.grids
-        if not isinstance(item, (tuple, list)) or len(item) != 2:
-            return False
-        x, y = item
-        if not isinstance(x, (int, np.integer)) or not isinstance(y, (int, np.integer)):
-            return False
-        return (int(x), int(y)) in self.grids
-
-    @staticmethod
-    def _parse_text(text: str) -> Iterator[tuple[GridLocation, str]]:
-        text = text.strip()
-        for y, raw_row in enumerate(text.split("\n")):
-            row = raw_row.strip()
-            for x, data in enumerate(row.split(" ")):
-                yield (x, y), data
-
-    @property
-    def shape(self) -> GridLocation:
-        return self._shape
-
-    @shape.setter
-    def shape(self, scale: str) -> None:
-        self._shape = node2location(scale.upper())
-        for y in range(self._shape[1] + 1):
-            for x in range(self._shape[0] + 1):
-                grid = self.grid_class()
-                grid.location = (x, y)
-                self.grids[(x, y)] = grid
-
-        # camera_data 可自动生成，但手动设置通常更稳定。
-        self.camera_data = [location2node(loca) for loca in camera_2d((0, 0, *self._shape), sight=self.camera_sight)]
-        self.camera_data_spawn_point = []
-        for grid in self:
-            grid.weight = 10.0
+        return item in self.layout
 
     @property
     def map_data(self) -> str:
@@ -133,12 +89,12 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
             self._load_map_data(self.map_data)
 
     def _load_map_data(self, text: str) -> None:
-        if not len(self.grids.keys()):
-            grids = np.array([loca for loca, _ in self._parse_text(text)])
-            self.shape = location2node(tuple(np.max(grids, axis=0)))
+        if not self.layout.grids:
+            grids = np.array([location for location, _ in parse_grid_text(text)])
+            self.layout.initialize(location2node(tuple(np.max(grids, axis=0))))
 
-        for loca, data in self._parse_text(text):
-            self.grids[loca].decode(data)
+        for location, data in parse_grid_text(text):
+            self.layout[location].decode(data)
 
     @property
     def land_based_data(self) -> list[tuple[str, str]]:
@@ -159,9 +115,9 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
         self._land_based_data = [(entry[0], entry[1]) for entry in data]
         for land_based in data:
             grid, rotation = land_based
-            grid = self.grids[location_ensure(grid)]
-            trigger = self.grid_covered(grid=grid, location=[(0, -1), (0, 1), (-1, 0), (1, 0)]).select(is_land=False)
-            block = self.grid_covered(grid=grid, location=rotation_dict[rotation]).select(is_land=False)
+            grid = self.layout[location_ensure(grid)]
+            trigger = self.layout.covered_by(grid, offsets=[(0, -1), (0, 1), (-1, 0), (1, 0)]).select(is_land=False)
+            block = self.layout.covered_by(grid, offsets=rotation_dict[rotation]).select(is_land=False)
             trigger.set(is_mechanism_trigger=True, mechanism_trigger=trigger, mechanism_block=block)
             block.set(is_mechanism_block=True)
 
@@ -178,11 +134,11 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
         self._maze_data = [tuple(group) for group in data]
         self.maze_round = len(data) * 3
         for index, raw_maze in enumerate(data):
-            maze = self.to_selected(raw_maze)
+            maze = self.layout.to_selected(raw_maze)
             maze.set(is_maze=True, maze_round=tuple(range(index * 3, index * 3 + 3)))
             for grid in maze:
                 self.pathfinder.project(grid, has_ambush=False)
-                grid.maze_nearby = self.select(cost=1).add(self.select(cost=2)).select(is_land=False)
+                grid.maze_nearby = self.layout.select(cost=1).add(self.layout.select(cost=2)).select(is_land=False)
 
     @property
     def fortress_data(self) -> tuple[SelectedGrids[GridInfo], SelectedGrids[GridInfo]]:
@@ -197,10 +153,10 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
 
     def _to_fortress_group(self, group: FortressGroup) -> SelectedGrids[GridInfo]:
         if isinstance(group, (GridInfo, str)):
-            return self.to_selected((group,))
+            return self.layout.to_selected((group,))
         if isinstance(group, SelectedGrids):
             return cast("SelectedGrids[GridInfo]", group)
-        return self.to_selected(group)
+        return self.layout.to_selected(group)
 
     def _load_fortress_data(self, data: tuple[SelectedGrids[GridInfo], SelectedGrids[GridInfo]]) -> None:
         """data 为 [要塞敌人, 阻挡格]，两项均可为格子名或格子名序列。"""
@@ -215,7 +171,7 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
 
     @bouncing_enemy_data.setter
     def bouncing_enemy_data(self, data: Sequence[Iterable[GridInfo | str | Point]]) -> None:
-        self._bouncing_enemy_data = [self.to_selected(route) for route in data]
+        self._bouncing_enemy_data = [self.layout.to_selected(route) for route in data]
 
     @staticmethod
     def _load_bouncing_enemy_data(data: Sequence[SelectedGrids[GridInfo]]) -> None:
@@ -245,27 +201,27 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
 
     def fixup_submarine_fleet(self) -> None:
         # 潜艇和下方格共享弹药图标，下方格可能被误识别为舰队。
-        for grid in self.select(is_fleet=True):
+        for grid in self.layout.select(is_fleet=True):
             if grid.is_spawn_point:
                 continue
-            for upper in self.grid_covered(grid, location=[(0, -1)]):
+            for upper in self.layout.covered_by(grid, offsets=[(0, -1)]):
                 if upper.is_submarine_spawn_point:
                     logger.info(f"Fixup submarine spawn point, fleet={grid} -> submarine={upper}")
                     grid.is_fleet = False
                     grid.is_current_fleet = False
                     upper.is_submarine = True
         # 初始化时格子不能同时为敌人和舰队；这种冲突也可能来自上方潜艇。
-        for grid in self.select(is_enemy=True, is_fleet=True):
+        for grid in self.layout.select(is_enemy=True, is_fleet=True):
             grid.is_fleet = False
             grid.is_current_fleet = False
 
     def show(self) -> None:
-        logger.info("   " + " ".join([" " + chr(x + 64 + 1) for x in range(self.shape[0] + 1)]))
-        for y in range(self.shape[1] + 1):
+        logger.info("   " + " ".join([" " + chr(x + 64 + 1) for x in range(self.layout.shape[0] + 1)]))
+        for y in range(self.layout.shape[1] + 1):
             text = (
                 str(y + 1).rjust(2)
                 + " "
-                + " ".join([self[(x, y)].str if (x, y) in self else "  " for x in range(self.shape[0] + 1)])
+                + " ".join([self[(x, y)].str if (x, y) in self else "  " for x in range(self.layout.shape[0] + 1)])
             )
             logger.info(text)
 
@@ -278,11 +234,11 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
             grid_location = self._require_grid_location(grid)
             raw_location = offset + grid_location
             loca = (int(raw_location[0]), int(raw_location[1]))
-            if loca in self.grids:
+            if loca in self.layout:
                 if self.ignore_prediction_match(globe=loca, local=grid):
                     continue
-                if not copy.copy(self.grids[loca]).merge(grid, mode=mode):
-                    logger.warning(f"Wrong Prediction. {self.grids[loca]} = '{grid.str}'")
+                if not copy.copy(self.layout[loca]).merge(grid, mode=mode):
+                    logger.warning(f"Wrong Prediction. {self.layout[loca]} = '{grid.str}'")
                     failed_count += 1
 
         if failed_count < 2:
@@ -290,10 +246,10 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
                 grid_location = self._require_grid_location(grid)
                 raw_location = offset + grid_location
                 loca = (int(raw_location[0]), int(raw_location[1]))
-                if loca in self.grids:
+                if loca in self.layout:
                     if self.ignore_prediction_match(globe=loca, local=grid):
                         continue
-                    self.grids[loca].merge(grid, mode=mode)
+                    self.layout[loca].merge(grid, mode=mode)
             if mode == "init":
                 self.fixup_submarine_fleet()
             return True
@@ -307,24 +263,6 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
     def reset_fleet(self) -> None:
         for grid in self:
             grid.is_current_fleet = False
-
-    @property
-    def camera_data(self) -> SelectedGrids[GridInfo]:
-        return self._camera_data
-
-    @camera_data.setter
-    def camera_data(self, nodes: Sequence[str]) -> None:
-        self._camera_data = SelectedGrids([self[node2location(node)] for node in nodes])
-
-    @property
-    def camera_data_spawn_point(self) -> SelectedGrids[GridInfo]:
-        """返回用于检测出生点舰队的额外相机位置。"""
-        return self._camera_data_spawn_point
-
-    @camera_data_spawn_point.setter
-    def camera_data_spawn_point(self, nodes: Sequence[str]) -> None:
-        """nodes 为格子名列表。"""
-        self._camera_data_spawn_point = SelectedGrids([self[node2location(node)] for node in nodes])
 
     @property
     def spawn_data(self) -> list[SpawnRule]:
@@ -369,31 +307,6 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
             spawn["boss"] += data.get("boss", 0)
             self._spawn_data_stack.append(spawn.copy())
 
-    @property
-    def weight_data(self) -> str:
-        return self._weight_data
-
-    @weight_data.setter
-    def weight_data(self, text: str) -> None:
-        self._weight_data = text
-        for loca, data in self._parse_text(text):
-            self[loca].weight = float(data)
-
-    @property
-    def map_covered(self) -> SelectedGrids[GridInfo]:
-        covered = []
-        for grid in self:
-            covered += self.grid_covered(grid).grids
-        return SelectedGrids(covered).add(self._map_covered)
-
-    @property
-    def manual_map_covered(self) -> SelectedGrids[GridInfo]:
-        return self._map_covered
-
-    @map_covered.setter
-    def map_covered(self, nodes: Sequence[str]) -> None:
-        self._map_covered = SelectedGrids([self[node2location(node)] for node in nodes])
-
     def ignore_prediction(self, globe: GridInfo | str | Point, **local: object) -> None:
         """忽略 globe 格上匹配 local 属性的预测；例如 D5 上的 1E 敌人。"""
         globe = location_ensure(globe)
@@ -408,34 +321,10 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与�
 
     @property
     def is_map_data_poor(self) -> bool:
-        if not self.select(may_enemy=True) or not self.select(may_boss=True) or not self.select(is_spawn_point=True):
+        if (
+            not self.layout.select(may_enemy=True)
+            or not self.layout.select(may_boss=True)
+            or not self.layout.select(is_spawn_point=True)
+        ):
             return False
         return bool(self.spawn_data)
-
-    def grid_covered(self, grid: GridInfo, location: Sequence[GridLocation] | None = None) -> SelectedGrids[GridInfo]:
-        """按相对坐标 location 返回 grid 覆盖的有效格子；默认使用其覆盖范围。"""
-        grid_location = self._require_grid_location(grid)
-        if location is None:
-            covered = [(grid_location[0] + upper[0], grid_location[1] + upper[1]) for upper in grid.covered_grid()]
-        else:
-            covered = [(grid_location[0] + upper[0], grid_location[1] + upper[1]) for upper in location]
-        covered = [self[upper] for upper in covered if upper in self]
-        return SelectedGrids(covered)
-
-    def select(self, **kwargs: object) -> SelectedGrids[GridInfo]:
-        result = []
-        for grid in self:
-            flag = True
-            for k, v in kwargs.items():
-                if getattr(grid, k) != v:
-                    flag = False
-            if flag:
-                result.append(grid)
-
-        return SelectedGrids(result)
-
-    def to_selected(self, grids: Iterable[GridInfo | str | Point]) -> SelectedGrids[GridInfo]:
-        return SelectedGrids([self[location_ensure(loca)] for loca in grids])
-
-    def flatten(self) -> ValuesView[GridInfo]:
-        return self.grids.values()

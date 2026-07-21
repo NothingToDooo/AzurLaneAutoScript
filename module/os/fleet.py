@@ -109,7 +109,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
     def map_data_init(self, map_: CampaignMap | None = None) -> None:
         map_ = OSCampaignMap()
-        map_.shape = self.zone.shape
+        map_.layout.initialize(self.zone.shape)
         super().map_data_init(map_)
 
     def map_control_init(self) -> None:

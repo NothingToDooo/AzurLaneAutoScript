@@ -715,7 +715,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if rescan_mode == "full":
             logger.hr("Map rescan full", level=2)
             self.map_init(map_=None)
-            queue = self.map.camera_data
+            queue = self.map.layout.camera_data
             while len(queue) > 0:
                 logger.hr(f"Map rescan {queue[0]}")
                 queue = queue.sort_by_camera_distance(self.camera)

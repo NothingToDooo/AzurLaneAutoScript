@@ -358,11 +358,11 @@ class Camera(MapOperation):
         if self.view.left_edge:
             x = 0 + self.view.center_loca[0]
         elif self.view.right_edge:
-            x = self.map.shape[0] - self.view.shape[0] + self.view.center_loca[0]
+            x = self.map.layout.shape[0] - self.view.shape[0] + self.view.center_loca[0]
         else:
             x = self.camera[0]
         if self.view.upper_edge:
-            y = self.map.shape[1] - self.view.shape[1] + self.view.center_loca[1]
+            y = self.map.layout.shape[1] - self.view.shape[1] + self.view.center_loca[1]
         elif self.view.lower_edge:
             y = 0 + self.view.center_loca[1]
         else:
@@ -492,7 +492,7 @@ class Camera(MapOperation):
         """执行未被 profile 规则处理的标准视野算法。"""
         location = request.location
         logger.info(f"In sight: {location2node(location)}")
-        sight = self.map.camera_sight if request.sight is None else request.sight
+        sight = self.map.layout.camera_sight if request.sight is None else request.sight
 
         diff = np.array(location) - self.camera
         if diff[1] > sight[3]:
@@ -546,15 +546,15 @@ class Camera(MapOperation):
         logger.info("Full scan find boss.")
         self.map.reset_fleet()
 
-        queue = self.map.select(may_boss=True)
+        queue = self.map.layout.select(may_boss=True)
         while len(queue) > 0:
             queue = queue.sort_by_camera_distance(self.camera)
             self.in_sight(queue[0])
             self.predict()
             queue = queue[1:]
 
-            boss = self.map.select(is_boss=True)
-            boss = boss.add(self.map.select(may_boss=True, is_enemy=True))
+            boss = self.map.layout.select(is_boss=True)
+            boss = boss.add(self.map.layout.select(may_boss=True, is_enemy=True))
             if boss:
                 logger.info(f"Boss found: {boss}")
                 self.map.show()
@@ -587,8 +587,8 @@ class Camera(MapOperation):
             return result
 
         whitelist = (
-            self.map.select(is_land=True)
-            .add(self.map.select(is_current_fleet=True))
+            self.map.layout.select(is_land=True)
+            .add(self.map.layout.select(is_current_fleet=True))
             .sort_by_camera_distance(self.camera)
         )
         blacklist = (

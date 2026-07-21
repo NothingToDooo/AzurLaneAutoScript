@@ -116,6 +116,8 @@ from module.gameplay.campaign_live import (
 from module.gameplay.encounter import HardBattleOutcome, HardSettings
 from module.hard import assets as hard_assets
 from module.map.map_base import CampaignMap
+from module.map.map_layout import CampaignMapLayout
+from module.map_detection.grid_info import GridInfo
 from module.ocr.ocr import Digit, DigitCounter
 from module.task_registry import command_to_config_name
 from module.ui.assets import CAMPAIGN_MENU_NO_EVENT
@@ -269,21 +271,27 @@ def _install_map_structures(
     compiled.bouncing_enemy_data = structures.bouncing_enemy_data
 
 
-def compile_campaign_map(definition: CampaignStageDefinition) -> CampaignMap:
+def compile_campaign_map(
+    definition: CampaignStageDefinition,
+    *,
+    grid_class: type[GridInfo] = GridInfo,
+) -> CampaignMap:
     """把不可变关卡定义编译为旧地图引擎唯一需要的运行对象。"""
 
     if not isinstance(definition, CampaignStageDefinition):
         message = "campaign map compiler requires a CampaignStageDefinition"
         raise TypeError(message)
     source = definition.map
-    compiled = CampaignMap(source.name)
-    compiled.shape = location2node((source.shape.columns - 1, source.shape.rows - 1))
-    compiled.map_covered = [location2node((cell.x, cell.y)) for cell in source.map_covered]
+    compiled = CampaignMap(source.name, layout=CampaignMapLayout(grid_class=grid_class))
+    compiled.layout.initialize(location2node((source.shape.columns - 1, source.shape.rows - 1)))
+    compiled.layout.set_manual_coverage([location2node((cell.x, cell.y)) for cell in source.map_covered])
     compiled.map_data = _variant_text(source.normal, "token")
     compiled.map_data_loop = _variant_text(source.loop, "token")
-    compiled.weight_data = _variant_text(source.normal, "weight")
-    compiled.camera_data = [location2node((cell.x, cell.y)) for cell in source.camera_data]
-    compiled.camera_data_spawn_point = [location2node((cell.x, cell.y)) for cell in source.camera_data_spawn_point]
+    compiled.layout.apply_weights(_variant_text(source.normal, "weight"))
+    compiled.layout.set_camera_data([location2node((cell.x, cell.y)) for cell in source.camera_data])
+    compiled.layout.set_camera_data_spawn_point(
+        [location2node((cell.x, cell.y)) for cell in source.camera_data_spawn_point]
+    )
     compiled.land_based_data = [
         (location2node((unit.cell_id.x, unit.cell_id.y)), unit.direction.value) for unit in source.land_based
     ]
@@ -492,8 +500,10 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         self._hard_behavior = build_campaign_clear_mode_behavior(
             self._runtime_profile.executor_instances(RuntimeExecutorKind.HARD_MODE)
         )
-        self.MAP = compile_campaign_map(definition)
-        self._runtime_profile.install_map_grid(self.MAP)
+        self.MAP = compile_campaign_map(
+            definition,
+            grid_class=self._runtime_profile.map_grid_class or GridInfo,
+        )
         camera_grid_class = self._runtime_profile.camera_grid_class
         if camera_grid_class is not None:
             self.grid_class = camera_grid_class

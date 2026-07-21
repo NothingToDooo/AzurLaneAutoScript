@@ -457,14 +457,6 @@ class CampaignRuntimeProfileManager:
     def configured_boss_fleet(self) -> ConfiguredBossFleet | None:
         return self._tuning_patch.config.configured_boss_fleet
 
-    def install_map_grid(self, compiled_map: CampaignMap) -> None:
-        if not isinstance(compiled_map, CampaignMap):
-            message = "runtime profile map grid installation requires CampaignMap"
-            raise TypeError(message)
-        grid_class = self.map_grid_class
-        if grid_class is not None:
-            compiled_map.grid_class = grid_class
-
     @property
     def map_grid_class(self) -> type[GridInfo] | None:
         values = tuple(

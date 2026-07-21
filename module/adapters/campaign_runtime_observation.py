@@ -101,7 +101,7 @@ class PreserveEnemyGenreExecutor(CampaignMapObserverExecutor):
         request: MovableScanRequest,
         next_handler: FullScanMovableNext,
     ) -> None:
-        self._preserved = runtime.map.select(enemy_genre=self._genre)
+        self._preserved = runtime.map.layout.select(enemy_genre=self._genre)
         logger.attr("Preserved_enemy_genre", self._preserved)
         try:
             next_handler(runtime, request)

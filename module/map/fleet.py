@@ -166,7 +166,7 @@ class Fleet(Camera, AmbushHandler):
 
     @property
     def _walk_sight(self) -> tuple[int, int, int, int]:
-        sight = self.map.camera_sight
+        sight = self.map.layout.camera_sight
         return (sight[0], 0, sight[2], sight[3])
 
     def _goto_walk_extra(self, grid: GridInfo) -> float:
@@ -383,9 +383,9 @@ class Fleet(Camera, AmbushHandler):
         self.map[state.location].is_fleet = True
         setattr(self, f"fleet_{self.fleet_current_index}_location", state.location)
         if state.result_mystery == "get_carrier":
-            previous = self.map.select(is_enemy=True)
+            previous = self.map.layout.select(is_enemy=True)
             self.full_scan(MapScanRequest(progress=self._spawn_progress(mode="carrier")))
-            spawned = self.map.select(is_enemy=True).delete(previous)
+            spawned = self.map.layout.select(is_enemy=True).delete(previous)
             logger.info(f"Carrier spawn: {spawned}")
         if state.result == "combat":
             self._turn_controller.battle_resolved(self.battle_count)
@@ -428,7 +428,7 @@ class Fleet(Camera, AmbushHandler):
             self.withdraw()
         portal_destination = self.map.topology.portal_destination(location)
         # 上方格子可能是潜艇，会干扰 predict_fleet()。
-        may_submarine_icon = self.map.grid_covered(self.map[location], location=[(0, -1)])
+        may_submarine_icon = self.map.layout.covered_by(self.map[location], offsets=[(0, -1)])
         may_submarine_icon = may_submarine_icon and self.fleet_submarine_location == may_submarine_icon[0].location
         request = _GotoRequest(
             location=location,
@@ -500,7 +500,7 @@ class Fleet(Camera, AmbushHandler):
             if maze_nearby is None:
                 msg = "激活的迷宫格缺少相邻格子"
                 raise RuntimeError(msg)
-            grids = maze_nearby.delete(self.map.select(is_fleet=True))
+            grids = maze_nearby.delete(self.map.layout.select(is_fleet=True))
             non_enemy_grids = grids.select(is_enemy=False)
             if non_enemy_grids:
                 grids = non_enemy_grids
@@ -533,8 +533,8 @@ class Fleet(Camera, AmbushHandler):
             location_dict[2] = self.fleet_2_location
         location_dict[1] = self.fleet_1_location
         # 解除要塞阻挡。
-        if self.config.MAP_HAS_FORTRESS and not self.map.select(is_fortress=True):
-            self.map.select(is_mechanism_block=True).set(is_mechanism_block=False)
+        if self.config.MAP_HAS_FORTRESS and not self.map.layout.select(is_fortress=True):
+            self.map.layout.select(is_mechanism_block=True).set(is_mechanism_block=False)
         self.map.pathfinder.project_fleets(
             location_dict, current=self.fleet_current, has_ambush=self.config.MAP_HAS_AMBUSH
         )
@@ -648,7 +648,7 @@ class Fleet(Camera, AmbushHandler):
         self.handle_info_bar()  # “Changed to fleet 2”信息条会遮住弹药图标。
         self.full_scan(
             MapScanRequest(
-                must_scan=self.map.camera_data_spawn_point,
+                must_scan=self.map.layout.camera_data_spawn_point,
                 progress=self._spawn_progress(mode="init"),
             )
         )
@@ -760,7 +760,7 @@ class Fleet(Camera, AmbushHandler):
         if grid.is_accessible:
             return SelectedGrids([])
 
-        enemies = self.map.select(is_enemy=True)
+        enemies = self.map.layout.select(is_enemy=True)
         logger.info(f"Potential enemy roadblocks: {enemies}")
         for repeat in range(1, enemies.count + 1):
             for select in itertools.combinations(enemies, repeat):
@@ -877,7 +877,7 @@ class Fleet(Camera, AmbushHandler):
         return result
 
     def submarine_move_near_boss(self, boss: GridInfo | str | GridLocation) -> bool:
-        if not (self.is_call_submarine_at_boss and self.map.select(is_submarine_spawn_point=True)):
+        if not (self.is_call_submarine_at_boss and self.map.layout.select(is_submarine_spawn_point=True)):
             return False
         if self.config.Submarine_DistanceToBoss == "use_open_ocean_support":
             logger.info("Going to use Open Ocean Support, skip moving submarines")
@@ -890,7 +890,7 @@ class Fleet(Camera, AmbushHandler):
         self.map.pathfinder.show_cost()
 
         def get_location(distance: int = 2) -> GridLocation:
-            grids = self.map.select(is_land=False).filter(
+            grids = self.map.layout.select(is_land=False).filter(
                 lambda grid: (
                     sum(
                         abs(coordinate - target) for coordinate, target in zip(location_ensure(grid), boss, strict=True)

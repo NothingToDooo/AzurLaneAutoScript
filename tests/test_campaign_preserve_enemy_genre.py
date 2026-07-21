@@ -75,7 +75,7 @@ class _PreserveRuntime:
         behavior: _MovableBehavior,
     ) -> None:
         self.map = CampaignMap("preserve-enemy-genre-test")
-        self.map.shape = "A1"
+        self.map.layout.initialize("A1")
         self.grid = self.map[(0, 0)]
         self.grid.is_siren = True
         self.grid.enemy_genre = _GENRE

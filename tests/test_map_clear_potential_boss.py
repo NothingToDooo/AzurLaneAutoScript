@@ -30,7 +30,7 @@ class _TrackedSelectedGrids(SelectedGrids[_Grid]):
         return _TrackedSelectedGrids(sorted_grids.grids, self.sort_calls)
 
 
-class _MapState:
+class _MapLayout:
     def __init__(self, grids: list[_Grid]) -> None:
         self.grids = grids
         self.sort_calls: list[tuple[str, ...]] = []
@@ -38,6 +38,11 @@ class _MapState:
     def select(self, **kwargs: object) -> _TrackedSelectedGrids:
         grids = [grid for grid in self.grids if all(getattr(grid, key) == value for key, value in kwargs.items())]
         return _TrackedSelectedGrids(grids, self.sort_calls)
+
+
+class _MapState:
+    def __init__(self, grids: list[_Grid]) -> None:
+        self.layout = _MapLayout(grids)
 
 
 class _Campaign(Map):
@@ -73,7 +78,7 @@ def test_clear_potential_boss_sorts_once_before_trying_candidates() -> None:
 
     assert campaign.attempts == [("wrong", ""), ("correct", "")]
     assert campaign.battle_count == 1
-    assert campaign.map.sort_calls == [("weight", "cost")]
+    assert campaign.map.layout.sort_calls == [("weight", "cost")]
 
 
 def test_clear_potential_boss_expects_boss_for_single_candidate() -> None:

@@ -20,7 +20,7 @@ class _Config:
     EnemyPriority_EnemyScaleBalanceWeight = "default"
 
 
-class _MapState:
+class _MapLayout:
     def __init__(self, grids: list[GridInfo]) -> None:
         self._grids = grids
         self._by_location = {grid.location: grid for grid in grids}
@@ -39,6 +39,17 @@ class _MapState:
                 if all(getattr(grid, field) == expected for field, expected in criteria.items())
             ]
         )
+
+
+class _MapState:
+    def __init__(self, grids: list[GridInfo]) -> None:
+        self.layout = _MapLayout(grids)
+
+    def __iter__(self) -> Iterator[GridInfo]:
+        return iter(self.layout)
+
+    def __getitem__(self, location: GridLocation) -> GridInfo:
+        return self.layout[location]
 
 
 class _CoordinationCampaign(Map):
@@ -61,7 +72,7 @@ class _CoordinationCampaign(Map):
 
     def _project_paths(self, *, record: bool) -> None:
         blocker_present = self.rescue_blocker.is_enemy if self.rescue_blocker is not None else None
-        for grid in self.map:
+        for grid in self.map.layout:
             cost_1, cost_2 = self._base_costs[grid.location]
             if grid is self.rescue_target and blocker_present is False:
                 cost_2 = 1

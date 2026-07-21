@@ -131,7 +131,7 @@ class _ProgramState:
         return self.single_fleet_override
 
 
-class _Map:
+class _MapLayout:
     def __init__(self, grids: list[GridInfo]) -> None:
         self._grids = grids
         self._by_location = {grid.location: grid for grid in grids}
@@ -150,6 +150,17 @@ class _Map:
                 if all(getattr(grid, name) == expected for name, expected in criteria.items())
             ]
         )
+
+
+class _Map:
+    def __init__(self, grids: list[GridInfo]) -> None:
+        self.layout = _MapLayout(grids)
+
+    def __iter__(self) -> Iterator[GridInfo]:
+        return iter(self.layout)
+
+    def __getitem__(self, location: tuple[int, int]) -> GridInfo:
+        return self.layout[location]
 
     def show(self) -> None:
         pass
@@ -280,7 +291,7 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
         raise AssertionError(message)
 
     def _hostile(self) -> GridInfo | None:
-        return next((grid for grid in self.map if grid.is_enemy or grid.is_siren or grid.is_boss), None)
+        return next((grid for grid in self.map.layout if grid.is_enemy or grid.is_siren or grid.is_boss), None)
 
     def _settle(self, grid: GridInfo | None = None) -> bool:
         if grid is None:
@@ -304,7 +315,7 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
 
     def clear_enemy(self, **criteria: object) -> bool:
         self.events.append(("clear_enemy", criteria))
-        return self._settle(next((grid for grid in self.map if grid.is_enemy and not grid.is_boss), None))
+        return self._settle(next((grid for grid in self.map.layout if grid.is_enemy and not grid.is_boss), None))
 
     def clear_any_enemy(self, **criteria: object) -> bool:
         self.events.append(("clear_any_enemy", criteria))
@@ -312,16 +323,16 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
 
     def clear_siren(self, **criteria: object) -> bool:
         self.events.append(("clear_siren", criteria))
-        return self._settle(next((grid for grid in self.map if grid.is_siren), None))
+        return self._settle(next((grid for grid in self.map.layout if grid.is_siren), None))
 
     def clear_filter_enemy(self, enemy_filter: str, preserve: int = 0) -> bool:
         self.events.append(("clear_filter_enemy", enemy_filter, preserve))
-        enemies = [grid for grid in self.map if grid.is_enemy and not grid.is_boss]
+        enemies = [grid for grid in self.map.layout if grid.is_enemy and not grid.is_boss]
         return self._settle(enemies[preserve] if len(enemies) > preserve else None)
 
     def brute_find_roadblocks(self, _grid: GridInfo, fleet: int | None = None) -> SelectedGrids[GridInfo]:
         self.events.append(("brute_find_roadblocks", fleet))
-        return SelectedGrids([grid for grid in self.map if grid.is_enemy and not grid.is_boss])
+        return SelectedGrids([grid for grid in self.map.layout if grid.is_enemy and not grid.is_boss])
 
     def clear_roadblocks(self, _roads: object, **selection: object) -> bool:
         self.events.append(("clear_roadblocks", selection))
@@ -380,7 +391,7 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
         self.events.append("break_siren_caught")
         if not self.mechanic_applied:
             return False
-        self._settle(next((grid for grid in self.map if grid.is_siren), None))
+        self._settle(next((grid for grid in self.map.layout if grid.is_siren), None))
         return True
 
     def fleet_2_protect(self) -> bool:
@@ -406,7 +417,7 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
 
     def clear_all_mystery(self, **_criteria: object) -> bool:
         self.events.append("clear_all_mystery")
-        for grid in self.map:
+        for grid in self.map.layout:
             grid.is_mystery = False
         return False
 
@@ -417,7 +428,7 @@ class _Runtime:  # ruff:ignore[too-many-public-methods] - 完整实现 BattleRun
 
     def clear_mechanism(self, grids: object = None) -> bool:
         self.events.append(("clear_mechanism", grids))
-        for grid in self.map:
+        for grid in self.map.layout:
             grid.is_mechanism_trigger = False
         return self.mechanic_applied
 
@@ -589,9 +600,9 @@ def test_initial_flags_queries_and_map_state_are_explicit() -> None:
     assert port.has_candidate_enemy((A1, D1), ("Main",), cancellation)
 
     port.mark_all_siren_candidates(cancellation)
-    assert all(grid.may_siren for grid in runtime.map)
+    assert all(grid.may_siren for grid in runtime.map.layout)
     port.set_map_weights(((6, 5, 4, 3, 2, 1),), cancellation)
-    assert [grid.weight for grid in runtime.map] == [6, 5, 4, 3, 2, 1]
+    assert [grid.weight for grid in runtime.map.layout] == [6, 5, 4, 3, 2, 1]
 
 
 def test_stage_single_fleet_state_overrides_the_generic_fleet_count() -> None:
@@ -871,7 +882,7 @@ def test_hidden_siren_candidates_are_marked_before_the_clear_primitive() -> None
     )
 
     assert result == program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.SIREN)
-    assert all(grid.may_siren for grid in runtime.map)
+    assert all(grid.may_siren for grid in runtime.map.layout)
     assert runtime.events == [("clear_chosen_enemy", (A1.x, A1.y), "siren", 1)]
 
 
@@ -1101,12 +1112,12 @@ def test_every_fleet_mechanic_action_has_a_fixed_projection() -> None:
     assert runtime.events == [("goto", (C1.x, C1.y), "", 1)]
 
     runtime = _Runtime()
-    runtime.map[B1.x, B1.y].weight = 5
-    runtime.map[B1.x, B1.y].cost = 2
-    runtime.map[B1.x, B1.y].cost_2 = 2
-    runtime.map[C1.x, C1.y].weight = 5
-    runtime.map[C1.x, C1.y].cost = 1
-    runtime.map[C1.x, C1.y].cost_2 = 1
+    runtime.map.layout[B1.x, B1.y].weight = 5
+    runtime.map.layout[B1.x, B1.y].cost = 2
+    runtime.map.layout[B1.x, B1.y].cost_2 = 2
+    runtime.map.layout[C1.x, C1.y].weight = 5
+    runtime.map.layout[C1.x, C1.y].cost = 1
+    runtime.map.layout[C1.x, C1.y].cost_2 = 1
     assert isinstance(
         _port(runtime).execute_mechanic(
             MoveFleetToBestCandidate(
@@ -1284,7 +1295,7 @@ def test_every_pickup_mechanic_action_has_a_fixed_projection() -> None:
         MechanicApplied,
     )
     assert runtime.events == [("goto", (C1.x, C1.y), "", 1)]
-    assert runtime.map[C1.x, C1.y].is_flare
+    assert runtime.map.layout[C1.x, C1.y].is_flare
 
 
 def test_pickup_ammo_selects_a_reachable_target_before_activating_requested_fleet() -> None:
@@ -1365,7 +1376,7 @@ def test_every_map_interaction_mechanic_action_has_a_fixed_projection() -> None:
     assert runtime.events == [("clear_chosen_mystery", (A1.x, A1.y))]
 
     runtime = _Runtime()
-    runtime.map[A1.x, A1.y].is_mechanism_trigger = True
+    runtime.map.layout[A1.x, A1.y].is_mechanism_trigger = True
     assert isinstance(
         _port(runtime).execute_mechanic(ClearMechanism(0, (A1,)), _cancel()),
         MechanicApplied,
@@ -1454,8 +1465,8 @@ def test_standalone_mechanic_actions_have_fixed_projections() -> None:
         _port(runtime).execute_mechanic(MoveEnemy(0, A1, B1), _cancel()),
         MechanicApplied,
     )
-    assert not runtime.map[A1.x, A1.y].is_enemy
-    assert runtime.map[B1.x, B1.y].is_enemy
+    assert not runtime.map.layout[A1.x, A1.y].is_enemy
+    assert runtime.map.layout[B1.x, B1.y].is_enemy
     assert runtime.events == [
         ("in_sight", (B1.x, B1.y)),
         "strategy_open",

@@ -33,8 +33,8 @@ class MovableEnemySnapshot:
     @classmethod
     def capture(cls, map_: CampaignMap) -> MovableEnemySnapshot:
         return cls(
-            sirens=tuple(location_ensure(grid) for grid in map_.select(is_siren=True)),
-            normal_enemies=tuple(location_ensure(grid) for grid in map_.select(is_enemy=True)),
+            sirens=tuple(location_ensure(grid) for grid in map_.layout.select(is_siren=True)),
+            normal_enemies=tuple(location_ensure(grid) for grid in map_.layout.select(is_enemy=True)),
         )
 
 
@@ -107,7 +107,7 @@ class CampaignFullScanEngine:
         logger.info(f"Full scan start, mode={progress.mode}")
         runtime.map.reset_fleet()
 
-        queue = request.queue or runtime.map.camera_data
+        queue = request.queue or runtime.map.layout.camera_data
         if request.must_scan:
             queue = queue.add(request.must_scan)
 
@@ -151,8 +151,8 @@ class MovableEnemyTracker:
             fleets=[self._require_fleet_location(runtime.fleet_current)] if request.enemy_cleared else [],
             fleet_step=step,
         )
-        matched_before_grids = runtime.map.to_selected(matched_before)
-        matched_after_grids = runtime.map.to_selected(matched_after)
+        matched_before_grids = runtime.map.layout.to_selected(matched_before)
+        matched_after_grids = runtime.map.layout.to_selected(matched_after)
         logger.info(f"Movable enemy {before} -> {after}")
         logger.info(f"Tracked enemy {matched_before_grids} -> {matched_after_grids}")
 
@@ -191,9 +191,10 @@ class MovableEnemyTracker:
         siren: bool,
     ) -> tuple[SelectedGrids[GridInfo], SelectedGrids[GridInfo], SelectedGrids[GridInfo], int]:
         before_locations = request.snapshot.sirens if siren else request.snapshot.normal_enemies
-        before = runtime.map.to_selected(before_locations)
-        after = runtime.map.select(is_siren=True) if siren else runtime.map.select(is_enemy=True)
-        spawn = runtime.map.select(may_siren=True) if siren else runtime.map.select(may_enemy=True)
+        layout = runtime.map.layout
+        before = layout.to_selected(before_locations)
+        after = layout.select(is_siren=True) if siren else layout.select(is_enemy=True)
+        spawn = layout.select(may_siren=True) if siren else layout.select(may_enemy=True)
         step = request.rules.siren_step if siren else 1
         return before, after, spawn, step
 
@@ -241,20 +242,21 @@ class MovableEnemyTracker:
         siren: bool,
     ) -> SelectedGrids[GridInfo]:
         current = MovableEnemyTracker._require_fleet_location(runtime.fleet_current)
-        covered = runtime.map.grid_covered(runtime.map[current], location=[(0, -2)])
+        layout = runtime.map.layout
+        covered = layout.covered_by(layout[current], offsets=[(0, -2)])
         for location in (runtime.fleet_1_location, runtime.fleet_2_location):
             if location:
-                covered = covered.add(runtime.map.grid_covered(runtime.map[location], location=[(0, -1)]))
+                covered = covered.add(layout.covered_by(layout[location], offsets=[(0, -1)]))
 
         if request.rules.normal_enemy and not request.rules.enemy_template:
             for location in (runtime.fleet_1_location, runtime.fleet_2_location):
                 if location:
-                    covered = covered.add(runtime.map.grid_covered(runtime.map[location], location=[(1, 0)]))
+                    covered = covered.add(layout.covered_by(layout[location], offsets=[(1, 0)]))
 
-        covered = covered.add(runtime.map.manual_map_covered)
-        cover_sources = after if siren else runtime.map.select(is_siren=True)
+        covered = covered.add(layout.manual_coverage)
+        cover_sources = after if siren else layout.select(is_siren=True)
         for grid in cover_sources:
-            covered = covered.add(runtime.map.grid_covered(grid))
+            covered = covered.add(layout.covered_by(grid))
         logger.attr("enemy_covered", covered)
         return covered
 
@@ -281,9 +283,9 @@ class MovableEnemyTracker:
                 runtime.map.topology.rebuild(wall=False, portal=request.rules.portal)
             for grid in diff:
                 runtime.map.pathfinder.project(grid, has_ambush=False)
-                accessible = accessible.add(runtime.map.select(cost=0)).add(runtime.map.select(cost=1))
+                accessible = accessible.add(runtime.map.layout.select(cost=0)).add(runtime.map.layout.select(cost=1))
                 if siren:
-                    accessible = accessible.add(runtime.map.select(cost=2))
+                    accessible = accessible.add(runtime.map.layout.select(cost=2))
 
         logger.attr("enemy_accessible", accessible)
         return accessible
@@ -322,8 +324,8 @@ class StandardCampaignMapScanner:
 
     def full_scan_movable(self, runtime: MapScannerRuntime, request: MovableScanRequest) -> None:
         rules = request.rules
-        sirens = runtime.map.to_selected(request.snapshot.sirens)
-        normal_enemies = runtime.map.to_selected(request.snapshot.normal_enemies)
+        sirens = runtime.map.layout.to_selected(request.snapshot.sirens)
+        normal_enemies = runtime.map.layout.to_selected(request.snapshot.normal_enemies)
         if rules.normal_enemy:
             if rules.siren:
                 self._wipe(sirens)
@@ -354,7 +356,7 @@ class StandardCampaignMapScanner:
     @staticmethod
     def _refresh_fleet_projection(runtime: MapScannerRuntime) -> None:
         if runtime.map_scanner_rules.fleet_2_enabled and not runtime.fleet_2_location:
-            fleets = runtime.map.select(is_fleet=True, is_current_fleet=False)
+            fleets = runtime.map.layout.select(is_fleet=True, is_current_fleet=False)
             if fleets.count:
                 logger.info(f"Predict fleet_2 to be {fleets[0]}")
                 runtime.fleet_2_location = location_ensure(fleets[0])

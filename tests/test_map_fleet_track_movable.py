@@ -85,9 +85,10 @@ class _Pathfinder:
 
 class _Map:
     def __init__(self) -> None:
+        self.layout = self
         self.grids: dict[_Location, _Grid] = {}
         self.select_results: dict[tuple[tuple[str, object], ...], _Selected] = {}
-        self.manual_map_covered = _Selected([])
+        self.manual_coverage = _Selected([])
         self.covered_result = _Selected([])
         self.missing = {"siren": 0, "enemy": 0}
         self.path_project_calls: list[tuple[object, object]] = []
@@ -110,7 +111,7 @@ class _Map:
     def to_selected(self, locations: list[_Location]) -> _Selected:
         return _Selected([self.grids[location] for location in locations])
 
-    def grid_covered(self, grid: _Grid, **_kwargs: object) -> _Selected:
+    def covered_by(self, grid: _Grid, **_kwargs: object) -> _Selected:
         if self.covered_result:
             return self.covered_result
         return _Selected([grid])

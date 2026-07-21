@@ -73,7 +73,7 @@ class OSCamera(OSMapOperation, Camera):
         location = location_ensure(grid)
         camera = location_ensure(camera) if camera is not None else self.camera
         if sight is None:
-            sight = self.map.camera_sight
+            sight = self.map.layout.camera_sight
 
         diff = np.array(location) - camera
         if diff[1] > sight[3]:

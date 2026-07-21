@@ -3,7 +3,7 @@ from module.map.map_base import CampaignMap
 
 def _synthetic_map(shape: str = "C2") -> CampaignMap:
     map_ = CampaignMap("topology-pathfinder-test")
-    map_.shape = shape
+    map_.layout.initialize(shape)
     return map_
 
 

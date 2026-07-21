@@ -10,10 +10,15 @@ if TYPE_CHECKING:
     from module.map_detection.grid_info import GridInfo
 
 
-class _MapMechanicMap(Protocol):
+class _MapMechanicLayout(Protocol):
     def __getitem__(self, item: tuple[int, int], /) -> GridInfo: ...
 
     def select(self, **criteria: object) -> SelectedGrids[GridInfo]: ...
+
+
+class _MapMechanicMap(Protocol):
+    @property
+    def layout(self) -> _MapMechanicLayout: ...
 
 
 class Mumu12MapMechanicRuntime(Protocol):
@@ -43,7 +48,7 @@ class Mumu12MapMechanicDriver:
         cancellation: CancellationSource,
     ) -> bool:
         selected = SelectedGrids([self._grid(cell) for cell in cells]) if cells else None
-        limit = len(cells) if cells else self._runtime.map.select(is_mechanism_trigger=True).count
+        limit = len(cells) if cells else self._runtime.map.layout.select(is_mechanism_trigger=True).count
         applied = False
         for _ in range(limit):
             cancellation.raise_if_requested()
@@ -67,7 +72,7 @@ class Mumu12MapMechanicDriver:
 
     def _grid(self, cell: CellId) -> GridInfo:
         try:
-            return self._runtime.map[(cell.x, cell.y)]
+            return self._runtime.map.layout[(cell.x, cell.y)]
         except KeyError:
             message = f"battle program references cell outside the active map: {cell}"
             raise BattleProgramMumu12AdapterError(message) from None

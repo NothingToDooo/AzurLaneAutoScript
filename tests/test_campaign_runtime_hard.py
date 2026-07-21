@@ -45,6 +45,16 @@ class _Map:
         bosses: tuple[_Grid, ...] = (),
         possible_bosses: tuple[_Grid, ...] = (),
     ) -> None:
+        self.layout = _Layout(bosses=bosses, possible_bosses=possible_bosses)
+
+
+class _Layout:
+    def __init__(
+        self,
+        *,
+        bosses: tuple[_Grid, ...] = (),
+        possible_bosses: tuple[_Grid, ...] = (),
+    ) -> None:
         self.bosses = bosses
         self.possible_bosses = possible_bosses
         self.select_calls: list[dict[str, object]] = []

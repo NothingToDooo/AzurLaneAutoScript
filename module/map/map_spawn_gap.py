@@ -12,10 +12,18 @@ if TYPE_CHECKING:
     from module.map_detection.grid_info import GridInfo
 
 
+class _SpawnGapLayout(Protocol):
+    def __iter__(self) -> Iterator[GridInfo]: ...
+
+    @property
+    def covered_grids(self) -> Iterable[GridInfo]: ...
+
+
 class _SpawnGapMap(Protocol):
     poor_map_data: bool
 
-    def __iter__(self) -> Iterator[GridInfo]: ...
+    @property
+    def layout(self) -> _SpawnGapLayout: ...
 
     @property
     def spawn_data_stack(self) -> Sequence[Mapping[str, int]]: ...
@@ -25,9 +33,6 @@ class _SpawnGapMap(Protocol):
 
     @property
     def bouncing_enemy_data(self) -> Sequence[Iterable[GridInfo]]: ...
-
-    @property
-    def map_covered(self) -> Iterable[GridInfo]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +88,7 @@ class MapSpawnGapPredictor:
             return
 
         snapshot = self.estimate(progress)
-        for grid in self._map.map_covered:
+        for grid in self._map.layout.covered_grids:
             for kind in ("enemy", "mystery", "siren", "boss"):
                 if (
                     getattr(grid, "may_" + kind)
@@ -112,17 +117,17 @@ class MapSpawnGapPredictor:
     def _carrier_gap(self, progress: MapSpawnProgress) -> int:
         if progress.mode != "carrier":
             return 0
-        observed = sum(grid.is_enemy and not grid.may_enemy for grid in self._map)
+        observed = sum(grid.is_enemy and not grid.may_enemy for grid in self._map.layout)
         return progress.carrier_count - observed
 
     def _subtract_observed_spawns(self, missing: dict[str, int]) -> None:
-        for grid in self._map:
+        for grid in self._map.layout:
             for kind in ("enemy", "mystery", "siren", "boss"):
                 if getattr(grid, "is_" + kind):
                     missing[kind] -= 1
 
     def _restore_dynamic_enemy_gaps(self, missing: dict[str, int]) -> None:
-        active_fortresses = sum(grid.is_fortress for grid in self._map)
+        active_fortresses = sum(grid.is_fortress for grid in self._map.layout)
         missing["enemy"] += len(self._map.fortress_data[0]) - active_fortresses
         for route in self._map.bouncing_enemy_data:
             if not any(grid.may_bouncing_enemy for grid in route):
@@ -131,7 +136,7 @@ class MapSpawnGapPredictor:
 
     def _possible_covered_spawns(self, mode: GridMode) -> dict[str, int]:
         possible = {"enemy": 0, "mystery": 0, "siren": 0, "boss": 0, "carrier": 0}
-        for grid in self._map.map_covered:
+        for grid in self._map.layout.covered_grids:
             if (grid.may_enemy or mode == "movable") and not grid.is_enemy:
                 possible["enemy"] += 1
             if grid.may_mystery and not grid.is_mystery:

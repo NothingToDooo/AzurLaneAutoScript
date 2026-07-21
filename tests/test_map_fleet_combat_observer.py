@@ -66,7 +66,7 @@ class _CombatFleet(Fleet):
     def __init__(self, observer: CampaignMapObserver) -> None:
         self.config = _Config()
         self.map = CampaignMap("fleet-observer-test")
-        self.map.shape = "A1"
+        self.map.layout.initialize("A1")
         self.map.spawn_data = []
         self._turn_controller = FleetTurnController(FleetTurnRules(), self.map)
         self._map_observer = observer

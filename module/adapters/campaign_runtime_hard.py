@@ -24,8 +24,13 @@ class _HardConfig(Protocol):
     def apply_runtime_overlay(self, **kwargs: object) -> None: ...
 
 
-class _HardMap(Protocol):
+class _HardMapLayout(Protocol):
     def select(self, **kwargs: object) -> SelectedGrids[object]: ...
+
+
+class _HardMap(Protocol):
+    @property
+    def layout(self) -> _HardMapLayout: ...
 
 
 class _HardRuntimeHost(Protocol):
@@ -70,11 +75,11 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
     @staticmethod
     def clear_boss(runtime: object) -> bool:
         host = _host(runtime)
-        grids = host.map.select(is_boss=True)
-        grids = grids.add(host.map.select(may_boss=True, is_enemy=True))
-        logger.info(f"May boss: {host.map.select(may_boss=True)}")
-        logger.info(f"May boss and is enemy: {host.map.select(may_boss=True, is_enemy=True)}")
-        logger.info(f"Is boss: {host.map.select(is_boss=True)}")
+        grids = host.map.layout.select(is_boss=True)
+        grids = grids.add(host.map.layout.select(may_boss=True, is_enemy=True))
+        logger.info(f"May boss: {host.map.layout.select(may_boss=True)}")
+        logger.info(f"May boss and is enemy: {host.map.layout.select(may_boss=True, is_enemy=True)}")
+        logger.info(f"Is boss: {host.map.layout.select(is_boss=True)}")
         if grids:
             logger.hr("Clear BOSS")
             grids = grids.sort("weight", "cost")

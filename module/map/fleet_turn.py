@@ -22,7 +22,14 @@ class _MazeGrid(Protocol):
     def maze_round(self) -> Collection[int]: ...
 
 
+class _FleetTurnLayout(Protocol):
+    def select(self, **criteria: object) -> object: ...
+
+
 class _FleetTurnMap(Protocol):
+    @property
+    def layout(self) -> _FleetTurnLayout: ...
+
     @property
     def spawn_data(self) -> Sequence[Mapping[str, int]]: ...
 
@@ -31,8 +38,6 @@ class _FleetTurnMap(Protocol):
 
     @property
     def bouncing_enemy_data(self) -> Sequence[_BouncingRoute]: ...
-
-    def select(self, **criteria: object) -> object: ...
 
     def __getitem__(self, location: GridLocation, /) -> _MazeGrid: ...
 
@@ -81,9 +86,9 @@ class FleetTurnController:
         rules = self._rules
         if not rules.movable_enemy:
             return
-        if not self._map.select(is_siren=True):
+        if not self._map.layout.select(is_siren=True):
             if rules.movable_normal_enemy:
-                if not self._map.select(is_enemy=True):
+                if not self._map.layout.select(is_enemy=True):
                     self._enemy_round = {}
             else:
                 self._enemy_round = {}

@@ -98,8 +98,8 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
         poor_map_data: bool,
     ) -> SelectedGrids[GridInfo]:
         if not poor_map_data:
-            return context.map.select(is_fleet=True, is_spawn_point=True)
-        return context.map.select(is_fleet=True)
+            return context.map.layout.select(is_fleet=True, is_spawn_point=True)
+        return context.map.layout.select(is_fleet=True)
 
     def _from_single(
         self,
@@ -111,7 +111,7 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
             return replace(request.previous, fleet_1=location_ensure(detected))
 
         logger.info("Fleet_2 not detected.")
-        spawn_points = context.map.select(is_spawn_point=True)
+        spawn_points = context.map.layout.select(is_spawn_point=True)
         if request.poor_map_data and not spawn_points:
             return replace(request.previous, fleet_1=location_ensure(detected))
         if spawn_points.count == 2:
@@ -144,7 +144,7 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
         previous: SurfaceFleetLocations,
         detected: GridInfo,
     ) -> SurfaceFleetLocations:
-        cover = context.map.grid_covered(detected, location=[(0, -1)])
+        cover = context.map.layout.covered_by(detected, offsets=[(0, -1)])
         if detected.is_current_fleet and len(cover) and cover[0].is_spawn_point:
             return replace(
                 previous,
@@ -159,7 +159,7 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
         previous: SurfaceFleetLocations,
         fleets: SelectedGrids[GridInfo],
     ) -> SurfaceFleetLocations:
-        current = context.map.select(is_current_fleet=True)
+        current = context.map.layout.select(is_current_fleet=True)
         if current.count == 1:
             return replace(
                 previous,
@@ -210,7 +210,7 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
         locations = previous
         if fleets.count == 0:
             logger.warning("No fleets detected.")
-            current = context.map.select(is_current_fleet=True)
+            current = context.map.layout.select(is_current_fleet=True)
             if current.count:
                 locations = replace(locations, fleet_1=location_ensure(current[0]))
         else:
@@ -233,7 +233,7 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
     ) -> SurfaceFleetLocations:
         logger.hr("Find all fleets")
         locations = previous
-        queue = context.map.select(is_spawn_point=True)
+        queue = context.map.layout.select(is_spawn_point=True)
         while queue:
             queue = queue.sort_by_camera_distance(context.camera)
             observation = self._observe_surface(context, queue[0])
@@ -255,10 +255,10 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
         if type(enabled) is not bool:
             message = "submarine location enabled flag must be a boolean"
             raise TypeError(message)
-        if not (enabled and context.map.select(is_submarine_spawn_point=True)):
+        if not (enabled and context.map.layout.select(is_submarine_spawn_point=True)):
             return None
 
-        submarines = context.map.select(is_submarine=True)
+        submarines = context.map.layout.select(is_submarine=True)
         count = submarines.count
         if count == 1:
             location = location_ensure(submarines[0])
@@ -270,16 +270,16 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
 
         if location is None:
             logger.warning("Unable to find submarine, assume it is at map center")
-            shape = context.map.shape
+            shape = context.map.layout.shape
             center = (shape[0] // 2, shape[1] // 2)
-            location = location_ensure(context.map.select(is_land=False).sort_by_camera_distance(center)[0])
+            location = location_ensure(context.map.layout.select(is_land=False).sort_by_camera_distance(center)[0])
 
         logger.info(f"Submarine: {location2node(location)}")
         return location
 
     def _locate_missing_submarine(self, context: FleetLocationContext) -> GridLocation | None:
         logger.info("No submarine found")
-        spawn_points = context.map.select(is_submarine_spawn_point=True)
+        spawn_points = context.map.layout.select(is_submarine_spawn_point=True)
         if spawn_points.count == 1:
             logger.info(f"Predict the only submarine spawn point {spawn_points[0]} as submarine")
             return location_ensure(spawn_points[0])
@@ -287,10 +287,10 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
         logger.info(f"Having multiple submarine spawn points: {spawn_points}")
         covered: SelectedGrids[GridInfo] = SelectedGrids([])
         for grid in spawn_points:
-            covered = covered.add(context.map.grid_covered(grid, location=[(0, 1)]))
+            covered = covered.add(context.map.layout.covered_by(grid, offsets=[(0, 1)]))
         covered = covered.filter(lambda grid: grid.is_enemy or grid.is_fleet or grid.is_siren or grid.is_boss)
         if covered.count == 1:
-            spawn_points = context.map.grid_covered(covered[0], location=[(0, -1)])
+            spawn_points = context.map.layout.covered_by(covered[0], offsets=[(0, -1)])
             logger.info(f"Submarine {spawn_points[0]} covered by {covered[0]}")
             return location_ensure(spawn_points[0])
 
@@ -305,7 +305,7 @@ class _StandardCampaignFleetLocator(CampaignFleetLocator):
 
     def _locate_all_submarines(self, context: FleetLocationContext) -> GridLocation | None:
         logger.hr("Find all submarines")
-        queue = context.map.select(is_submarine_spawn_point=True)
+        queue = context.map.layout.select(is_submarine_spawn_point=True)
         while queue:
             queue = queue.sort_by_camera_distance(context.camera)
             if self._observe_submarine(context, queue[0]):

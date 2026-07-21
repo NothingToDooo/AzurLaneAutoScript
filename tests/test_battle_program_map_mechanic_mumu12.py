@@ -34,6 +34,11 @@ class _Cancellation:
 
 class _Map:
     def __init__(self, grids: list[GridInfo]) -> None:
+        self.layout = _Layout(grids)
+
+
+class _Layout:
+    def __init__(self, grids: list[GridInfo]) -> None:
         self.grids = {grid.location: grid for grid in grids}
 
     def __getitem__(self, location: tuple[int, int]) -> GridInfo:
@@ -58,7 +63,9 @@ class _Runtime:
 
     def clear_mechanism(self, grids: SelectedGrids[GridInfo] | None = None) -> bool:
         candidates = (
-            self.map.select(is_mechanism_trigger=True) if grids is None else grids.select(is_mechanism_trigger=True)
+            self.map.layout.select(is_mechanism_trigger=True)
+            if grids is None
+            else grids.select(is_mechanism_trigger=True)
         )
         self.events.append(("clear_mechanism", candidates.location))
         if not candidates:
@@ -182,7 +189,7 @@ def test_all_requested_cells_are_resolved_before_mechanism_io() -> None:
         _driver(runtime).trigger_mechanisms((A1, B1), _cancellation(runtime))
 
     assert runtime.events == []
-    assert runtime.map[(0, 0)].is_mechanism_trigger
+    assert runtime.map.layout[(0, 0)].is_mechanism_trigger
 
 
 def test_pre_requested_cancellation_prevents_mechanism_io() -> None:
@@ -195,7 +202,7 @@ def test_pre_requested_cancellation_prevents_mechanism_io() -> None:
         )
 
     assert runtime.events == ["cancellation"]
-    assert runtime.map[(0, 0)].is_mechanism_trigger
+    assert runtime.map.layout[(0, 0)].is_mechanism_trigger
 
 
 def test_clear_bouncing_enemy_checks_cancellation_around_the_closed_action() -> None:

@@ -22,12 +22,20 @@ class _BouncingRoute:
 
 class _Map:
     def __init__(self) -> None:
+        self.layout = _Layout()
         self.spawn_data: list[dict[str, int]] = []
-        self.siren_count = 0
-        self.enemy_count = 0
         self.maze_round = 3
         self.bouncing_enemy_data: list[_BouncingRoute] = []
         self.grids: dict[tuple[int, int], _MazeGrid] = {}
+
+    def __getitem__(self, location: tuple[int, int]) -> _MazeGrid:
+        return self.grids[location]
+
+
+class _Layout:
+    def __init__(self) -> None:
+        self.siren_count = 0
+        self.enemy_count = 0
 
     def select(self, **criteria: object) -> tuple[object, ...]:
         if criteria == {"is_siren": True}:
@@ -36,15 +44,12 @@ class _Map:
             return tuple(object() for _ in range(self.enemy_count))
         raise AssertionError(criteria)
 
-    def __getitem__(self, location: tuple[int, int]) -> _MazeGrid:
-        return self.grids[location]
-
 
 def test_enemy_move_event_follows_battle_registration_and_arrival_order() -> None:
     rules = FleetTurnRules(movable_enemy=True, movable_enemy_turns=(2,), enemy_move_wait=0.7)
     map_ = _Map()
     map_.spawn_data = [{"siren": 1}]
-    map_.siren_count = 1
+    map_.layout.siren_count = 1
     controller = FleetTurnController(rules, map_)
 
     controller.initialize(battle_count=0)
@@ -57,12 +62,12 @@ def test_battle_resolution_clears_movement_schedule_after_last_enemy() -> None:
     rules = FleetTurnRules(movable_enemy=True, movable_enemy_turns=(2,), enemy_move_wait=0.7)
     map_ = _Map()
     map_.spawn_data = [{"siren": 1}, {}]
-    map_.siren_count = 1
+    map_.layout.siren_count = 1
     controller = FleetTurnController(rules, map_)
     controller.initialize(battle_count=0)
     assert controller.fleet_arrived() is FleetTurnEvent.STABLE
 
-    map_.siren_count = 0
+    map_.layout.siren_count = 0
     controller.battle_resolved(battle_count=1)
 
     assert controller.fleet_arrived() is FleetTurnEvent.STABLE
@@ -79,7 +84,7 @@ def test_movable_normal_enemy_uses_its_own_turn_interval() -> None:
     )
     map_ = _Map()
     map_.spawn_data = [{"enemy": 1}]
-    map_.enemy_count = 1
+    map_.layout.enemy_count = 1
     controller = FleetTurnController(rules, map_)
     controller.initialize(battle_count=0)
 
@@ -111,7 +116,7 @@ def test_enemy_move_takes_priority_when_maze_changes_on_the_same_arrival() -> No
     )
     map_ = _Map()
     map_.spawn_data = [{"siren": 1}]
-    map_.siren_count = 1
+    map_.layout.siren_count = 1
     controller = FleetTurnController(rules, map_)
     controller.initialize(battle_count=0)
 
@@ -130,7 +135,7 @@ def test_movement_wait_combines_due_enemies_maze_and_active_bouncing_routes() ->
     )
     map_ = _Map()
     map_.spawn_data = [{"siren": 2}]
-    map_.siren_count = 2
+    map_.layout.siren_count = 2
     map_.bouncing_enemy_data = [_BouncingRoute(active=True), _BouncingRoute(active=False)]
     controller = FleetTurnController(rules, map_)
     controller.initialize(battle_count=0)

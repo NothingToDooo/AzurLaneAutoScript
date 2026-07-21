@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from module.map.map_base import CampaignMap
 
 
-class _RoadblockMap:
+class _RoadblockLayout:
     def __init__(self, enemies: list[GridInfo]) -> None:
         self.enemies = enemies
 
@@ -19,6 +19,11 @@ class _RoadblockMap:
             message = f"unexpected map selection: {criteria}"
             raise AssertionError(message)
         return SelectedGrids([enemy for enemy in self.enemies if enemy.is_enemy])
+
+
+class _RoadblockMap:
+    def __init__(self, enemies: list[GridInfo]) -> None:
+        self.layout = _RoadblockLayout(enemies)
 
 
 class _RoadblockFleet(Fleet):

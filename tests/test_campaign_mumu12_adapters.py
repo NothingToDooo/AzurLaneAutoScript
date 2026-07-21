@@ -153,6 +153,8 @@ if TYPE_CHECKING:
     from module.handler.map_transition_ui import MapTransitionUi
     from module.map.map_base import CampaignMap
 
+from module.map_detection.grid_info import GridInfo
+
 
 def _variant(tokens: tuple[str, ...]) -> RunVariant:
     return RunVariant(
@@ -1060,17 +1062,27 @@ def test_compiler_materializes_both_variants_and_map_structure() -> None:
     compiled = compile_campaign_map(_definition())
 
     assert compiled.name == "T1"
-    assert compiled.shape == (1, 1)
+    assert compiled.layout.shape == (1, 1)
     assert compiled.map_data == "SP ME\n-- MB"
     assert compiled.map_data_loop == "SP --\nME MB"
-    assert compiled.weight_data == "1.0 2.0\n3.0 4.0"
-    assert [str(grid) for grid in compiled.camera_data] == ["A1", "B2"]
-    assert [str(grid) for grid in compiled.camera_data_spawn_point] == ["B1"]
-    assert [str(grid) for grid in compiled.manual_map_covered] == ["A2"]
+    assert compiled.layout.weight_data == "1.0 2.0\n3.0 4.0"
+    assert [grid.weight for grid in compiled.layout] == [1.0, 2.0, 3.0, 4.0]
+    assert [str(grid) for grid in compiled.layout.camera_data] == ["A1", "B2"]
+    assert [str(grid) for grid in compiled.layout.camera_data_spawn_point] == ["B1"]
+    assert [str(grid) for grid in compiled.layout.manual_coverage] == ["A2"]
     assert compiled.topology.portals == (((0, 1), (1, 0)),)
     assert compiled.land_based_data == [("B2", "left")]
     assert compiled.spawn_data == [{"battle": 0, "enemy": 1}, {"battle": 1, "boss": 1}]
     assert compiled.spawn_data_loop == [{"battle": 0, "enemy": 1}, {"battle": 1, "boss": 1}]
+
+
+def test_compiler_builds_every_grid_with_the_injected_runtime_type() -> None:
+    class _RuntimeGrid(GridInfo):
+        pass
+
+    compiled = compile_campaign_map(_definition(), grid_class=_RuntimeGrid)
+
+    assert all(type(grid) is _RuntimeGrid for grid in compiled)
 
 
 def test_compiler_projects_typed_map_structures_into_legacy_mechanisms() -> None:

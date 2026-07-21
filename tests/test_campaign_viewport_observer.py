@@ -73,8 +73,12 @@ class _DispatchCamera(Camera):
         )
 
 
-class _ViewportMap:
+class _ViewportLayout:
     camera_sight = (-3, -1, 3, 2)
+
+
+class _ViewportMap:
+    layout = _ViewportLayout()
 
 
 class _StandardCamera(Camera):

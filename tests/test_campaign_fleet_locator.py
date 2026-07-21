@@ -58,18 +58,19 @@ class _Map:
     shape = (1, 1)
 
     def __init__(self, detected: GridLocation) -> None:
+        self.layout = self
         self._grids: SelectedGrids[GridInfo] = SelectedGrids([_Grid(detected)])
 
     def select(self, **criteria: object) -> SelectedGrids[GridInfo]:
         return self._grids.select(**criteria)
 
     @staticmethod
-    def grid_covered(
+    def covered_by(
         grid: GridInfo,
         *,
-        location: list[GridLocation],
+        offsets: list[GridLocation],
     ) -> SelectedGrids[GridInfo]:
-        del grid, location
+        del grid, offsets
         return SelectedGrids([])
 
 

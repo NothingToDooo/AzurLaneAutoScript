@@ -129,6 +129,7 @@ class _Selected:
 
 class _Map:
     def __init__(self) -> None:
+        self.layout = self
         self.select_results: dict[tuple[tuple[str, object], ...], _Selected] = {}
         self.cover_results: dict[_Location, _Selected] = {}
         self.shape = (6, 6)
@@ -139,7 +140,7 @@ class _Map:
     def select(self, **kwargs: object) -> _Selected:
         return self.select_results.get(tuple(sorted(kwargs.items())), _Selected([]))
 
-    def grid_covered(self, grid: _Grid, **_kwargs: object) -> _Selected:
+    def covered_by(self, grid: _Grid, **_kwargs: object) -> _Selected:
         return self.cover_results.get(grid.location, _Selected([]))
 
 
