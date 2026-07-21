@@ -1,15 +1,18 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Protocol, override
+from typing import TYPE_CHECKING, Protocol, override
 
 from module.handler.assets import MAP_ENEMY_SEARCHING
 from module.logger import logger
+from module.map.fleet_locator import (
+    STANDARD_CAMPAIGN_FLEET_LOCATOR,
+    CampaignFleetLocator,
+)
+from module.map.map_scanner import STANDARD_CAMPAIGN_MAP_SCANNER, CampaignMapScanner
 
 if TYPE_CHECKING:
     from module.base.type_alias import ImageArray
-    from module.map.camera import FullScanOptions
     from module.map.map_base import CampaignMap
-    from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import FleetLocation, GridLocation, GridMode
+    from module.map.type_alias import GridLocation
     from module.map_detection.grid_info import GridInfo
 
 
@@ -26,38 +29,6 @@ class CombatMapObserver(Protocol):
         runtime: MapObserverRuntime,
         destination: GridInfo,
     ) -> bool: ...
-
-
-class MapScannerRuntime(Protocol):
-    map: CampaignMap
-
-    def _standard_full_scan(
-        self,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None: ...
-
-    def _standard_full_scan_movable(self, *, enemy_cleared: bool = True) -> None: ...
-
-
-class CampaignMapScanner(Protocol):
-    def full_scan(
-        self,
-        runtime: MapScannerRuntime,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None: ...
-
-    def full_scan_movable(
-        self,
-        runtime: MapScannerRuntime,
-        *,
-        enemy_cleared: bool = True,
-    ) -> None: ...
 
 
 class EnemySearchingObserver(Protocol):
@@ -93,28 +64,6 @@ class CampaignMapViewport(Protocol):
     """调整地图视野，但不负责把调用参数规范化。"""
 
     def in_sight(self, runtime: MapViewportRuntime, request: InSightRequest) -> None: ...
-
-
-class FleetLocatorRuntime(Protocol):
-    @property
-    def _fleet_2_enabled(self) -> bool: ...
-
-    @property
-    def fleet_current(self) -> FleetLocation: ...
-
-    def _set_fleet_location(
-        self,
-        index: Literal[1, 2],
-        location: GridLocation,
-    ) -> None: ...
-
-    def _standard_find_current_fleet(self) -> FleetLocation: ...
-
-
-class CampaignFleetLocator(Protocol):
-    """定位当前舰队，不暴露旧 runtime string operation。"""
-
-    def find_current_fleet(self, runtime: FleetLocatorRuntime) -> FleetLocation: ...
 
 
 class MapPreparationRuntime(Protocol):
@@ -158,35 +107,6 @@ class _StandardCombatMapObserver(CombatMapObserver):
         return False
 
 
-class _StandardCampaignMapScanner(CampaignMapScanner):
-    @override
-    def full_scan(
-        self,
-        runtime: MapScannerRuntime,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None:
-        runtime._standard_full_scan(  # ruff:ignore[private-member-access] - 标准 scanner 只负责调用 Fleet 私有算法原语。
-            options=options,
-            queue=queue,
-            must_scan=must_scan,
-            mode=mode,
-        )
-
-    @override
-    def full_scan_movable(
-        self,
-        runtime: MapScannerRuntime,
-        *,
-        enemy_cleared: bool = True,
-    ) -> None:
-        runtime._standard_full_scan_movable(  # ruff:ignore[private-member-access] - 标准 scanner 只负责调用 Fleet 私有算法原语。
-            enemy_cleared=enemy_cleared
-        )
-
-
 class _StandardEnemySearchingObserver(EnemySearchingObserver):
     @override
     def appears(
@@ -207,12 +127,6 @@ class _StandardCampaignMapViewport(CampaignMapViewport):
         )
 
 
-class _StandardCampaignFleetLocator(CampaignFleetLocator):
-    @override
-    def find_current_fleet(self, runtime: FleetLocatorRuntime) -> FleetLocation:
-        return runtime._standard_find_current_fleet()  # ruff:ignore[private-member-access] - 标准 locator 只负责调用 Fleet 私有算法原语。
-
-
 class _StandardCampaignMapPreparation(CampaignMapPreparation):
     @override
     def map_get_info(self, runtime: MapPreparationRuntime) -> None:
@@ -225,9 +139,9 @@ class _StandardCampaignMapPreparation(CampaignMapPreparation):
 
 STANDARD_CAMPAIGN_MAP_OBSERVER = CampaignMapObserver(
     combat=_StandardCombatMapObserver(),
-    scanner=_StandardCampaignMapScanner(),
+    scanner=STANDARD_CAMPAIGN_MAP_SCANNER,
     enemy_searching=_StandardEnemySearchingObserver(),
     viewport=_StandardCampaignMapViewport(),
-    fleet_locator=_StandardCampaignFleetLocator(),
+    fleet_locator=STANDARD_CAMPAIGN_FLEET_LOCATOR,
     preparation=_StandardCampaignMapPreparation(),
 )

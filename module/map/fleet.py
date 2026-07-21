@@ -10,11 +10,23 @@ from module.base.utils import location2node
 from module.exception import MapDetectionError, MapEnemyMoved, MapWalkError
 from module.handler.ambush import AmbushHandler
 from module.logger import logger
-from module.map.camera import Camera, FullScanOptions
+from module.map.camera import Camera
+from module.map.fleet_locator import (
+    SurfaceFleetLocationRequest,
+    SurfaceFleetLocations,
+    SurfaceFleetObservation,
+)
 from module.map.fleet_turn import FleetTurnController, FleetTurnEvent, FleetTurnRules
 from module.map.map_grids import SelectedGrids
+from module.map.map_scanner import (
+    MapScannerRules,
+    MapScanRequest,
+    MovableEnemyRules,
+    MovableEnemySnapshot,
+    MovableScanRequest,
+)
 from module.map.map_spawn_gap import MapSpawnGapPredictor, MapSpawnProgress
-from module.map.utils import location_ensure, match_movable
+from module.map.utils import location_ensure
 
 if TYPE_CHECKING:
     from module.combat.combat import CombatEnd
@@ -38,12 +50,22 @@ class _GotoState:
     arrive_unexpected_timer: Timer
     ambushed_retry: Timer
     walk_timeout: Timer
+    movable_snapshot: MovableEnemySnapshot
     result: str = "nothing"
     result_mystery: str = ""
     arrived: bool = False
 
 
-class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - 待拆分扫描、定位与导航状态。
+@dataclass(frozen=True, slots=True)
+class _GotoRequest:
+    location: GridLocation
+    expected: str
+    is_portal: bool
+    may_submarine_icon: bool
+    movable_snapshot: MovableEnemySnapshot
+
+
+class Fleet(Camera, AmbushHandler):
     fleet_1_location: FleetLocation = ()
     fleet_2_location: FleetLocation = ()
     fleet_submarine_location: FleetLocation = ()
@@ -53,7 +75,8 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
     fleet_ammo = 5
     ammo_count = 3
     _turn_controller: FleetTurnController
-    _spawn_gap_predictor: MapSpawnGapPredictor
+    map_spawn_gap_predictor: MapSpawnGapPredictor
+    map_scanner_rules: MapScannerRules
 
     @staticmethod
     def _require_fleet_location(location: FleetLocation | None) -> GridLocation:
@@ -61,10 +84,6 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
             msg = "舰队缺少地图位置"
             raise RuntimeError(msg)
         return location
-
-    @staticmethod
-    def _selected_locations(grids: SelectedGrids[GridInfo]) -> list[GridLocation]:
-        return [location_ensure(grid) for grid in grids]
 
     @property
     def fleet_1(self) -> Self:
@@ -87,14 +106,6 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         self.fleet_2_location = self._require_fleet_location(value)
 
     @property
-    def fleet_submarine(self) -> Self:
-        return self
-
-    @fleet_submarine.setter
-    def fleet_submarine(self, value: GridLocation | None) -> None:
-        self.fleet_submarine_location = self._require_fleet_location(value)
-
-    @property
     def fleet_current(self) -> FleetLocation:
         if self.fleet_current_index == 2:
             return self.fleet_2_location
@@ -108,20 +119,10 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
             self.fleet_1_location = value
 
     @property
-    def _fleet_2_enabled(self) -> bool:
-        return bool(self.config.fleet_2)
-
-    @property
     def configured_boss_fleet(self) -> int:
         """返回当前运行实例采用的 boss 舰队配置。"""
 
         return self.config.fleet_boss
-
-    def _set_fleet_location(self, index: Literal[1, 2], location: GridLocation) -> None:
-        if index == 1:
-            self.fleet_1 = location
-        else:
-            self.fleet_2 = location
 
     @property
     def fleet_boss(self) -> Self:
@@ -163,9 +164,6 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
     def switch_to(self) -> None:
         pass
 
-    movable_before: SelectedGrids[GridInfo]
-    movable_before_normal: SelectedGrids[GridInfo]
-
     @property
     def _walk_sight(self) -> tuple[int, int, int, int]:
         sight = self.map.camera_sight
@@ -192,26 +190,23 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
 
     def _goto_state(
         self,
-        location: GridLocation,
-        expected: str,
+        request: _GotoRequest,
         grid: Grid,
-        *,
-        is_portal: bool,
-        may_submarine_icon: bool,
     ) -> _GotoState:
         extra = self._goto_walk_extra(grid)
         movement_wait = self._turn_controller.movement_wait
         return _GotoState(
-            location=location,
-            expected=expected,
+            location=request.location,
+            expected=request.expected,
             grid=grid,
-            is_portal=is_portal,
-            may_submarine_icon=may_submarine_icon,
+            is_portal=request.is_portal,
+            may_submarine_icon=request.may_submarine_icon,
             extra=extra,
             arrive_timer=Timer(0.5 + movement_wait + extra, count=2),
             arrive_unexpected_timer=Timer(1.5 + movement_wait + extra, count=6),
             ambushed_retry=Timer(0.5 + movement_wait + extra, count=2),
             walk_timeout=Timer(20).start(),
+            movable_snapshot=request.movable_snapshot,
         )
 
     def _goto_handle_fleet_lock(self, state: _GotoState) -> None:
@@ -392,7 +387,10 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         self.map[state.location].is_fleet = True
         setattr(self, f"fleet_{self.fleet_current_index}_location", state.location)
         if state.result_mystery == "get_carrier":
-            self.full_scan_carrier()
+            previous = self.map.select(is_enemy=True)
+            self.full_scan(MapScanRequest(progress=self._spawn_progress(mode="carrier")))
+            spawned = self.map.select(is_enemy=True).delete(previous)
+            logger.info(f"Carrier spawn: {spawned}")
         if state.result == "combat":
             self._turn_controller.battle_resolved(self.battle_count)
             self.predict()
@@ -400,7 +398,23 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         if turn_event is FleetTurnEvent.ENEMY_MOVED:
             if state.result != "combat":
                 self.predict()
-            self.full_scan_movable(enemy_cleared=state.result == "combat")
+            self._map_observer.scanner.full_scan_movable(
+                self,
+                MovableScanRequest(
+                    snapshot=state.movable_snapshot,
+                    progress=self._spawn_progress(),
+                    rules=MovableEnemyRules(
+                        siren=self.config.MAP_HAS_MOVABLE_ENEMY,
+                        normal_enemy=self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY,
+                        enemy_template=bool(self.config.MAP_ENEMY_TEMPLATE),
+                        wall=self.config.MAP_HAS_WALL,
+                        portal=self.config.MAP_HAS_PORTAL,
+                        ambush=self.config.MAP_HAS_AMBUSH,
+                        siren_step=self.config.MOVABLE_ENEMY_FLEET_STEP,
+                    ),
+                    enemy_cleared=state.result == "combat",
+                ),
+            )
             self.find_path_initial()
             raise MapEnemyMoved
         if turn_event is FleetTurnEvent.MAZE_CHANGED:
@@ -413,24 +427,24 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
     def _goto(self, location: GridInfo | str | GridLocation, expected: str = "") -> None:
         """直达目标格并处理伏击、空袭、神秘事件和战斗；expected 可为 combat、combat_siren 或 mystery。"""
         location = location_ensure(location)
-        self.movable_before = self.map.select(is_siren=True)
-        self.movable_before_normal = self.map.select(is_enemy=True)
+        movable_snapshot = MovableEnemySnapshot.capture(self.map)
         if self.hp_retreat_triggered():
             self.withdraw()
         is_portal = self.map[location].is_portal
         # 上方格子可能是潜艇，会干扰 predict_fleet()。
         may_submarine_icon = self.map.grid_covered(self.map[location], location=[(0, -1)])
         may_submarine_icon = may_submarine_icon and self.fleet_submarine_location == may_submarine_icon[0].location
+        request = _GotoRequest(
+            location=location,
+            expected=expected,
+            is_portal=is_portal,
+            may_submarine_icon=bool(may_submarine_icon),
+            movable_snapshot=movable_snapshot,
+        )
 
         while 1:
             grid = self._goto_click_target(location)
-            state = self._goto_state(
-                location,
-                expected,
-                grid,
-                is_portal=is_portal,
-                may_submarine_icon=bool(may_submarine_icon),
-            )
+            state = self._goto_state(request, grid)
             self._goto_wait_arrival(state)
             if state.arrived:
                 # 弹药格必须再点一次，否则下一次点击不会生效。
@@ -540,376 +554,35 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
                 fleets.append(text)
         logger.info(" ".join(fleets))
 
-    def show_submarine(self) -> None:
-        location = self._require_fleet_location(self.fleet_submarine_location)
-        logger.info(f"Submarine: {location2node(location)}")
-
-    def full_scan(
-        self,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None:
-        self._map_observer.scanner.full_scan(
-            self,
-            options=options,
-            queue=queue,
-            must_scan=must_scan,
+    def _spawn_progress(self, mode: GridMode = "normal") -> MapSpawnProgress:
+        return MapSpawnProgress(
+            battle_count=self.battle_count,
+            mystery_count=self.mystery_count,
+            siren_count=self.siren_count,
+            carrier_count=self.carrier_count,
             mode=mode,
         )
 
-    def _standard_full_scan(
-        self,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None:
-        if options is None:
-            options = FullScanOptions(
-                queue=queue,
-                must_scan=must_scan,
-                battle_count=self.battle_count,
-                mystery_count=self.mystery_count,
-                siren_count=self.siren_count,
-                carrier_count=self.carrier_count,
-                mode=mode,
-            )
-        if self.config.MAP_HAS_DECOY_ENEMY and options.mode == "normal":
-            options.mode = "decoy"
-        super().full_scan(options)
-
-        if self.config.fleet_2 and not self.fleet_2_location:
-            fleets = self.map.select(is_fleet=True, is_current_fleet=False)
-            if fleets.count:
-                logger.info(f"Predict fleet_2 to be {fleets[0]}")
-                self.fleet_2_location = self._require_fleet_location(fleets[0].location)
-
-        for loca in [self.fleet_1_location, self.fleet_2_location]:
-            if len(loca) and loca in self.map:
-                grid = self.map[loca]
-                if grid.may_boss and grid.is_caught_by_siren:
-                    # Boss 可能直接刷新在舰队所在格。
-                    pass
-                else:
-                    self.map[loca].wipe_out()
-
-    def full_scan_carrier(self) -> None:
-        """神秘事件触发敌方搜索后扫描新增敌人。"""
-        prev = self.map.select(is_enemy=True)
-        self.full_scan(mode="carrier")
-        diff = self.map.select(is_enemy=True).delete(prev)
-        logger.info(f"Carrier spawn: {diff}")
-
-    def full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
-        self._map_observer.scanner.full_scan_movable(
+    def full_scan(self, request: MapScanRequest | None = None) -> None:
+        """通过当前 profile 的 scanner 执行一次完整地图扫描。"""
+        self._map_observer.scanner.full_scan(
             self,
-            enemy_cleared=enemy_cleared,
+            request or MapScanRequest(progress=self._spawn_progress()),
         )
 
-    def _standard_full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
-        """敌人移动后扫描；enemy_cleared 为 True 时也扫描新刷敌人。"""
-        if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-            if self.config.MAP_HAS_MOVABLE_ENEMY:
-                for grid in self.movable_before:
-                    grid.wipe_out()
-                for grid in self.movable_before_normal:
-                    grid.wipe_out()
-                self.full_scan(mode="movable")
-                self.track_movable(enemy_cleared=enemy_cleared, siren=True)
-                self.track_movable(enemy_cleared=enemy_cleared, siren=False)
-            else:
-                for grid in self.movable_before_normal:
-                    grid.wipe_out()
-                self.full_scan(mode="movable")
-                self.track_movable(enemy_cleared=enemy_cleared, siren=False)
+    def _observe_surface_fleet(self, grid: GridInfo) -> SurfaceFleetObservation:
+        self.in_sight(grid, sight=(-1, 0, 1, 2))
+        local = self.convert_global_to_local(grid)
+        found = local.predict_fleet()
+        return SurfaceFleetObservation(found=found, current=found and local.predict_current_fleet())
 
-        elif self.config.MAP_HAS_MOVABLE_ENEMY:
-            for grid in self.movable_before:
-                grid.wipe_out()
-            self.full_scan(
-                queue=None if enemy_cleared else self.movable_before, must_scan=self.movable_before, mode="movable"
-            )
-            self.track_movable(enemy_cleared=enemy_cleared, siren=True)
-
-    def track_movable(self, *, enemy_cleared: bool = True, siren: bool = True) -> None:
-        """跟踪移动并推断漏检敌人；siren 区分塞壬与普通敌人。"""
-        before, after, spawn, step = self._track_movable_context(siren=siren)
-        matched_before, matched_after = match_movable(
-            before=self._selected_locations(before),
-            spawn=self._selected_locations(spawn),
-            after=self._selected_locations(after),
-            fleets=[self._require_fleet_location(self.fleet_current)] if enemy_cleared else [],
-            fleet_step=step,
-        )
-        matched_before = self.map.to_selected(matched_before)
-        matched_after = self.map.to_selected(matched_after)
-        logger.info(f"Movable enemy {before} -> {after}")
-        logger.info(f"Tracked enemy {matched_before} -> {matched_after}")
-
-        self._track_movable_delete_wrong_detection(after=after, matched_after=matched_after)
-        diff = before.delete(matched_before)
-        missing = self._track_movable_missing_count(siren=siren)
-        if diff and missing != 0:
-            logger.warning(f"Movable enemy tracking lost: {diff}")
-            predict = self._track_movable_predict_missing(diff=diff, after=after, siren=siren)
-            matched_after = matched_after.add(predict)
-        elif missing == 0:
-            logger.info(f"Movable enemy tracking drop: {diff}")
-
-        self._track_movable_mark_matched(matched_after)
-
-    def _track_movable_context(
-        self, *, siren: bool
-    ) -> tuple[SelectedGrids[GridInfo], SelectedGrids[GridInfo], SelectedGrids[GridInfo], int]:
-        before = self.movable_before if siren else self.movable_before_normal
-        after = self.map.select(is_siren=True) if siren else self.map.select(is_enemy=True)
-        spawn = self.map.select(may_siren=True) if siren else self.map.select(may_enemy=True)
-        step = self.config.MOVABLE_ENEMY_FLEET_STEP if siren else 1
-        return before, after, spawn, step
-
-    def _track_movable_delete_wrong_detection(
-        self, *, after: SelectedGrids[GridInfo], matched_after: SelectedGrids[GridInfo]
-    ) -> None:
-        if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-            return
-
-        for grid in after.delete(matched_after):
-            if not grid.may_siren:
-                logger.warning(f"Wrong detection: {grid}")
-                grid.wipe_out()
-
-    def _track_movable_missing_count(self, *, siren: bool) -> int:
-        snapshot = self._spawn_gap_predictor.estimate(
-            MapSpawnProgress(
-                battle_count=self.battle_count,
-                mystery_count=self.mystery_count,
-                siren_count=self.siren_count,
-                carrier_count=self.carrier_count,
-            )
-        )
-        return snapshot.missing["siren"] if siren else snapshot.missing["enemy"]
-
-    def _track_movable_predict_missing(
-        self,
-        *,
-        diff: SelectedGrids[GridInfo],
-        after: SelectedGrids[GridInfo],
-        siren: bool,
-    ) -> SelectedGrids[GridInfo]:
-        covered = self._track_movable_covered_grids(after=after, siren=siren)
-        accessible = self._track_movable_accessible_grids(diff=diff, siren=siren)
-        predict = accessible.intersect(covered).select(is_sea=True, is_fleet=False)
-        logger.info(f"Movable enemy predict: {predict}")
-        self._track_movable_mark_predicted(predict, siren=siren)
-        return predict
-
-    def _track_movable_covered_grids(self, *, after: SelectedGrids[GridInfo], siren: bool) -> SelectedGrids[GridInfo]:
-        covered = self.map.grid_covered(self.map[self.fleet_current], location=[(0, -2)])
-        for location in (self.fleet_1_location, self.fleet_2_location):
-            if location:
-                covered = covered.add(self.map.grid_covered(self.map[location], location=[(0, -1)]))
-
-        if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY and not self.config.MAP_ENEMY_TEMPLATE:
-            for location in (self.fleet_1_location, self.fleet_2_location):
-                if location:
-                    covered = covered.add(self.map.grid_covered(self.map[location], location=[(1, 0)]))
-
-        covered = covered.add(self.map.manual_map_covered)
-        cover_sources = after if siren else self.map.select(is_siren=True)
-        for grid in cover_sources:
-            covered = covered.add(self.map.grid_covered(grid))
-        logger.attr("enemy_covered", covered)
-        return covered
-
-    def _track_movable_accessible_grids(self, *, diff: SelectedGrids[GridInfo], siren: bool) -> SelectedGrids[GridInfo]:
-        accessible: SelectedGrids[GridInfo] = SelectedGrids([])
-        if self.config.MAP_HAS_WALL:
-            self.map.grid_connection_initial(wall=False, portal=self.config.MAP_HAS_PORTAL)
-
-        for grid in diff:
-            self.map.find_path_initial(grid, has_ambush=False)
-            accessible = accessible.add(self.map.select(cost=0)).add(self.map.select(cost=1))
-            if siren:
-                accessible = accessible.add(self.map.select(cost=2))
-
-        if self.config.MAP_HAS_WALL:
-            self.map.grid_connection_initial(wall=self.config.MAP_HAS_WALL, portal=self.config.MAP_HAS_PORTAL)
-        self.map.find_path_initial(self.fleet_current, has_ambush=self.config.MAP_HAS_AMBUSH)
-        logger.attr("enemy_accessible", accessible)
-        return accessible
-
-    @staticmethod
-    def _track_movable_mark_predicted(predict: SelectedGrids[GridInfo], *, siren: bool) -> None:
-        for grid in predict:
-            if siren:
-                grid.is_siren = True
-            grid.is_enemy = True
-
-    def _track_movable_mark_matched(self, matched_after: SelectedGrids[GridInfo]) -> None:
-        for grid in matched_after:
-            if grid.location != self.fleet_current:
-                grid.is_movable = True
-
-    def find_all_fleets(self) -> None:
-        logger.hr("Find all fleets")
-        queue = self.map.select(is_spawn_point=True)
-        while queue:
-            queue = queue.sort_by_camera_distance(self.camera)
-            self.in_sight(queue[0], sight=(-1, 0, 1, 2))
-            grid = self.convert_global_to_local(queue[0])
-            if grid.predict_fleet():
-                if grid.predict_current_fleet():
-                    self.fleet_1 = queue[0].location
-                else:
-                    self.fleet_2 = queue[0].location
-            queue = queue[1:]
-
-    def find_current_fleet(self) -> FleetLocation:
-        return self._map_observer.fleet_locator.find_current_fleet(self)
-
-    def _standard_find_current_fleet(self) -> FleetLocation:
-        logger.hr("Find current fleet")
-        fleets = self._find_current_fleet_candidates()
-        logger.info(f"Fleets: {fleets}")
-
-        count = fleets.count
-        if count == 1:
-            self._find_current_fleet_from_single(fleets)
-        elif count == 2:
-            self._find_current_fleet_from_pair(fleets)
-        else:
-            self._find_current_fleet_from_unexpected_count(fleets)
-
-        self.show_fleet()
-        return self.fleet_current
-
-    def _find_current_fleet_candidates(self) -> SelectedGrids[GridInfo]:
-        if not self.config.POOR_MAP_DATA:
-            return self.map.select(is_fleet=True, is_spawn_point=True)
-        return self.map.select(is_fleet=True)
-
-    def _find_current_fleet_from_single(self, fleets: SelectedGrids[GridInfo]) -> None:
-        if not self.config.fleet_2:
-            self.fleet_1 = fleets[0].location
-            return
-
-        logger.info("Fleet_2 not detected.")
-        spawn_points = self.map.select(is_spawn_point=True)
-        if self.config.POOR_MAP_DATA and not spawn_points:
-            self.fleet_1 = fleets[0].location
-        elif spawn_points.count == 2:
-            self._find_current_fleet_from_spawn_points(fleets[0], spawn_points)
-        else:
-            self._find_current_fleet_from_cover(fleets[0])
-
-    def _find_current_fleet_from_spawn_points(self, detected: GridInfo, spawn_points: SelectedGrids[GridInfo]) -> None:
-        logger.info("Predict fleet to be spawn point")
-        another = spawn_points.delete(SelectedGrids([detected]))[0]
-        if detected.is_current_fleet:
-            self.fleet_1 = detected.location
-            self.fleet_2 = another.location
-        else:
-            self.fleet_1 = another.location
-            self.fleet_2 = detected.location
-
-    def _find_current_fleet_from_cover(self, detected: GridInfo) -> None:
-        cover = self.map.grid_covered(detected, location=[(0, -1)])
-        if detected.is_current_fleet and len(cover) and cover[0].is_spawn_point:
-            self.fleet_1 = detected.location
-            self.fleet_2 = cover[0].location
-        else:
-            self.find_all_fleets()
-
-    def _find_current_fleet_from_pair(self, fleets: SelectedGrids[GridInfo]) -> None:
-        current = self.map.select(is_current_fleet=True)
-        if current.count == 1:
-            self.fleet_1 = current[0].location
-            self.fleet_2 = fleets.delete(current)[0].location
-            return
-
-        self._find_current_fleet_pair_by_prediction(fleets)
-
-    def _find_current_fleet_pair_by_prediction(self, fleets: SelectedGrids[GridInfo]) -> None:
-        fleets = fleets.sort_by_camera_distance(self.camera)
-        first, second = fleets[0], fleets[1]
-        if self._is_current_fleet_by_prediction(first):
-            self.fleet_1 = first.location
-            self.fleet_2 = second.location
-        elif self._is_current_fleet_by_prediction(second):
-            self.fleet_1 = second.location
-            self.fleet_2 = first.location
-        else:
-            logger.warning("Current fleet not found")
-            self.fleet_1 = first.location
-            self.fleet_2 = second.location
-
-    def _is_current_fleet_by_prediction(self, grid: GridInfo) -> bool:
+    def _observe_current_fleet(self, grid: GridInfo) -> bool:
         self.in_sight(grid, sight=(-1, 0, 1, 2))
         return self.convert_global_to_local(grid).predict_current_fleet()
 
-    def _find_current_fleet_from_unexpected_count(self, fleets: SelectedGrids[GridInfo]) -> None:
-        if fleets.count == 0:
-            logger.warning("No fleets detected.")
-            current = self.map.select(is_current_fleet=True)
-            if current.count:
-                self.fleet_1 = current[0].location
-        else:
-            logger.warning(f"Too many fleets: {fleets}.")
-        self.find_all_fleets()
-
-    def find_all_submarines(self) -> None:
-        logger.hr("Find all submarines")
-        queue = self.map.select(is_submarine_spawn_point=True)
-        while queue:
-            queue = queue.sort_by_camera_distance(self.camera)
-            self.in_sight(queue[0], sight=(-2, -1, 2, -1))
-            grid = self.convert_global_to_local(queue[0])
-            if grid.predict_submarine():
-                self.fleet_submarine = queue[0].location
-                break
-            queue = queue[1:]
-
-    def find_submarine(self) -> GridLocation | None:
-        if not (self.config.submarine and self.map.select(is_submarine_spawn_point=True)):
-            return None
-
-        fleets = self.map.select(is_submarine=True)
-        count = fleets.count
-        if count == 1:
-            self.fleet_submarine = fleets[0].location
-        elif count == 0:
-            logger.info("No submarine found")
-            spawn_point = self.map.select(is_submarine_spawn_point=True)
-            if spawn_point.count == 1:
-                logger.info(f"Predict the only submarine spawn point {spawn_point[0]} as submarine")
-                self.fleet_submarine = spawn_point[0].location
-            else:
-                logger.info(f"Having multiple submarine spawn points: {spawn_point}")
-                covered = SelectedGrids([])
-                for grid in spawn_point:
-                    covered = covered.add(self.map.grid_covered(grid, location=[(0, 1)]))
-                covered = covered.filter(lambda g: g.is_enemy or g.is_fleet or g.is_siren or g.is_boss)
-                if covered.count == 1:
-                    spawn_point = self.map.grid_covered(covered[0], location=[(0, -1)])
-                    logger.info(f"Submarine {spawn_point[0]} covered by {covered[0]}")
-                    self.fleet_submarine = spawn_point[0].location
-                else:
-                    logger.info("Found multiple submarine spawn points being covered")
-                    self.find_all_submarines()
-        else:
-            logger.warning(f"Too many submarines: {fleets}.")
-            self.find_all_submarines()
-
-        if not len(self.fleet_submarine_location):
-            logger.warning("Unable to find submarine, assume it is at map center")
-            shape = self.map.shape
-            center = (shape[0] // 2, shape[1] // 2)
-            self.fleet_submarine = self.map.select(is_land=False).sort_by_camera_distance(center)[0].location
-
-        self.show_submarine()
-        return self._require_fleet_location(self.fleet_submarine_location)
+    def _observe_submarine(self, grid: GridInfo) -> bool:
+        self.in_sight(grid, sight=(-2, -1, 2, -1))
+        return self.convert_global_to_local(grid).predict_submarine()
 
     def map_init(self, map_: CampaignMap | None) -> None:
         """进入地图后、执行任何地图操作前调用。"""
@@ -947,7 +620,11 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
             fortress=self.config.MAP_HAS_FORTRESS,
             bouncing_enemy=self.config.MAP_HAS_BOUNCING_ENEMY,
         )
-        self._spawn_gap_predictor = MapSpawnGapPredictor(self.map)
+        self.map_spawn_gap_predictor = MapSpawnGapPredictor(self.map)
+        self.map_scanner_rules = MapScannerRules(
+            decoy_enemy=bool(self.config.MAP_HAS_DECOY_ENEMY),
+            fleet_2_enabled=bool(self.config.fleet_2),
+        )
         self._turn_controller = FleetTurnController(
             FleetTurnRules(
                 movable_enemy=self.config.MAP_HAS_MOVABLE_ENEMY,
@@ -973,9 +650,31 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         self.lv_get()
         self.ensure_edge_insight(preset=self.map.in_map_swipe_preset_data)
         self.handle_info_bar()  # “Changed to fleet 2”信息条会遮住弹药图标。
-        self.full_scan(must_scan=self.map.camera_data_spawn_point, mode="init")
-        self.find_current_fleet()
-        self.find_submarine()
+        self.full_scan(
+            MapScanRequest(
+                must_scan=self.map.camera_data_spawn_point,
+                progress=self._spawn_progress(mode="init"),
+            )
+        )
+        surface_locations = self._map_observer.fleet_locator.locate_surface(
+            self,
+            SurfaceFleetLocationRequest(
+                previous=SurfaceFleetLocations(
+                    fleet_1=self.fleet_1_location,
+                    fleet_2=self.fleet_2_location,
+                ),
+                fleet_2_enabled=bool(self.config.fleet_2),
+                poor_map_data=self.map.poor_map_data,
+            ),
+        )
+        self.fleet_1_location = surface_locations.fleet_1
+        self.fleet_2_location = surface_locations.fleet_2
+        self.show_fleet()
+        submarine_location = self._map_observer.fleet_locator.locate_submarine(
+            self,
+            enabled=bool(self.config.submarine),
+        )
+        self.fleet_submarine_location = submarine_location or ()
         self.find_path_initial()
         self.map.show_cost()
         self._turn_controller.initialize(self.battle_count)

@@ -1,7 +1,8 @@
 from typing import override
 
-from module.map.camera import Camera, FullScanOptions
+from module.map.camera import Camera
 from module.map.map_base import CampaignMap
+from module.map.map_scanner import CampaignFullScanEngine, MapScanRequest
 from module.map.map_spawn_gap import MapSpawnGapPredictor, MapSpawnProgress
 
 
@@ -31,7 +32,7 @@ class _SpawnGapCamera(Camera):
     def __init__(self, map_: CampaignMap, predictor: MapSpawnGapPredictor) -> None:
         self.map = map_
         self.camera = (0, 0)
-        self._spawn_gap_predictor = predictor
+        self.map_spawn_gap_predictor = predictor
 
 
 def test_estimate_accounts_for_progress_and_observed_spawns() -> None:
@@ -128,21 +129,19 @@ def test_poor_map_never_finishes_or_infers_covered_spawns() -> None:
     assert map_[(0, 0)].is_enemy is False
 
 
-def test_camera_scan_uses_one_progress_snapshot_for_completion_and_inference() -> None:
+def test_full_scan_uses_one_progress_snapshot_for_completion_and_inference() -> None:
     map_ = _campaign_map("ME", [{"battle": 0, "enemy": 1}])
     predictor = _RecordingSpawnGapPredictor()
     camera = _SpawnGapCamera(map_, predictor)
     progress = MapSpawnProgress(battle_count=4, mystery_count=3, siren_count=2, carrier_count=1, mode="movable")
 
-    camera.full_scan(
-        FullScanOptions(
+    CampaignFullScanEngine().scan(
+        camera,
+        MapScanRequest(
             queue=map_.to_selected(["A1"]),
-            battle_count=progress.battle_count,
-            mystery_count=progress.mystery_count,
-            siren_count=progress.siren_count,
-            carrier_count=progress.carrier_count,
-            mode=progress.mode,
-        )
+            progress=progress,
+        ),
     )
 
-    assert predictor.calls == [("complete", progress), ("infer", progress)]
+    assert [event for event, _progress in predictor.calls] == ["complete", "infer"]
+    assert all(observed_progress is progress for _event, observed_progress in predictor.calls)

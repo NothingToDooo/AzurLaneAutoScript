@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast, override
@@ -7,16 +9,20 @@ from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplement
 from module.handler.assets import MAP_ENEMY_SEARCHING
 from module.handler.fast_forward import AUTO_SEARCH
 from module.logger import logger
+from module.map.fleet_locator import (
+    FleetLocationContext,
+    SurfaceFleetLocationRequest,
+    SurfaceFleetLocations,
+)
 
 from .campaign_map_observer import (
     CampaignMapObserverContributor,
     CampaignMapObserverExecutor,
     EnemySearchingNext,
-    FindCurrentFleetNext,
     FullScanMovableNext,
     FullScanNext,
-    FullScanRequest,
     InSightNext,
+    LocateSurfaceFleetNext,
     MapClearPercentageNext,
     MapGetInfoNext,
 )
@@ -34,13 +40,11 @@ if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
     from module.map.map_grids import SelectedGrids
     from module.map.map_observer import (
-        FleetLocatorRuntime,
         InSightRequest,
         MapPreparationRuntime,
-        MapScannerRuntime,
         MapViewportRuntime,
     )
-    from module.map.type_alias import FleetLocation
+    from module.map.map_scanner import MapScannerRuntime, MapScanRequest, MovableScanRequest
     from module.map_detection.grid_info import GridInfo
 
 
@@ -96,21 +100,20 @@ class PreserveEnemyGenreExecutor(CampaignMapObserverExecutor):
     def _full_scan_movable(
         self,
         runtime: MapScannerRuntime,
+        request: MovableScanRequest,
         next_handler: FullScanMovableNext,
-        *,
-        enemy_cleared: bool = True,
     ) -> None:
         self._preserved = runtime.map.select(enemy_genre=self._genre)
         logger.attr("Preserved_enemy_genre", self._preserved)
         try:
-            next_handler(runtime, enemy_cleared=enemy_cleared)
+            next_handler(runtime, request)
         finally:
             self._restore_preserved()
 
     def _full_scan(
         self,
         runtime: MapScannerRuntime,
-        request: FullScanRequest,
+        request: MapScanRequest,
         next_handler: FullScanNext,
     ) -> None:
         next_handler(runtime, request)
@@ -145,26 +148,21 @@ def _build_fixed_fleet_locations(context: RuntimeExecutorBuildContext) -> Runtim
     fleet_1 = node2location(_string(options, "fleet_1"))
     fleet_2 = node2location(_string(options, "fleet_2"))
 
-    def find_current_fleet(
-        runtime: FleetLocatorRuntime,
-        next_handler: FindCurrentFleetNext,
-    ) -> FleetLocation:
-        del next_handler
+    def locate_surface_fleet(
+        context: FleetLocationContext,
+        request: SurfaceFleetLocationRequest,
+        next_handler: LocateSurfaceFleetNext,
+    ) -> SurfaceFleetLocations:
+        del context, next_handler
         logger.hr("Find current fleet")
         logger.info(f"No fleet scan, assume fleet_1 at {location2node(fleet_1)}")
-        runtime._set_fleet_location(  # ruff:ignore[private-member-access] - fixed locator 只能通过显式 port 原语更新舰队位置。
-            1,
-            fleet_1,
-        )
-        if runtime._fleet_2_enabled:  # ruff:ignore[private-member-access] - fixed locator 只读取显式 port 开关。
+        located_fleet_2 = request.previous.fleet_2
+        if request.fleet_2_enabled:
             logger.info(f"No fleet scan, assume fleet_2 at {location2node(fleet_2)}")
-            runtime._set_fleet_location(  # ruff:ignore[private-member-access] - fixed locator 只能通过显式 port 原语更新舰队位置。
-                2,
-                fleet_2,
-            )
-        return runtime.fleet_current
+            located_fleet_2 = fleet_2
+        return SurfaceFleetLocations(fleet_1=fleet_1, fleet_2=located_fleet_2)
 
-    return CampaignMapObserverExecutor(CampaignMapObserverContributor(find_current_fleet=find_current_fleet))
+    return CampaignMapObserverExecutor(CampaignMapObserverContributor(locate_surface_fleet=locate_surface_fleet))
 
 
 @dataclass(frozen=True, slots=True)

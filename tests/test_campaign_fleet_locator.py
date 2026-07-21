@@ -1,12 +1,11 @@
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from module.adapters.campaign_map_observer import (
     CampaignMapObserverContributor,
     CampaignMapObserverExecutor,
-    FindCurrentFleetNext,
+    LocateSurfaceFleetNext,
     build_campaign_map_observer,
 )
 from module.adapters.campaign_runtime_implementations import (
@@ -28,91 +27,117 @@ from module.content.runtime_profile import (
     RuntimeTuningValue,
 )
 from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
-from module.map.fleet import Fleet
+from module.map.fleet_locator import (
+    FleetLocationContext,
+    SurfaceFleetLocationRequest,
+    SurfaceFleetLocations,
+    SurfaceFleetObservation,
+)
+from module.map.map_grids import SelectedGrids
+from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from typing import Literal
 
-    from module.map.map_observer import CampaignMapObserver, FleetLocatorRuntime
-    from module.map.type_alias import FleetLocation, GridLocation
+    from module.map.map_base import CampaignMap
+    from module.map.map_observer import CampaignMapObserver
+    from module.map.type_alias import GridLocation
 
 _IMPLEMENTATION = RuntimeImplementationId("observation/fixed_fleet_locations")
+_PREVIOUS = SurfaceFleetLocations(fleet_1=(9, 9), fleet_2=(8, 8))
 
 
-class _DispatchFleet(Fleet):
-    def __init__(self, observer: CampaignMapObserver) -> None:
-        self._map_observer = observer
+class _Grid(GridInfo):
+    def __init__(self, location: GridLocation) -> None:
+        self.location = location
+        self.is_fleet = True
+        self.is_spawn_point = True
 
 
-@dataclass(frozen=True, slots=True)
-class _FleetConfig:
-    fleet_2: bool
+class _Map:
+    shape = (1, 1)
 
+    def __init__(self, detected: GridLocation) -> None:
+        self._grids: SelectedGrids[GridInfo] = SelectedGrids([_Grid(detected)])
 
-class _FixedProfileFleet(Fleet):
-    config: _FleetConfig
+    def select(self, **criteria: object) -> SelectedGrids[GridInfo]:
+        return self._grids.select(**criteria)
 
-    def __init__(
-        self,
-        observer: CampaignMapObserver,
+    @staticmethod
+    def grid_covered(
+        grid: GridInfo,
         *,
-        fleet_2_enabled: bool,
-        current_index: Literal[1, 2],
-    ) -> None:
-        self._map_observer = observer
-        self.config = _FleetConfig(fleet_2_enabled)
-        self.fleet_current_index = current_index
-        self.fleet_1_location = (9, 9)
-        self.fleet_2_location = (8, 8)
+        location: list[GridLocation],
+    ) -> SelectedGrids[GridInfo]:
+        del grid, location
+        return SelectedGrids([])
 
-    @override
-    def _standard_find_current_fleet(self) -> FleetLocation:
-        message = "fixed profile must not call the standard Fleet locator"
+
+class _LocatorContext:
+    camera: GridLocation = (0, 0)
+
+    def __init__(self, detected: GridLocation = (4, 6)) -> None:
+        self.map = cast("CampaignMap", _Map(detected))
+        self.observation_calls: list[str] = []
+
+    def _observe_surface_fleet(self, grid: GridInfo) -> SurfaceFleetObservation:
+        del grid
+        self.observation_calls.append("surface")
+        message = "single detected fleet must not require directed observation"
+        raise AssertionError(message)
+
+    def _observe_current_fleet(self, grid: GridInfo) -> bool:
+        del grid
+        self.observation_calls.append("current")
+        message = "single detected fleet must not require current-fleet observation"
+        raise AssertionError(message)
+
+    def _observe_submarine(self, grid: GridInfo) -> bool:
+        del grid
+        self.observation_calls.append("submarine")
+        message = "surface fleet location must not observe submarines"
         raise AssertionError(message)
 
 
-class _LocatorRuntime:
-    def __init__(
-        self,
-        *,
-        fleet_2_enabled: bool = False,
-        current_index: Literal[1, 2] = 1,
-        standard_result: FleetLocation | None = None,
-        standard_bomb: bool = False,
-    ) -> None:
-        self._fleet_2_enabled_value = fleet_2_enabled
-        self.current_index = current_index
-        self.locations: dict[int, FleetLocation] = {1: (9, 9), 2: (8, 8)}
-        self.assignments: list[tuple[int, GridLocation]] = []
-        self.standard_result = standard_result
-        self.standard_bomb = standard_bomb
-        self.standard_calls = 0
+class _UnusedLocatorContext:
+    def __init__(self) -> None:
+        self.observation_calls: list[str] = []
 
     @property
-    def _fleet_2_enabled(self) -> bool:
-        return self._fleet_2_enabled_value
+    def map(self) -> CampaignMap:
+        message = "fixed fleet profile must not inspect the map"
+        raise AssertionError(message)
 
     @property
-    def fleet_current(self) -> FleetLocation:
-        return self.locations[self.current_index]
+    def camera(self) -> GridLocation:
+        message = "fixed fleet profile must not inspect the camera"
+        raise AssertionError(message)
 
-    def _set_fleet_location(
-        self,
-        index: Literal[1, 2],
-        location: GridLocation,
-    ) -> None:
-        self.assignments.append((index, location))
-        self.locations[index] = location
+    def _observe_surface_fleet(self, grid: GridInfo) -> SurfaceFleetObservation:
+        del grid
+        self.observation_calls.append("surface")
+        message = "fixed fleet profile must not observe fleets"
+        raise AssertionError(message)
 
-    def _standard_find_current_fleet(self) -> FleetLocation:
-        self.standard_calls += 1
-        if self.standard_bomb:
-            message = "replacement must not call the standard locator"
-            raise AssertionError(message)
-        if self.standard_result is not None:
-            return self.standard_result
-        return self.fleet_current
+    def _observe_current_fleet(self, grid: GridInfo) -> bool:
+        del grid
+        self.observation_calls.append("current")
+        message = "fixed fleet profile must not observe the current fleet"
+        raise AssertionError(message)
+
+    def _observe_submarine(self, grid: GridInfo) -> bool:
+        del grid
+        self.observation_calls.append("submarine")
+        message = "fixed fleet profile must not observe submarines"
+        raise AssertionError(message)
+
+
+def _request(*, fleet_2_enabled: bool = False) -> SurfaceFleetLocationRequest:
+    return SurfaceFleetLocationRequest(
+        previous=_PREVIOUS,
+        fleet_2_enabled=fleet_2_enabled,
+        poor_map_data=False,
+    )
 
 
 def _real_profile(pack_id: str, stage_id: str) -> CampaignRuntimeProfile:
@@ -145,107 +170,102 @@ def _observer_for(profile: CampaignRuntimeProfile) -> CampaignMapObserver:
     return build_campaign_map_observer(instances)
 
 
-def test_fleet_public_locator_preserves_exact_runtime_and_return() -> None:
-    seen: list[FleetLocatorRuntime] = []
-    expected = (int("7"), int("8"))
+def test_fleet_locator_composition_preserves_exact_context_request_and_return() -> None:
+    context = _LocatorContext()
+    request = _request()
+    expected = SurfaceFleetLocations(fleet_1=(7, 8), fleet_2=())
+    seen: list[tuple[FleetLocationContext, SurfaceFleetLocationRequest]] = []
 
-    def find_current_fleet(
-        runtime: FleetLocatorRuntime,
-        next_handler: FindCurrentFleetNext,
-    ) -> FleetLocation:
+    def locate_surface_fleet(
+        received_context: FleetLocationContext,
+        received_request: SurfaceFleetLocationRequest,
+        next_handler: LocateSurfaceFleetNext,
+    ) -> SurfaceFleetLocations:
         del next_handler
-        seen.append(runtime)
+        seen.append((received_context, received_request))
         return expected
 
     observer = build_campaign_map_observer(
-        (CampaignMapObserverExecutor(CampaignMapObserverContributor(find_current_fleet=find_current_fleet)),)
+        (CampaignMapObserverExecutor(CampaignMapObserverContributor(locate_surface_fleet=locate_surface_fleet)),)
     )
-    fleet = _DispatchFleet(observer)
 
-    result = fleet.find_current_fleet()
+    result = observer.fleet_locator.locate_surface(context, request)
 
-    assert seen == [fleet]
-    assert seen[0] is fleet
+    assert seen == [(context, request)]
+    assert seen[0][0] is context
+    assert seen[0][1] is request
     assert result is expected
 
 
 def test_standard_fleet_locator_is_the_composition_fallback() -> None:
-    expected = (int("4"), int("6"))
-    runtime = _LocatorRuntime(standard_result=expected)
+    context = _LocatorContext()
+    request = _request()
 
-    result = build_campaign_map_observer(()).fleet_locator.find_current_fleet(runtime)
+    result = build_campaign_map_observer(()).fleet_locator.locate_surface(context, request)
 
-    assert result is expected
-    assert runtime.standard_calls == 1
+    assert result == SurfaceFleetLocations(fleet_1=(4, 6), fleet_2=(8, 8))
 
 
 def test_fleet_locator_composition_is_later_first() -> None:
     order: list[str] = []
-    seen: list[FleetLocatorRuntime] = []
+    seen: list[tuple[FleetLocationContext, SurfaceFleetLocationRequest]] = []
 
     def earlier(
-        runtime: FleetLocatorRuntime,
-        next_handler: FindCurrentFleetNext,
-    ) -> FleetLocation:
+        context: FleetLocationContext,
+        request: SurfaceFleetLocationRequest,
+        next_handler: LocateSurfaceFleetNext,
+    ) -> SurfaceFleetLocations:
         order.append("earlier")
-        seen.append(runtime)
-        return next_handler(runtime)
+        seen.append((context, request))
+        return next_handler(context, request)
 
     def later(
-        runtime: FleetLocatorRuntime,
-        next_handler: FindCurrentFleetNext,
-    ) -> FleetLocation:
+        context: FleetLocationContext,
+        request: SurfaceFleetLocationRequest,
+        next_handler: LocateSurfaceFleetNext,
+    ) -> SurfaceFleetLocations:
         order.append("later")
-        seen.append(runtime)
-        return next_handler(runtime)
+        seen.append((context, request))
+        return next_handler(context, request)
 
-    expected = (int("5"), int("7"))
-    runtime = _LocatorRuntime(standard_result=expected)
+    context = _LocatorContext(detected=(5, 7))
+    request = _request()
     observer = build_campaign_map_observer(
         (
-            CampaignMapObserverExecutor(CampaignMapObserverContributor(find_current_fleet=earlier)),
-            CampaignMapObserverExecutor(CampaignMapObserverContributor(find_current_fleet=later)),
+            CampaignMapObserverExecutor(CampaignMapObserverContributor(locate_surface_fleet=earlier)),
+            CampaignMapObserverExecutor(CampaignMapObserverContributor(locate_surface_fleet=later)),
         )
     )
 
-    result = observer.fleet_locator.find_current_fleet(runtime)
+    result = observer.fleet_locator.locate_surface(context, request)
 
     assert order == ["later", "earlier"]
-    assert seen == [runtime, runtime]
-    assert all(item is runtime for item in seen)
-    assert runtime.standard_calls == 1
-    assert result is expected
+    assert seen == [(context, request), (context, request)]
+    assert all(received_context is context for received_context, _ in seen)
+    assert all(received_request is request for _, received_request in seen)
+    assert result == SurfaceFleetLocations(fleet_1=(5, 7), fleet_2=(8, 8))
 
 
 @pytest.mark.parametrize(
-    ("fleet_2_enabled", "current_index", "expected_assignments", "expected_result"),
+    ("fleet_2_enabled", "expected"),
     [
-        (False, 1, [(1, (3, 4))], (3, 4)),
-        (True, 2, [(1, (3, 4)), (2, (5, 4))], (5, 4)),
+        (False, SurfaceFleetLocations(fleet_1=(3, 4), fleet_2=(8, 8))),
+        (True, SurfaceFleetLocations(fleet_1=(3, 4), fleet_2=(5, 4))),
     ],
 )
 def test_fixed_fleet_locations_replace_standard_and_honor_fleet_2(
     *,
     fleet_2_enabled: bool,
-    current_index: Literal[1, 2],
-    expected_assignments: list[tuple[int, GridLocation]],
-    expected_result: FleetLocation,
+    expected: SurfaceFleetLocations,
 ) -> None:
     observer = _observer_for(_fixed_profile({"fleet_1": "D5", "fleet_2": "F5"}))
-    runtime = _LocatorRuntime(
-        fleet_2_enabled=fleet_2_enabled,
-        current_index=current_index,
-        standard_bomb=True,
+
+    result = observer.fleet_locator.locate_surface(
+        _UnusedLocatorContext(),
+        _request(fleet_2_enabled=fleet_2_enabled),
     )
 
-    result = observer.fleet_locator.find_current_fleet(runtime)
-
-    assert runtime.assignments == expected_assignments
-    assert result == expected_result
-    assert result == runtime.fleet_current
-    assert runtime.standard_calls == 0
-    if not fleet_2_enabled:
-        assert runtime.locations[2] == (8, 8)
+    assert result == expected
 
 
 @pytest.mark.parametrize("stage_id", ["a1", "c1"])
@@ -257,43 +277,15 @@ def test_real_20240521_profiles_wire_fixed_fleet_locator(stage_id: str) -> None:
         for binding in extension.executors
         if binding.implementation_id == _IMPLEMENTATION
     )
-    runtime = _LocatorRuntime(fleet_2_enabled=True, current_index=2, standard_bomb=True)
 
-    result = _observer_for(profile).fleet_locator.find_current_fleet(runtime)
+    result = _observer_for(profile).fleet_locator.locate_surface(
+        _UnusedLocatorContext(),
+        _request(fleet_2_enabled=True),
+    )
 
     assert len(bindings) == 1
     assert dict(bindings[0].options) == {"fleet_1": "D5", "fleet_2": "F5"}
-    assert runtime.assignments == [(1, (3, 4)), (2, (5, 4))]
-    assert result == (5, 4)
-    assert runtime.standard_calls == 0
-
-
-@pytest.mark.parametrize(
-    ("fleet_2_enabled", "current_index", "expected_fleet_2", "expected_result"),
-    [
-        (False, 1, (8, 8), (3, 4)),
-        (True, 2, (5, 4), (5, 4)),
-    ],
-)
-def test_real_fixed_profile_uses_the_fleet_private_location_port(
-    *,
-    fleet_2_enabled: bool,
-    current_index: Literal[1, 2],
-    expected_fleet_2: FleetLocation,
-    expected_result: FleetLocation,
-) -> None:
-    fleet = _FixedProfileFleet(
-        _observer_for(_real_profile("event_20240521_cn", "a1")),
-        fleet_2_enabled=fleet_2_enabled,
-        current_index=current_index,
-    )
-
-    result = fleet.find_current_fleet()
-
-    assert fleet.fleet_1_location == (3, 4)
-    assert fleet.fleet_2_location == expected_fleet_2
-    assert result == expected_result
-    assert result == fleet.fleet_current
+    assert result == SurfaceFleetLocations(fleet_1=(3, 4), fleet_2=(5, 4))
 
 
 def test_fixed_fleet_profile_rejects_obsolete_string_operation() -> None:

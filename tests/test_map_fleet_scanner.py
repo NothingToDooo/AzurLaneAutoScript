@@ -1,14 +1,26 @@
 from typing import TYPE_CHECKING, override
 
-from module.map.camera import FullScanOptions
 from module.map.fleet import Fleet
+from module.map.map_base import CampaignMap
 from module.map.map_grids import SelectedGrids
 from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
+from module.map.map_scanner import (
+    CampaignFullScanEngine,
+    MapScannerRules,
+    MapScanRequest,
+    MovableEnemyRules,
+    MovableEnemySnapshot,
+    MovableEnemyTracker,
+    MovableScanRequest,
+    StandardCampaignMapScanner,
+)
+from module.map.map_spawn_gap import MapSpawnProgress
 from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
-    from module.map.map_observer import MapScannerRuntime
-    from module.map.type_alias import GridMode
+    import pytest
+
+    from module.map.map_scanner import FullScanContext, MapScannerRuntime, MovableTrackerContext
 
 
 class _RecordingScanner:
@@ -18,20 +30,16 @@ class _RecordingScanner:
     def full_scan(
         self,
         runtime: MapScannerRuntime,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
+        request: MapScanRequest,
     ) -> None:
-        self.calls.append(("full_scan", runtime, options, queue, must_scan, mode))
+        self.calls.append(("full_scan", runtime, request))
 
     def full_scan_movable(
         self,
         runtime: MapScannerRuntime,
-        *,
-        enemy_cleared: bool = True,
+        request: MovableScanRequest,
     ) -> None:
-        self.calls.append(("full_scan_movable", runtime, enemy_cleared))
+        self.calls.append(("full_scan_movable", runtime, request))
 
 
 class _ScannerFleet(Fleet):
@@ -46,59 +54,127 @@ class _ScannerFleet(Fleet):
         )
 
 
-class _MovableConfig:
-    MAP_HAS_MOVABLE_ENEMY = True
-    MAP_HAS_MOVABLE_NORMAL_ENEMY = False
+class _RecordingMovableTracker(MovableEnemyTracker):
+    def __init__(self) -> None:
+        self.calls: list[tuple[MovableTrackerContext, MovableScanRequest, bool]] = []
+
+    @override
+    def track(
+        self,
+        runtime: MovableTrackerContext,
+        request: MovableScanRequest,
+        *,
+        siren: bool,
+    ) -> None:
+        self.calls.append((runtime, request, siren))
 
 
 class _NestedFullScanFleet(Fleet):
-    config: _MovableConfig
-
     def __init__(self) -> None:
-        self.config = _MovableConfig()
-        self.movable_before = SelectedGrids([GridInfo()])
-        self.calls: list[tuple[object, ...]] = []
+        self.map = CampaignMap("nested-full-scan-test")
+        self.map.map_data = "MS"
+        self.map[(0, 0)].is_siren = True
+        self.scan_requests: list[MapScanRequest] = []
 
     @override
-    def full_scan(
-        self,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None:
-        self.calls.append(("public_full_scan", options, queue, must_scan, mode))
-
-    @override
-    def track_movable(self, *, enemy_cleared: bool = True, siren: bool = True) -> None:
-        self.calls.append(("track_movable", enemy_cleared, siren))
+    def full_scan(self, request: MapScanRequest | None = None) -> None:
+        assert request is not None
+        self.scan_requests.append(request)
 
 
-def test_fleet_canonical_scan_methods_forward_exact_arguments_to_injected_scanner() -> None:
+class _StandardFullScanFleet(Fleet):
+    def __init__(self) -> None:
+        self.map = CampaignMap("standard-full-scan-test")
+        self.map.map_data = "ME MS"
+        self.map_scanner_rules = MapScannerRules(decoy_enemy=True, fleet_2_enabled=True)
+        self.fleet_current_index = 1
+        self.fleet_1_location = (0, 0)
+        self.fleet_2_location = ()
+        self.map[(0, 0)].is_fleet = True
+        self.map[(0, 0)].is_current_fleet = True
+        self.map[(0, 0)].is_enemy = True
+        self.map[(1, 0)].is_fleet = True
+        self.map[(1, 0)].is_siren = True
+
+
+def _movable_request(*, enemy_cleared: bool = True) -> MovableScanRequest:
+    return MovableScanRequest(
+        snapshot=MovableEnemySnapshot(sirens=((0, 0),)),
+        progress=MapSpawnProgress(battle_count=3),
+        rules=MovableEnemyRules(
+            siren=True,
+            normal_enemy=False,
+            enemy_template=False,
+            wall=False,
+            portal=False,
+            ambush=False,
+            siren_step=2,
+        ),
+        enemy_cleared=enemy_cleared,
+    )
+
+
+def test_fleet_full_scan_and_observer_movable_scan_forward_exact_requests() -> None:
     scanner = _RecordingScanner()
     fleet = _ScannerFleet(scanner)
-    options = FullScanOptions(battle_count=4)
-    queue = SelectedGrids([GridInfo()])
-    must_scan = SelectedGrids([GridInfo()])
+    scan_request = MapScanRequest(
+        queue=SelectedGrids([GridInfo()]),
+        must_scan=SelectedGrids([GridInfo()]),
+        progress=MapSpawnProgress(battle_count=4, mode="movable"),
+    )
+    movable_request = _movable_request(enemy_cleared=False)
 
-    fleet.full_scan(options, queue, must_scan, "movable")
-    fleet.full_scan_movable(enemy_cleared=False)
+    fleet.full_scan(scan_request)
+    scanner.full_scan_movable(fleet, movable_request)
 
     assert scanner.calls == [
-        ("full_scan", fleet, options, queue, must_scan, "movable"),
-        ("full_scan_movable", fleet, False),
+        ("full_scan", fleet, scan_request),
+        ("full_scan_movable", fleet, movable_request),
     ]
 
 
 def test_standard_movable_scan_reenters_the_public_full_scan_dispatch() -> None:
     fleet = _NestedFullScanFleet()
+    tracker = _RecordingMovableTracker()
+    scanner = StandardCampaignMapScanner(tracker=tracker)
+    request = _movable_request(enemy_cleared=False)
 
-    STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan_movable(
-        fleet,
-        enemy_cleared=False,
+    scanner.full_scan_movable(fleet, request)
+
+    assert len(fleet.scan_requests) == 1
+    scan_request = fleet.scan_requests[0]
+    assert scan_request.progress == MapSpawnProgress(battle_count=3, mode="movable")
+    assert scan_request.queue is scan_request.must_scan
+    assert scan_request.queue is not None
+    assert [grid.location for grid in scan_request.queue] == [(0, 0)]
+    assert tracker.calls == [(fleet, request, True)]
+
+
+def test_standard_full_scan_uses_effective_decoy_request_and_refreshes_fleet_projection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fleet = _StandardFullScanFleet()
+    engine = CampaignFullScanEngine()
+    calls: list[tuple[FullScanContext, MapScanRequest]] = []
+
+    def record_scan(runtime: FullScanContext, observed_request: MapScanRequest) -> None:
+        calls.append((runtime, observed_request))
+
+    monkeypatch.setattr(engine, "scan", record_scan)
+    scanner = StandardCampaignMapScanner(engine=engine)
+    request = MapScanRequest(
+        progress=MapSpawnProgress(
+            battle_count=2,
+            mystery_count=3,
+            siren_count=4,
+            carrier_count=5,
+        )
     )
 
-    assert fleet.calls == [
-        ("public_full_scan", None, fleet.movable_before, fleet.movable_before, "movable"),
-        ("track_movable", False, True),
-    ]
+    scanner.full_scan(fleet, request)
+
+    assert request.progress.mode == "normal"
+    assert calls == [(fleet, request.with_mode("decoy"))]
+    assert fleet.fleet_2_location == (1, 0)
+    assert fleet.map[(0, 0)].is_enemy is False
+    assert fleet.map[(1, 0)].is_siren is False

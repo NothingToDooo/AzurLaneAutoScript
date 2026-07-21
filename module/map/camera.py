@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import copy
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -15,7 +16,6 @@ from module.map.assets import MAP_PREPARATION
 from module.map.map_base import CampaignMap, location2node
 from module.map.map_observer import InSightRequest
 from module.map.map_operation import MapOperation
-from module.map.map_spawn_gap import MapSpawnGapPredictor, MapSpawnProgress
 from module.map.map_swipe import STANDARD_MAP_SWIPE_SERVICE, MapSwipeRequest, MapSwipeService
 from module.map.utils import location_ensure, random_direction
 from module.map_detection.grid import Grid
@@ -33,7 +33,8 @@ if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
     from module.base.type_alias import Area, NumericArray, Point
     from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import GridLocation, GridMode
+    from module.map.map_spawn_gap import MapSpawnGapPredictor
+    from module.map.type_alias import GridLocation
     from module.map_detection.grid_info import GridInfo
 
 type RecoveryOverlay = tuple[Button, MatchOffset, Button, str]
@@ -54,17 +55,6 @@ IMAGE_IN_MAP_PREPARATION_MESSAGE = "Image is in MAP_PREPARATION"
 IMAGE_IN_AUTO_SEARCH_MENU_MESSAGE = "Image is in auto search menu"
 
 
-@dataclass(slots=True)
-class FullScanOptions:
-    queue: SelectedGrids[GridInfo] | None = None
-    must_scan: SelectedGrids[GridInfo] | None = None
-    battle_count: int = 0
-    mystery_count: int = 0
-    siren_count: int = 0
-    carrier_count: int = 0
-    mode: GridMode = "normal"
-
-
 class Camera(MapOperation):
     view: View
     map: CampaignMap
@@ -73,7 +63,7 @@ class Camera(MapOperation):
     _prev_view: View | None = None
     _prev_swipe: Point | None = None
     _map_swipe_service: MapSwipeService = STANDARD_MAP_SWIPE_SERVICE
-    _spawn_gap_predictor: MapSpawnGapPredictor
+    map_spawn_gap_predictor: MapSpawnGapPredictor
 
     def _standard_map_swipe(self, vector: Point, *, box: Area) -> bool:
         """按浮点格子向量在 box 坐标区域内滑动，返回相机是否移动。"""
@@ -492,45 +482,6 @@ class Camera(MapOperation):
 
             if not has_swiped:
                 break
-
-    def full_scan(self, options: FullScanOptions | None = None) -> None:
-        """按扫描队列、必扫格子、计数快照和模式扫描整张地图。"""
-        if options is None:
-            options = FullScanOptions()
-        progress = MapSpawnProgress(
-            battle_count=options.battle_count,
-            mystery_count=options.mystery_count,
-            siren_count=options.siren_count,
-            carrier_count=options.carrier_count,
-            mode=options.mode,
-        )
-        logger.info(f"Full scan start, mode={options.mode}")
-        self.map.reset_fleet()
-
-        queue = options.queue or self.map.camera_data
-        if options.must_scan:
-            queue = queue.add(options.must_scan)
-
-        while len(queue) > 0:
-            if self._spawn_gap_predictor.scan_complete(progress):
-                if options.must_scan and queue.count != queue.delete(options.must_scan).count:
-                    logger.info("Continue scanning.")
-                else:
-                    logger.info("All spawn found, Early stopped.")
-                    break
-
-            queue = queue.sort_by_camera_distance(self.camera)
-            self.focus_to(queue[0])
-            self.focus_to_grid_center(0.25)
-            success = self.map.update(grids=self.view, camera=self.camera, mode=options.mode)
-            if not success:
-                self.ensure_edge_insight(skip_first_update=False)
-                continue
-
-            queue = queue[1:]
-
-        self._spawn_gap_predictor.infer_covered_spawns(progress)
-        self.map.show()
 
     def in_sight(self, location: GridInfo | str | Point, sight: tuple[int, int, int, int] | None = None) -> None:
         """确保格子位于相机视野矩形内；sight 形如 (-3, -1, 3, 2)。"""

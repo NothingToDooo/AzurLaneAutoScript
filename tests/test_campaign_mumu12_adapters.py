@@ -132,6 +132,13 @@ from module.gameplay.emotion import (
 )
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
 from module.map.map_fleet_preparation import STANDARD_FLEET_PREPARATION_SERVICE
+from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER
+from module.map.map_scanner import (
+    MovableEnemyRules,
+    MovableEnemySnapshot,
+    MovableScanRequest,
+)
+from module.map.map_spawn_gap import MapSpawnProgress
 from module.ui.page import page_campaign_menu, page_event
 
 if TYPE_CHECKING:
@@ -324,6 +331,21 @@ def test_declarative_runtime_wires_t4_map_observer_to_the_real_fortress_grid() -
 def test_declarative_runtime_wires_real_preserve_enemy_genre_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    observed: list[tuple[object, MovableScanRequest]] = []
+
+    def standard_movable(
+        _scanner: object,
+        observed_runtime: object,
+        request: MovableScanRequest,
+    ) -> None:
+        observed.append((observed_runtime, request))
+        cast("DeclarativeCampaignMapRuntime", observed_runtime).map[(0, 0)].wipe_out()
+
+    monkeypatch.setattr(
+        type(STANDARD_CAMPAIGN_MAP_OBSERVER.scanner),
+        "full_scan_movable",
+        standard_movable,
+    )
     config = in_memory_config("campaign-map-scanner-wiring", {})
     definition = load_default_stage(StageRef("event_20210325_cn", "a1"))
     runtime = DeclarativeCampaignMapRuntime(config, object.__new__(Device), definition)
@@ -331,17 +353,27 @@ def test_declarative_runtime_wires_real_preserve_enemy_genre_profile(
     grid = runtime.map[(0, 0)]
     grid.is_siren = True
     grid.enemy_genre = "Siren_Dace"
-    observed: list[bool] = []
+    request = MovableScanRequest(
+        snapshot=MovableEnemySnapshot.capture(runtime.map),
+        progress=MapSpawnProgress(),
+        rules=MovableEnemyRules(
+            siren=True,
+            normal_enemy=False,
+            enemy_template=False,
+            wall=False,
+            portal=False,
+            ambush=False,
+            siren_step=2,
+        ),
+        enemy_cleared=False,
+    )
 
-    def standard_movable(*, enemy_cleared: bool = True) -> None:
-        observed.append(enemy_cleared)
-        grid.wipe_out()
+    runtime._map_observer.scanner.full_scan_movable(  # ruff:ignore[private-member-access] - 验证 profile observer 的真实组合顺序。
+        runtime,
+        request,
+    )
 
-    monkeypatch.setattr(runtime, "_standard_full_scan_movable", standard_movable)
-
-    runtime.full_scan_movable(enemy_cleared=False)
-
-    assert observed == [False]
+    assert observed == [(runtime, request)]
     assert grid.is_siren
     assert grid.enemy_genre == "Siren_Dace"
 

@@ -6,6 +6,8 @@ import pytest
 from module.exception import MapEnemyMoved, MapWalkError
 from module.map.fleet import Fleet
 from module.map.fleet_turn import FleetTurnEvent
+from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
+from module.map.map_scanner import MapScanRequest, MovableEnemySnapshot, MovableScanRequest
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -24,6 +26,11 @@ class _Config:
     MAP_HAS_MAZE = False
     MAP_HAS_AMBUSH = False
     MAP_HAS_DECOY_ENEMY = False
+    MAP_HAS_MOVABLE_ENEMY = True
+    MAP_HAS_MOVABLE_NORMAL_ENEMY = False
+    MAP_ENEMY_TEMPLATE: tuple[str, ...] = ()
+    MAP_HAS_WALL = False
+    MOVABLE_ENEMY_FLEET_STEP = 2
 
 
 class _GridList:
@@ -103,6 +110,16 @@ class _TurnController:
         return location in self.maze_nodes
 
 
+class _RecordingScanner:
+    @staticmethod
+    def full_scan(runtime: object, request: MapScanRequest) -> None:
+        del runtime, request
+
+    @staticmethod
+    def full_scan_movable(runtime: object, request: MovableScanRequest) -> None:
+        cast("_Fleet", runtime).calls.append(("full_scan_movable", request.enemy_cleared))
+
+
 class _Fleet(Fleet):
     config: _Config
     map: _Map
@@ -113,6 +130,14 @@ class _Fleet(Fleet):
         self.calls: list[object] = []
         self.turns = _TurnController(self.calls)
         self._turn_controller = cast("FleetTurnController", self.turns)
+        self._map_observer = CampaignMapObserver(
+            combat=STANDARD_CAMPAIGN_MAP_OBSERVER.combat,
+            scanner=cast("Any", _RecordingScanner()),
+            enemy_searching=STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching,
+            viewport=STANDARD_CAMPAIGN_MAP_OBSERVER.viewport,
+            fleet_locator=STANDARD_CAMPAIGN_MAP_OBSERVER.fleet_locator,
+            preparation=STANDARD_CAMPAIGN_MAP_OBSERVER.preparation,
+        )
         self.fail_once: set[GridInfo | str | GridLocation] = set()
         self.predict_error: BaseException | None = None
         self.fleet_current_index = 1
@@ -136,10 +161,6 @@ class _Fleet(Fleet):
         self.calls.append(("predict",))
         if self.predict_error is not None:
             raise self.predict_error
-
-    @override
-    def full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
-        self.calls.append(("full_scan_movable", enemy_cleared))
 
     @override
     def find_path_initial(self) -> None:
@@ -215,6 +236,7 @@ def test_goto_finish_keeps_battle_prediction_before_turn_advance() -> None:
             result="combat",
             result_mystery="",
             expected="combat",
+            movable_snapshot=MovableEnemySnapshot(),
         ),
     )
 
@@ -235,6 +257,7 @@ def test_goto_finish_handles_enemy_turn_after_battle_prediction() -> None:
             result="combat",
             result_mystery="",
             expected="combat",
+            movable_snapshot=MovableEnemySnapshot(),
         ),
     )
 

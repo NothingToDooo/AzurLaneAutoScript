@@ -2,22 +2,27 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, override, runtime_checkable
 
 from module.content.runtime_profile import RuntimeExecutorKind
+from module.map.fleet_locator import (
+    STANDARD_CAMPAIGN_FLEET_LOCATOR,
+    CampaignFleetLocator,
+    FleetLocationContext,
+    SurfaceFleetLocationRequest,
+    SurfaceFleetLocations,
+)
 from module.map.map_observer import (
     STANDARD_CAMPAIGN_MAP_OBSERVER,
-    CampaignFleetLocator,
     CampaignMapObserver,
     CampaignMapPreparation,
     CampaignMapScanner,
     CampaignMapViewport,
     CombatMapObserver,
     EnemySearchingObserver,
-    FleetLocatorRuntime,
     InSightRequest,
     MapObserverRuntime,
     MapPreparationRuntime,
-    MapScannerRuntime,
     MapViewportRuntime,
 )
+from module.map.map_scanner import MapScannerRuntime, MapScanRequest, MovableScanRequest
 
 from .campaign_runtime_profile import CampaignRuntimeProfileError, RuntimeExecutorInstance
 
@@ -25,9 +30,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from module.base.type_alias import ImageArray
-    from module.map.camera import FullScanOptions
-    from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import FleetLocation, GridMode
+    from module.map.type_alias import GridLocation
     from module.map_detection.grid_info import GridInfo
 
 type CameraRepositioningNext = Callable[[MapObserverRuntime, GridInfo], bool]
@@ -37,24 +40,19 @@ type CameraRepositioningHandler = Callable[
 ]
 
 
-@dataclass(frozen=True, slots=True)
-class FullScanRequest:
-    options: FullScanOptions | None = None
-    queue: SelectedGrids[GridInfo] | None = None
-    must_scan: SelectedGrids[GridInfo] | None = None
-    mode: GridMode = "normal"
-
-
-type FullScanNext = Callable[[MapScannerRuntime, FullScanRequest], None]
-type FullScanHandler = Callable[[MapScannerRuntime, FullScanRequest, FullScanNext], None]
+type FullScanNext = Callable[[MapScannerRuntime, MapScanRequest], None]
+type FullScanHandler = Callable[[MapScannerRuntime, MapScanRequest, FullScanNext], None]
 
 type InSightNext = Callable[[MapViewportRuntime, InSightRequest], None]
 type InSightHandler = Callable[[MapViewportRuntime, InSightRequest, InSightNext], None]
 
-type FindCurrentFleetNext = Callable[[FleetLocatorRuntime], FleetLocation]
-type FindCurrentFleetHandler = Callable[
-    [FleetLocatorRuntime, FindCurrentFleetNext],
-    FleetLocation,
+type LocateSurfaceFleetNext = Callable[
+    [FleetLocationContext, SurfaceFleetLocationRequest],
+    SurfaceFleetLocations,
+]
+type LocateSurfaceFleetHandler = Callable[
+    [FleetLocationContext, SurfaceFleetLocationRequest, LocateSurfaceFleetNext],
+    SurfaceFleetLocations,
 ]
 
 type MapGetInfoNext = Callable[[MapPreparationRuntime], None]
@@ -70,8 +68,7 @@ class FullScanMovableNext(Protocol):
     def __call__(
         self,
         runtime: MapScannerRuntime,
-        *,
-        enemy_cleared: bool = True,
+        request: MovableScanRequest,
     ) -> None: ...
 
 
@@ -79,9 +76,8 @@ class FullScanMovableHandler(Protocol):
     def __call__(
         self,
         runtime: MapScannerRuntime,
+        request: MovableScanRequest,
         next_handler: FullScanMovableNext,
-        *,
-        enemy_cleared: bool = True,
     ) -> None: ...
 
 
@@ -113,7 +109,7 @@ class CampaignMapObserverContributor:
     full_scan_movable: FullScanMovableHandler | None = None
     enemy_searching: EnemySearchingHandler | None = None
     in_sight: InSightHandler | None = None
-    find_current_fleet: FindCurrentFleetHandler | None = None
+    locate_surface_fleet: LocateSurfaceFleetHandler | None = None
     map_get_info: MapGetInfoHandler | None = None
     map_clear_percentage: MapClearPercentageHandler | None = None
 
@@ -163,29 +159,17 @@ class _ComposedCampaignMapScanner(CampaignMapScanner):
     def full_scan(
         self,
         runtime: MapScannerRuntime,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
+        request: MapScanRequest,
     ) -> None:
-        self.full_scan_handler(
-            runtime,
-            FullScanRequest(
-                options=options,
-                queue=queue,
-                must_scan=must_scan,
-                mode=mode,
-            ),
-        )
+        self.full_scan_handler(runtime, request)
 
     @override
     def full_scan_movable(
         self,
         runtime: MapScannerRuntime,
-        *,
-        enemy_cleared: bool = True,
+        request: MovableScanRequest,
     ) -> None:
-        self.full_scan_movable_handler(runtime, enemy_cleared=enemy_cleared)
+        self.full_scan_movable_handler(runtime, request)
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,11 +200,24 @@ class _ComposedCampaignMapViewport(CampaignMapViewport):
 
 @dataclass(frozen=True, slots=True)
 class _ComposedCampaignFleetLocator(CampaignFleetLocator):
-    handler: FindCurrentFleetNext
+    handler: LocateSurfaceFleetNext
 
     @override
-    def find_current_fleet(self, runtime: FleetLocatorRuntime) -> FleetLocation:
-        return self.handler(runtime)
+    def locate_surface(
+        self,
+        context: FleetLocationContext,
+        request: SurfaceFleetLocationRequest,
+    ) -> SurfaceFleetLocations:
+        return self.handler(context, request)
+
+    @override
+    def locate_submarine(
+        self,
+        context: FleetLocationContext,
+        *,
+        enabled: bool,
+    ) -> GridLocation | None:
+        return STANDARD_CAMPAIGN_FLEET_LOCATOR.locate_submarine(context, enabled=enabled)
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,7 +253,7 @@ def _overlay_full_scan(
     handler: FullScanHandler,
     next_handler: FullScanNext,
 ) -> FullScanNext:
-    def execute(runtime: MapScannerRuntime, request: FullScanRequest) -> None:
+    def execute(runtime: MapScannerRuntime, request: MapScanRequest) -> None:
         handler(runtime, request, next_handler)
 
     return execute
@@ -268,10 +265,9 @@ def _overlay_full_scan_movable(
 ) -> FullScanMovableNext:
     def execute(
         runtime: MapScannerRuntime,
-        *,
-        enemy_cleared: bool = True,
+        request: MovableScanRequest,
     ) -> None:
-        handler(runtime, next_handler, enemy_cleared=enemy_cleared)
+        handler(runtime, request, next_handler)
 
     return execute
 
@@ -304,12 +300,15 @@ def _overlay_in_sight(
     return execute
 
 
-def _overlay_find_current_fleet(
-    handler: FindCurrentFleetHandler,
-    next_handler: FindCurrentFleetNext,
-) -> FindCurrentFleetNext:
-    def execute(runtime: FleetLocatorRuntime) -> FleetLocation:
-        return handler(runtime, next_handler)
+def _overlay_locate_surface_fleet(
+    handler: LocateSurfaceFleetHandler,
+    next_handler: LocateSurfaceFleetNext,
+) -> LocateSurfaceFleetNext:
+    def execute(
+        context: FleetLocationContext,
+        request: SurfaceFleetLocationRequest,
+    ) -> SurfaceFleetLocations:
+        return handler(context, request, next_handler)
 
     return execute
 
@@ -349,14 +348,8 @@ def _overlay_preparation(
     return map_get_info, map_clear_percentage
 
 
-def _standard_full_scan(runtime: MapScannerRuntime, request: FullScanRequest) -> None:
-    STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan(
-        runtime,
-        options=request.options,
-        queue=request.queue,
-        must_scan=request.must_scan,
-        mode=request.mode,
-    )
+def _standard_full_scan(runtime: MapScannerRuntime, request: MapScanRequest) -> None:
+    STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan(runtime, request)
 
 
 def build_campaign_map_observer(
@@ -371,7 +364,7 @@ def build_campaign_map_observer(
     full_scan_movable = STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan_movable
     enemy_searching = STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching.appears
     in_sight = STANDARD_CAMPAIGN_MAP_OBSERVER.viewport.in_sight
-    find_current_fleet = STANDARD_CAMPAIGN_MAP_OBSERVER.fleet_locator.find_current_fleet
+    locate_surface_fleet = STANDARD_CAMPAIGN_MAP_OBSERVER.fleet_locator.locate_surface
     map_get_info = STANDARD_CAMPAIGN_MAP_OBSERVER.preparation.map_get_info
     map_clear_percentage = STANDARD_CAMPAIGN_MAP_OBSERVER.preparation.get_map_clear_percentage
     for instance in instances:
@@ -397,10 +390,10 @@ def build_campaign_map_observer(
             )
         if contributor.in_sight is not None:
             in_sight = _overlay_in_sight(contributor.in_sight, in_sight)
-        if contributor.find_current_fleet is not None:
-            find_current_fleet = _overlay_find_current_fleet(
-                contributor.find_current_fleet,
-                find_current_fleet,
+        if contributor.locate_surface_fleet is not None:
+            locate_surface_fleet = _overlay_locate_surface_fleet(
+                contributor.locate_surface_fleet,
+                locate_surface_fleet,
             )
         map_get_info, map_clear_percentage = _overlay_preparation(
             contributor,
@@ -412,7 +405,7 @@ def build_campaign_map_observer(
         scanner=_ComposedCampaignMapScanner(full_scan, full_scan_movable),
         enemy_searching=_ComposedEnemySearchingObserver(enemy_searching),
         viewport=_ComposedCampaignMapViewport(in_sight),
-        fleet_locator=_ComposedCampaignFleetLocator(find_current_fleet),
+        fleet_locator=_ComposedCampaignFleetLocator(locate_surface_fleet),
         preparation=_ComposedCampaignMapPreparation(
             map_get_info,
             map_clear_percentage,

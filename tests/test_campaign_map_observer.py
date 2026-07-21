@@ -6,14 +6,19 @@ import pytest
 from module.adapters.campaign_map_observer import (
     CampaignMapObserverContributor,
     CampaignMapObserverExecutor,
-    FullScanRequest,
     build_campaign_map_observer,
 )
 from module.handler.assets import MAP_ENEMY_SEARCHING
-from module.map.camera import FullScanOptions
 from module.map.map_base import CampaignMap
 from module.map.map_grids import SelectedGrids
 from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
+from module.map.map_scanner import (
+    MapScanRequest,
+    MovableEnemyRules,
+    MovableEnemySnapshot,
+    MovableScanRequest,
+)
+from module.map.map_spawn_gap import MapSpawnProgress
 from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
@@ -28,8 +33,8 @@ if TYPE_CHECKING:
         FullScanNext,
     )
     from module.base.type_alias import ImageArray
-    from module.map.map_observer import MapObserverRuntime, MapScannerRuntime
-    from module.map.type_alias import GridMode
+    from module.map.map_observer import MapObserverRuntime
+    from module.map.map_scanner import MapScannerRuntime
 
 
 class _Runtime:
@@ -42,19 +47,6 @@ class _Runtime:
 class _ScannerRuntime:
     def __init__(self) -> None:
         self.map = CampaignMap("scanner-test")
-        self.calls: list[tuple[object, ...]] = []
-
-    def _standard_full_scan(
-        self,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None:
-        self.calls.append(("standard_scan", options, queue, must_scan, mode))
-
-    def _standard_full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
-        self.calls.append(("standard_movable", enemy_cleared))
 
 
 def test_standard_map_observer_matches_only_the_current_boss_spawn() -> None:
@@ -104,30 +96,31 @@ def test_map_observer_composition_is_later_first_and_preserves_destination_ident
 
 
 def test_map_observer_is_frozen_and_composes_scanners_later_first() -> None:
-    runtime = _ScannerRuntime()
-    scan_calls: list[tuple[str, MapScannerRuntime, FullScanRequest]] = []
-    movable_calls: list[tuple[str, MapScannerRuntime, bool]] = []
+    runtime = cast("MapScannerRuntime", _ScannerRuntime())
+    scan_calls: list[tuple[str, MapScannerRuntime, MapScanRequest]] = []
+    movable_calls: list[tuple[str, MapScannerRuntime, MovableScanRequest]] = []
 
-    def scan_handler(label: str) -> FullScanHandler:
+    def scan_handler(label: str, *, terminal: bool = False) -> FullScanHandler:
         def execute(
             observed_runtime: MapScannerRuntime,
-            request: FullScanRequest,
+            request: MapScanRequest,
             next_handler: FullScanNext,
         ) -> None:
             scan_calls.append((label, observed_runtime, request))
-            next_handler(observed_runtime, request)
+            if not terminal:
+                next_handler(observed_runtime, request)
 
         return execute
 
-    def movable_handler(label: str) -> FullScanMovableHandler:
+    def movable_handler(label: str, *, terminal: bool = False) -> FullScanMovableHandler:
         def execute(
             runtime: MapScannerRuntime,
+            request: MovableScanRequest,
             next_handler: FullScanMovableNext,
-            *,
-            enemy_cleared: bool = True,
         ) -> None:
-            movable_calls.append((label, runtime, enemy_cleared))
-            next_handler(runtime, enemy_cleared=enemy_cleared)
+            movable_calls.append((label, runtime, request))
+            if not terminal:
+                next_handler(runtime, request)
 
         return execute
 
@@ -135,8 +128,8 @@ def test_map_observer_is_frozen_and_composes_scanners_later_first() -> None:
         (
             CampaignMapObserverExecutor(
                 CampaignMapObserverContributor(
-                    full_scan=scan_handler("first"),
-                    full_scan_movable=movable_handler("first"),
+                    full_scan=scan_handler("first", terminal=True),
+                    full_scan_movable=movable_handler("first", terminal=True),
                 )
             ),
             CampaignMapObserverExecutor(
@@ -147,30 +140,39 @@ def test_map_observer_is_frozen_and_composes_scanners_later_first() -> None:
             ),
         )
     )
-    options = FullScanOptions(battle_count=3)
     queue = SelectedGrids([GridInfo()])
     must_scan = SelectedGrids([GridInfo()])
-
-    observer.scanner.full_scan(
-        runtime,
-        options=options,
+    scan_request = MapScanRequest(
         queue=queue,
         must_scan=must_scan,
-        mode="movable",
+        progress=MapSpawnProgress(battle_count=3, mode="movable"),
     )
-    observer.scanner.full_scan_movable(runtime, enemy_cleared=False)
+    movable_request = MovableScanRequest(
+        snapshot=MovableEnemySnapshot(sirens=((0, 0),)),
+        progress=MapSpawnProgress(battle_count=3),
+        rules=MovableEnemyRules(
+            siren=True,
+            normal_enemy=False,
+            enemy_template=False,
+            wall=False,
+            portal=False,
+            ambush=False,
+            siren_step=2,
+        ),
+        enemy_cleared=False,
+    )
+
+    observer.scanner.full_scan(runtime, scan_request)
+    observer.scanner.full_scan_movable(runtime, movable_request)
 
     assert [label for label, _, _ in scan_calls] == ["second", "first"]
     assert scan_calls[0][1] is runtime
-    assert scan_calls[0][2] is scan_calls[1][2]
-    assert scan_calls[0][2] == FullScanRequest(options, queue, must_scan, "movable")
+    assert scan_calls[0][2] is scan_request
+    assert scan_calls[1][2] is scan_request
     assert [label for label, _, _ in movable_calls] == ["second", "first"]
     assert movable_calls[0][1] is runtime
-    assert [enemy_cleared for _, _, enemy_cleared in movable_calls] == [False, False]
-    assert runtime.calls == [
-        ("standard_scan", options, queue, must_scan, "movable"),
-        ("standard_movable", False),
-    ]
+    assert movable_calls[0][2] is movable_request
+    assert movable_calls[1][2] is movable_request
     field_name = "combat"
     with pytest.raises(FrozenInstanceError):
         setattr(observer, field_name, STANDARD_CAMPAIGN_MAP_OBSERVER.combat)

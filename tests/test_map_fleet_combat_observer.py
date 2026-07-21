@@ -1,9 +1,11 @@
 from typing import TYPE_CHECKING, override
 
+import module.map.fleet as fleet_module
 from module.map.fleet import Fleet
 from module.map.fleet_turn import FleetTurnController, FleetTurnRules
 from module.map.map_base import CampaignMap
 from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
+from module.map.map_scanner import MovableEnemySnapshot
 from module.map_detection.grid import Grid
 
 if TYPE_CHECKING:
@@ -104,11 +106,14 @@ class _CombatFleet(Fleet):
 
     def run_combat_at(self, location: GridLocation) -> None:
         state = self._goto_state(
-            location,
-            "combat",
+            fleet_module._GotoRequest(  # ruff:ignore[private-member-access] - 构造真实导航状态以测试战斗观测顺序。
+                location=location,
+                expected="combat",
+                is_portal=False,
+                may_submarine_icon=False,
+                movable_snapshot=MovableEnemySnapshot(),
+            ),
             _LocalGrid(),
-            is_portal=False,
-            may_submarine_icon=False,
         )
         self._goto_handle_combat(state)
 
