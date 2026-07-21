@@ -73,8 +73,9 @@ class _Map:
         self.path_results: dict[tuple[GridLocation, int, bool], list[GridLocation]] = {}
         self.find_path_calls: list[tuple[GridLocation, int, bool]] = []
         self.cells: dict[GridLocation, _Cell] = {}
+        self.pathfinder = self
 
-    def find_path(self, location: GridLocation, *, step: int, turning_optimize: bool) -> list[GridLocation]:
+    def route(self, location: GridLocation, *, step: int, turning_optimize: bool) -> list[GridLocation]:
         call = (location, step, turning_optimize)
         self.find_path_calls.append(call)
         return self.path_results[call]

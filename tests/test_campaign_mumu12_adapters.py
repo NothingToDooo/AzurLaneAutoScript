@@ -1067,7 +1067,7 @@ def test_compiler_materializes_both_variants_and_map_structure() -> None:
     assert [str(grid) for grid in compiled.camera_data] == ["A1", "B2"]
     assert [str(grid) for grid in compiled.camera_data_spawn_point] == ["B1"]
     assert [str(grid) for grid in compiled.manual_map_covered] == ["A2"]
-    assert compiled.portal_data == [((0, 1), (1, 0))]
+    assert compiled.topology.portals == (((0, 1), (1, 0)),)
     assert compiled.land_based_data == [("B2", "left")]
     assert compiled.spawn_data == [{"battle": 0, "enemy": 1}, {"battle": 1, "boss": 1}]
     assert compiled.spawn_data_loop == [{"battle": 0, "enemy": 1}, {"battle": 1, "boss": 1}]
@@ -1098,10 +1098,10 @@ def test_compiler_projects_typed_map_structures_into_legacy_mechanisms() -> None
     assert [tuple(grid.location for grid in route) for route in compiled.bouncing_enemy_data] == [((0, 0), (1, 0))]
 
     compiled.load_map_data()
-    compiled.grid_connection_initial(wall=True)
+    compiled.topology.rebuild(wall=True)
     compiled.load_mechanism(maze=True, fortress=True, bouncing_enemy=True)
-    assert (1, 0) not in compiled.grid_connection[(0, 0)]
-    assert (0, 1) not in compiled.grid_connection[(0, 0)]
+    assert (1, 0) not in compiled.topology.neighbors((0, 0))
+    assert (0, 1) not in compiled.topology.neighbors((0, 0))
     assert compiled[(0, 0)].is_maze is True
     assert compiled[(1, 0)].is_fortress is True
     assert compiled[(0, 1)].is_mechanism_block is True

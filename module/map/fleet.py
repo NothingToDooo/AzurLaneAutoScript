@@ -43,7 +43,7 @@ class _GotoState:
     location: GridLocation
     expected: str
     grid: Grid
-    is_portal: bool
+    portal_destination: GridLocation | None
     may_submarine_icon: bool
     extra: float
     arrive_timer: Timer
@@ -60,7 +60,7 @@ class _GotoState:
 class _GotoRequest:
     location: GridLocation
     expected: str
-    is_portal: bool
+    portal_destination: GridLocation | None
     may_submarine_icon: bool
     movable_snapshot: MovableEnemySnapshot
 
@@ -153,7 +153,7 @@ class Fleet(Camera, AmbushHandler):
             self.camera = self._require_fleet_location(self.fleet_current)
             self.update()
             self.find_path_initial()
-            self.map.show_cost()
+            self.map.pathfinder.show_cost()
             self.show_fleet()
             self.hp_get()
             self.lv_get()
@@ -199,7 +199,7 @@ class Fleet(Camera, AmbushHandler):
             location=request.location,
             expected=request.expected,
             grid=grid,
-            is_portal=request.is_portal,
+            portal_destination=request.portal_destination,
             may_submarine_icon=request.may_submarine_icon,
             extra=extra,
             arrive_timer=Timer(0.5 + movement_wait + extra, count=2),
@@ -325,12 +325,8 @@ class Fleet(Camera, AmbushHandler):
                 logger.warning("Arrive with unexpected result")
             else:
                 return False
-        if state.is_portal:
-            portal_link = self.map[state.location].portal_link
-            if portal_link is None:
-                msg = "传送门格缺少目标位置"
-                raise RuntimeError(msg)
-            state.location = portal_link
+        if state.portal_destination is not None:
+            state.location = state.portal_destination
             self.camera = state.location
         logger.info(
             f"Arrive {location2node(state.location)} confirm. Result: {state.result}. Expected: {state.expected}"
@@ -358,7 +354,7 @@ class Fleet(Camera, AmbushHandler):
         while 1:
             self.device.screenshot()
             self.view.update(image=self.device.image)
-            if state.is_portal:
+            if state.portal_destination is not None:
                 self.update(allow_error=True)
                 state.grid = self.view[self.view.center_loca]
 
@@ -430,14 +426,14 @@ class Fleet(Camera, AmbushHandler):
         movable_snapshot = MovableEnemySnapshot.capture(self.map)
         if self.hp_retreat_triggered():
             self.withdraw()
-        is_portal = self.map[location].is_portal
+        portal_destination = self.map.topology.portal_destination(location)
         # 上方格子可能是潜艇，会干扰 predict_fleet()。
         may_submarine_icon = self.map.grid_covered(self.map[location], location=[(0, -1)])
         may_submarine_icon = may_submarine_icon and self.fleet_submarine_location == may_submarine_icon[0].location
         request = _GotoRequest(
             location=location,
             expected=expected,
-            is_portal=is_portal,
+            portal_destination=portal_destination,
             may_submarine_icon=bool(may_submarine_icon),
             movable_snapshot=movable_snapshot,
         )
@@ -492,7 +488,7 @@ class Fleet(Camera, AmbushHandler):
         self, location: GridLocation, *, step_optimize: bool, turning_optimize: bool
     ) -> list[GridLocation]:
         step = self.fleet_step if step_optimize else 0
-        return self.map.find_path(location, step=step, turning_optimize=turning_optimize)
+        return self.map.pathfinder.route(location, step=step, turning_optimize=turning_optimize)
 
     def _goto_wait_maze(self, node: GridLocation) -> None:
         if not self._turn_controller.maze_active_on(node):
@@ -522,7 +518,7 @@ class Fleet(Camera, AmbushHandler):
         logger.warning("Map walk error.")
         self.predict()
         self.ensure_edge_insight()
-        nodes = self.map.find_path(node, step=1, turning_optimize=False)
+        nodes = self.map.pathfinder.route(node, step=1, turning_optimize=False)
         for retry_node in nodes:
             self._goto(retry_node, expected=expected)
 
@@ -539,7 +535,7 @@ class Fleet(Camera, AmbushHandler):
         # 解除要塞阻挡。
         if self.config.MAP_HAS_FORTRESS and not self.map.select(is_fortress=True):
             self.map.select(is_mechanism_block=True).set(is_mechanism_block=False)
-        self.map.find_path_initial_multi_fleet(
+        self.map.pathfinder.project_fleets(
             location_dict, current=self.fleet_current, has_ambush=self.config.MAP_HAS_AMBUSH
         )
 
@@ -610,7 +606,7 @@ class Fleet(Camera, AmbushHandler):
         self.map.poor_map_data = self.config.POOR_MAP_DATA
         self.map.load_map_data(use_loop=self.map_is_clear_mode)
         self.map.load_spawn_data(use_loop=self.map_is_clear_mode)
-        self.map.grid_connection_initial(
+        self.map.topology.rebuild(
             wall=self.config.MAP_HAS_WALL,
             portal=self.config.MAP_HAS_PORTAL,
         )
@@ -676,7 +672,7 @@ class Fleet(Camera, AmbushHandler):
         )
         self.fleet_submarine_location = submarine_location or ()
         self.find_path_initial()
-        self.map.show_cost()
+        self.map.pathfinder.show_cost()
         self._turn_controller.initialize(self.battle_count)
 
     def handle_clear_mode_config_cover(self) -> bool:
@@ -890,8 +886,8 @@ class Fleet(Camera, AmbushHandler):
         boss = location_ensure(boss)
         logger.info(f"Move submarine near {location2node(boss)}")
 
-        self.map.find_path_initial(self.fleet_submarine_location, has_ambush=False, has_enemy=False)
-        self.map.show_cost()
+        self.map.pathfinder.project(self.fleet_submarine_location, has_ambush=False, has_enemy=False)
+        self.map.pathfinder.show_cost()
 
         def get_location(distance: int = 2) -> GridLocation:
             grids = self.map.select(is_land=False).filter(

@@ -65,14 +65,14 @@ class Map(Fleet):
 
         self.full_scan()
         self.find_path_initial()
-        self.map.show_cost()
+        self.map.pathfinder.show_cost()
         return self.battle_count >= battle_count
 
     def clear_chosen_mystery(self, grid: GridInfo) -> None:
         logger.info(f"Clear mystery: {grid}")
         self.show_fleet()
         self.goto(grid, expected="mystery")
-        self.map.show_cost()
+        self.map.pathfinder.show_cost()
 
     def pick_up_ammo(self, grid: GridInfo | None = None) -> bool:
         if grid is None:
@@ -110,7 +110,7 @@ class Map(Fleet):
         for grid in grids:
             logger.info(f"Clear mechanism: {grid}")
             self.goto(grid)
-            self.map.show_cost()
+            self.map.pathfinder.show_cost()
             logger.info(f"Mechanism trigger release: {grid.mechanism_trigger}")
             logger.info(f"Mechanism block release: {grid.mechanism_block}")
             raise MapEnemyMoved
@@ -642,7 +642,7 @@ class Map(Fleet):
                 route.select(may_bouncing_enemy=True).set(may_bouncing_enemy=False)
                 self.full_scan()
                 self.find_path_initial()
-                self.map.show_cost()
+                self.map.pathfinder.show_cost()
                 return True
             if n >= 12:
                 logger.warning("Failed to clear bouncing enemy after 12 trial")

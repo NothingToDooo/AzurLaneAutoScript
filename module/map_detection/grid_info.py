@@ -52,8 +52,6 @@ class GridInfo:
     is_current_fleet = False
     is_submarine = False  # ss
     is_siren = False  # SI
-    is_portal = False
-    portal_link: GridLocation | None = None
     is_maze = False
     maze_round: tuple[int, ...] = (0, 1, 2)
     maze_nearby: SelectedGrids[GridInfo] | None = None
@@ -77,7 +75,6 @@ class GridInfo:
     cost = 9999
     cost_1 = 9999
     cost_2 = 9999
-    connection: GridLocation | None = None
     weight: float = 1
 
     location: GridLocation | None = None

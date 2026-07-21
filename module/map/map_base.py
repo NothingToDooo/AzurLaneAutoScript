@@ -1,5 +1,4 @@
 import copy
-from itertools import pairwise
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
@@ -7,11 +6,13 @@ import numpy as np
 from module.base.utils import location2node, node2location
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
+from module.map.map_pathfinder import CampaignPathfinder
+from module.map.map_topology import CampaignMapTopology
 from module.map.utils import camera_2d, location_ensure
 from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence, ValuesView
+    from collections.abc import Iterable, Iterator, Mapping, Sequence, ValuesView
 
     from module.base.type_alias import Point
     from module.map.type_alias import GridLocation, GridMode
@@ -23,17 +24,17 @@ type FortressItem = GridInfo | str
 type FortressGroup = FortressItem | tuple[FortressItem, ...] | list[FortressItem] | SelectedGrids[GridInfo]
 
 
-class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、拓扑与寻路状态。
+class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局与地图数据状态。
     def __init__(self, name: str | None = None) -> None:
         self.name = name
         self.grid_class: type[GridInfo] = GridInfo
         self.grids: dict[GridLocation, GridInfo] = {}
+        self.topology = CampaignMapTopology(self.grids)
+        self.pathfinder = CampaignPathfinder(self.grids, self.topology)
         self._shape: GridLocation = (0, 0)
         self._map_data = ""
         self._map_data_loop = ""
         self._weight_data = ""
-        self._wall_data = ""
-        self._portal_data: list[tuple[GridLocation, GridLocation]] = []
         self._land_based_data: list[tuple[str, str]] = []
         self._maze_data: list[tuple[str, ...]] = []
         self.maze_round = 9
@@ -50,7 +51,6 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、�
         self.in_map_swipe_preset_data: GridLocation | None = None
         self.poor_map_data = False
         self.camera_sight = (-3, -1, 3, 2)
-        self.grid_connection: dict[GridLocation, set[GridLocation]] = {}
 
     @staticmethod
     def _require_grid_location(grid: GridInfo) -> GridLocation:
@@ -141,26 +141,6 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、�
             self.grids[loca].decode(data)
 
     @property
-    def wall_data(self) -> str:
-        return self._wall_data
-
-    @wall_data.setter
-    def wall_data(self, text: str) -> None:
-        self._wall_data = text
-
-    @property
-    def portal_data(self) -> list[tuple[GridLocation, GridLocation]]:
-        return self._portal_data
-
-    @portal_data.setter
-    def portal_data(self, portal_list: Sequence[tuple[str, str]]) -> None:
-        """portal_list 形如 [(起点, 终点), ...]。"""
-        for nodes in portal_list:
-            node1, node2 = location_ensure(nodes[0]), location_ensure(nodes[1])
-            self._portal_data.append((node1, node2))
-            self[node1].is_portal = True
-
-    @property
     def land_based_data(self) -> list[tuple[str, str]]:
         return self._land_based_data
 
@@ -201,7 +181,7 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、�
             maze = self.to_selected(raw_maze)
             maze.set(is_maze=True, maze_round=tuple(range(index * 3, index * 3 + 3)))
             for grid in maze:
-                self.find_path_initial(grid, has_ambush=False)
+                self.pathfinder.project(grid, has_ambush=False)
                 grid.maze_nearby = self.select(cost=1).add(self.select(cost=2)).select(is_land=False)
 
     @property
@@ -262,66 +242,6 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、�
             self._load_fortress_data(self._fortress_data)
         if bouncing_enemy:
             self._load_bouncing_enemy_data(self._bouncing_enemy_data)
-
-    def _init_grid_connection(self) -> None:
-        total = set(self.grids.keys())
-        for grid in self:
-            grid_location = self._require_grid_location(grid)
-            connection: set[GridLocation] = set()
-            for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0)):
-                arr = (grid_location[0] + dx, grid_location[1] + dy)
-                if arr in total:
-                    connection.add(arr)
-            self.grid_connection[grid_location] = connection
-
-    def _parse_wall_disconnects(self) -> list[tuple[GridLocation, GridLocation]]:
-        wall = []
-        for y, line in enumerate(filter(None, self._wall_data.splitlines())):
-            for x, letter in enumerate(line[4:-2]):
-                if letter != " ":
-                    wall.append((x, y))
-        if not wall:
-            return []
-
-        wall = np.array(wall)
-        vert = wall[np.all([wall[:, 0] % 4 == 2, wall[:, 1] % 2 == 0], axis=0)]
-        hori = wall[np.all([wall[:, 0] % 4 == 0, wall[:, 1] % 2 == 1], axis=0)]
-        disconnect: list[tuple[GridLocation, GridLocation]] = []
-        for raw_location in (vert - (2, 0)) // (4, 2):
-            location = (int(raw_location[0]), int(raw_location[1]))
-            disconnect.append((location, (location[0] + 1, location[1])))
-        for raw_location in (hori - (0, 1)) // (4, 2):
-            location = (int(raw_location[0]), int(raw_location[1]))
-            disconnect.append((location, (location[0], location[1] + 1)))
-        return disconnect
-
-    def _apply_wall_connections(self) -> None:
-        for g1, g2 in self._parse_wall_disconnects():
-            self.grid_connection[g1].remove(g2)
-            self.grid_connection[g2].remove(g1)
-
-    def _apply_portal_connections(self, *, portal: bool) -> None:
-        for start, end in self._portal_data:
-            if portal:
-                self.grid_connection[start].add(end)
-                self[start].is_portal = True
-                self[start].portal_link = end
-                continue
-            if end in self.grid_connection[start]:
-                self.grid_connection[start].remove(end)
-            self[start].is_portal = False
-            self[start].portal_link = None
-
-    def grid_connection_initial(self, *, wall: bool = False, portal: bool = False) -> bool:
-        """按开关应用墙和传送门连接。"""
-        logger.info(f"grid_connection: wall={wall}, portal={portal}")
-
-        self._init_grid_connection()
-        if wall and self._wall_data:
-            self._apply_wall_connections()
-        self._apply_portal_connections(portal=portal)
-
-        return True
 
     def fixup_submarine_fleet(self) -> None:
         # 潜艇和下方格共享弹药图标，下方格可能被误识别为舰队。
@@ -491,211 +411,6 @@ class CampaignMap:  # ruff:ignore[too-many-public-methods] - 待拆分布局、�
         if not self.select(may_enemy=True) or not self.select(may_boss=True) or not self.select(is_spawn_point=True):
             return False
         return bool(self.spawn_data)
-
-    def show_cost(self) -> None:
-        logger.info("   " + " ".join(["   " + chr(x + 64 + 1) for x in range(self.shape[0] + 1)]))
-        for y in range(self.shape[1] + 1):
-            text = (
-                str(y + 1).rjust(2)
-                + " "
-                + " ".join(
-                    [str(self[(x, y)].cost).rjust(4) if (x, y) in self else "    " for x in range(self.shape[0] + 1)]
-                )
-            )
-            logger.info(text)
-
-    def show_connection(self) -> None:
-        logger.info("   " + " ".join([" " + chr(x + 64 + 1) for x in range(self.shape[0] + 1)]))
-        for y in range(self.shape[1] + 1):
-            text = (
-                str(y + 1).rjust(2)
-                + " "
-                + " ".join(
-                    [self._connection_text(self[(x, y)]) if (x, y) in self else "  " for x in range(self.shape[0] + 1)]
-                )
-            )
-            logger.info(text)
-
-    @staticmethod
-    def _connection_text(grid: GridInfo) -> str:
-        return location2node(grid.connection) if grid.connection is not None else "  "
-
-    def _reset_path_costs(self, start_location: GridLocation) -> set[GridInfo]:
-        for grid in self:
-            grid.cost = 9999
-            grid.connection = None
-        start = self[start_location]
-        start.cost = 0
-        return {start}
-
-    def _update_path_neighbor(
-        self, grid: GridInfo, location: GridLocation, ambush_cost: int, *, has_enemy: bool
-    ) -> GridInfo | None:
-        neighbor = self[location]
-        if neighbor.is_land or neighbor.is_mechanism_block:
-            return None
-
-        cost = ambush_cost if neighbor.may_ambush else 1
-        cost += grid.cost
-        if cost < neighbor.cost:
-            neighbor.cost = cost
-            neighbor.connection = self._require_grid_location(grid)
-        elif cost == neighbor.cost:
-            neighbor_location = self._require_grid_location(neighbor)
-            grid_location = self._require_grid_location(grid)
-            if abs(neighbor_location[0] - grid_location[0]) == 1:
-                neighbor.connection = grid_location
-        if neighbor.is_sea or not has_enemy:
-            return neighbor
-        return None
-
-    def find_path_initial(
-        self,
-        location: GridInfo | str | Point,
-        *,
-        has_ambush: bool = True,
-        has_enemy: bool = True,
-    ) -> None:
-        """从 location 计算路径代价；has_enemy=False 时只区分海面与陆地。"""
-        location = location_ensure(location)
-        ambush_cost = 10 if has_ambush else 1
-        visited = self._reset_path_costs(location)
-
-        while 1:
-            new = visited.copy()
-            for grid in visited:
-                grid_location = self._require_grid_location(grid)
-                for location in self.grid_connection[grid_location]:
-                    neighbor = self._update_path_neighbor(grid, location, ambush_cost, has_enemy=has_enemy)
-                    if neighbor is not None:
-                        new.add(neighbor)
-            if len(new) == len(visited):
-                break
-            visited = new
-
-    def find_path_initial_multi_fleet(
-        self,
-        location_dict: Mapping[int, GridLocation | tuple[()]],
-        current: GridLocation | tuple[()],
-        *,
-        has_ambush: bool,
-    ) -> None:
-        """按舰队位置写入 cost_<fleet>；当前舰队最后计算并保留在通用 cost 中。"""
-        locations = sorted(location_dict.items(), key=lambda kv: (int(kv[1] == current),))
-        for fleet, location in locations:
-            if location == ():
-                continue
-            self.find_path_initial(location, has_ambush=has_ambush)
-            attr = f"cost_{fleet}"
-            for grid in self:
-                setattr(grid, attr, grid.cost)
-
-    def _find_path(self, location: GridLocation) -> list[GridLocation] | None:
-        """从目标格沿 connection 回溯，返回起点到目标格的坐标路线。"""
-        if self[location].cost == 0:
-            return [location]
-        if self[location].connection is None:
-            return None
-        res = [location]
-        current = self[location].connection
-        while current is not None:
-            if len(res) > 30:
-                logger.warning("Route too long")
-                logger.warning(res)
-            res.append(current)
-            current = self[current].connection
-        res.reverse()
-        return res
-
-    @staticmethod
-    def _append_avoid_indexes(
-        index: int,
-        route: Sequence[GridLocation],
-        base_indexes: Collection[int],
-        inserted: list[int],
-    ) -> None:
-        if (index > 1) and (index - 1 not in base_indexes):
-            inserted.append(index - 1)
-        if (index < len(route) - 2) and (index + 1 not in base_indexes):
-            inserted.append(index + 1)
-
-    def _turning_route_indexes(self, route: Sequence[GridLocation]) -> list[int]:
-        res: list[int] = []
-        diff = np.abs(np.diff(route, axis=0))
-        turning = np.diff(diff, axis=0)[:, 0]
-        indexes = np.where(turning == -1)[0] + 1
-        for index in indexes:
-            if not self[route[index]].is_fleet:
-                res.append(index)
-                continue
-
-            logger.info(f"Path_node_avoid: {self[route[index]]}")
-            self._append_avoid_indexes(index, route, indexes, res)
-        res.append(len(route) - 1)
-        return res
-
-    def _step_route_indexes(self, route: Sequence[GridLocation], indexes: list[int], step: int) -> list[int]:
-        indexes.insert(0, 0)
-        inserted = []
-        for left, right in pairwise(indexes):
-            for index in list(range(left, right, step))[1:]:
-                way_node = self[route[index]]
-                if way_node.is_fleet or way_node.is_portal or way_node.is_flare:
-                    logger.info(f"Path_node_avoid: {way_node}")
-                    self._append_avoid_indexes(index, route, indexes, inserted)
-                else:
-                    inserted.append(index)
-            inserted.append(right)
-        return inserted
-
-    def _route_node_indexes(self, route: Sequence[GridLocation], step: int, *, turning_optimize: bool) -> list[int]:
-        if turning_optimize:
-            indexes = self._turning_route_indexes(route)
-            if step == 0:
-                return indexes
-        else:
-            if step == 0:
-                return [len(route) - 1]
-            indexes = [max(len(route) - 1, 0)]
-        return self._step_route_indexes(route, indexes, step)
-
-    def _find_route_node(
-        self, route: Sequence[GridLocation], step: int = 0, *, turning_optimize: bool = False
-    ) -> list[GridLocation]:
-        """从路线选取实际点击节点；step 限制步长，turning_optimize 减少转弯伏击。"""
-        return [route[index] for index in self._route_node_indexes(route, step, turning_optimize=turning_optimize)]
-
-    def find_path(
-        self, location: GridInfo | str | Point, step: int = 0, *, turning_optimize: bool = False
-    ) -> list[GridLocation]:
-        location = location_ensure(location)
-
-        path = self._find_path(location)
-        if path is None or not len(path):
-            logger.warning("No path found. Return destination.")
-            return [location]
-        full_path = ", ".join(location2node(grid) for grid in path)
-        logger.info(f"Full path: [{full_path}]")
-
-        portal_path = []
-        index = [0]
-        for i, (current, next_location) in enumerate(pairwise(path)):
-            grid = self[current]
-            if grid.is_portal and grid.portal_link == next_location:
-                index += [i, i + 1]
-            if grid.is_maze and i != 0:
-                index += [i]
-        if len(path) not in index:
-            index.append(len(path))
-        for start, end in pairwise(index):
-            if end - start == 1 and self[path[start]].is_portal and self[path[start]].portal_link == path[end]:
-                continue
-            local_path = path[start : end + 1]
-            local_path = self._find_route_node(local_path, step=step, turning_optimize=turning_optimize)
-            portal_path += local_path
-            route = ", ".join(location2node(grid) for grid in local_path)
-            logger.info(f"Path: [{route}]")
-        return portal_path
 
     def grid_covered(self, grid: GridInfo, location: Sequence[GridLocation] | None = None) -> SelectedGrids[GridInfo]:
         """按相对坐标 location 返回 grid 覆盖的有效格子；默认使用其覆盖范围。"""

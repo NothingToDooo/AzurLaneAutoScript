@@ -227,9 +227,9 @@ def _spawn_data(variant: RunVariant) -> list[dict[str, int]]:
 
 @dataclass(frozen=True, slots=True)
 class _CompiledMapStructures:
-    """旧地图对象所需的结构数据；后续可按 normal/loop 分别编译。"""
+    """地图运行时所需的结构数据；后续可按 normal/loop 分别编译。"""
 
-    wall_data: str
+    walls: tuple[tuple[GridLocation, GridLocation], ...]
     maze_data: tuple[tuple[str, ...], ...]
     fortress_data: tuple[tuple[str, ...], tuple[str, ...]]
     bouncing_enemy_data: tuple[tuple[str, ...], ...]
@@ -240,31 +240,14 @@ def _node(cell: object) -> str:
     return location2node((typed.x, typed.y))
 
 
-def _compile_wall_data(structures: MapStructureRules, *, columns: int, rows: int) -> str:
-    if not structures.walls:
-        return ""
-    width = columns * 4 - 3
-    canvas = [[" "] * width for _ in range(rows * 2 - 1)]
-    for wall in structures.walls:
-        source = wall.source
-        target = wall.target
-        if source.y == target.y:
-            left = min(source.x, target.x)
-            canvas[source.y * 2][left * 4 + 2] = "|"
-        else:
-            top = min(source.y, target.y)
-            canvas[top * 2 + 1][source.x * 4] = "-"
-    return "\n".join(f"    {''.join(line)}, " for line in canvas)
+def _location(cell: object) -> GridLocation:
+    typed = cast("CellId", cell)
+    return typed.x, typed.y
 
 
-def _compile_map_structures(
-    structures: MapStructureRules,
-    *,
-    columns: int,
-    rows: int,
-) -> _CompiledMapStructures:
+def _compile_map_structures(structures: MapStructureRules) -> _CompiledMapStructures:
     return _CompiledMapStructures(
-        wall_data=_compile_wall_data(structures, columns=columns, rows=rows),
+        walls=tuple((_location(wall.source), _location(wall.target)) for wall in structures.walls),
         maze_data=tuple(tuple(_node(cell) for cell in group) for group in structures.maze_groups),
         fortress_data=(
             tuple(_node(cell) for cell in structures.fortress_enemy_cells),
@@ -274,8 +257,13 @@ def _compile_map_structures(
     )
 
 
-def _install_map_structures(compiled: CampaignMap, structures: _CompiledMapStructures) -> None:
-    compiled.wall_data = structures.wall_data
+def _install_map_structures(
+    compiled: CampaignMap,
+    structures: _CompiledMapStructures,
+    *,
+    portals: tuple[tuple[GridLocation, GridLocation], ...],
+) -> None:
+    compiled.topology.configure(walls=structures.walls, portals=portals)
     compiled.maze_data = structures.maze_data
     compiled.fortress_data = structures.fortress_data
     compiled.bouncing_enemy_data = structures.bouncing_enemy_data
@@ -296,22 +284,18 @@ def compile_campaign_map(definition: CampaignStageDefinition) -> CampaignMap:
     compiled.weight_data = _variant_text(source.normal, "weight")
     compiled.camera_data = [location2node((cell.x, cell.y)) for cell in source.camera_data]
     compiled.camera_data_spawn_point = [location2node((cell.x, cell.y)) for cell in source.camera_data_spawn_point]
-    compiled.portal_data = [
-        (
-            location2node((portal.source.x, portal.source.y)),
-            location2node((portal.target.x, portal.target.y)),
-        )
-        for portal in source.portals
-    ]
     compiled.land_based_data = [
         (location2node((unit.cell_id.x, unit.cell_id.y)), unit.direction.value) for unit in source.land_based
     ]
     _install_map_structures(
         compiled,
-        _compile_map_structures(
-            definition.mechanics.map_structures,
-            columns=source.shape.columns,
-            rows=source.shape.rows,
+        _compile_map_structures(definition.mechanics.map_structures),
+        portals=tuple(
+            (
+                (portal.source.x, portal.source.y),
+                (portal.target.x, portal.target.y),
+            )
+            for portal in source.portals
         ),
     )
     compiled.spawn_data = _spawn_data(source.normal)

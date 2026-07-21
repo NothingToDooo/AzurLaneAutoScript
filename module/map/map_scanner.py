@@ -272,17 +272,17 @@ class MovableEnemyTracker:
 
         def restore_projection() -> None:
             if request.rules.wall:
-                runtime.map.grid_connection_initial(wall=True, portal=request.rules.portal)
-            runtime.map.find_path_initial(runtime.fleet_current, has_ambush=request.rules.ambush)
+                runtime.map.topology.rebuild(wall=True, portal=request.rules.portal)
+            runtime.map.pathfinder.project(runtime.fleet_current, has_ambush=request.rules.ambush)
 
         with cleanup_scope(
             restore_projection,
             message="movable enemy projection and path restore both failed",
         ):
             if request.rules.wall:
-                runtime.map.grid_connection_initial(wall=False, portal=request.rules.portal)
+                runtime.map.topology.rebuild(wall=False, portal=request.rules.portal)
             for grid in diff:
-                runtime.map.find_path_initial(grid, has_ambush=False)
+                runtime.map.pathfinder.project(grid, has_ambush=False)
                 accessible = accessible.add(runtime.map.select(cost=0)).add(runtime.map.select(cost=1))
                 if siren:
                     accessible = accessible.add(runtime.map.select(cost=2))

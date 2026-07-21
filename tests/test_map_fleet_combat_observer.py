@@ -109,7 +109,7 @@ class _CombatFleet(Fleet):
             fleet_module._GotoRequest(  # ruff:ignore[private-member-access] - 构造真实导航状态以测试战斗观测顺序。
                 location=location,
                 expected="combat",
-                is_portal=False,
+                portal_destination=None,
                 may_submarine_icon=False,
                 movable_snapshot=MovableEnemySnapshot(),
             ),

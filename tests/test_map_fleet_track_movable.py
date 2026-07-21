@@ -64,6 +64,25 @@ class _Selected(list[_Grid]):  # ruff:ignore[subclass-builtin] - 测试替身须
         return result
 
 
+class _Topology:
+    def __init__(self, map_: _Map) -> None:
+        self._map = map_
+
+    def rebuild(self, **kwargs: object) -> None:
+        self._map.topology_rebuild_calls.append(kwargs)
+
+
+class _Pathfinder:
+    def __init__(self, map_: _Map) -> None:
+        self._map = map_
+
+    def project(self, grid: object, *, has_ambush: object) -> None:
+        self._map.path_project_calls.append((grid, has_ambush))
+        if grid is self._map.path_project_failure:
+            msg = "path projection failed"
+            raise RuntimeError(msg)
+
+
 class _Map:
     def __init__(self) -> None:
         self.grids: dict[_Location, _Grid] = {}
@@ -71,9 +90,11 @@ class _Map:
         self.manual_map_covered = _Selected([])
         self.covered_result = _Selected([])
         self.missing = {"siren": 0, "enemy": 0}
-        self.find_path_initial_calls: list[tuple[object, object]] = []
-        self.grid_connection_calls: list[dict[str, object]] = []
-        self.find_path_failure: object | None = None
+        self.path_project_calls: list[tuple[object, object]] = []
+        self.topology_rebuild_calls: list[dict[str, object]] = []
+        self.path_project_failure: object | None = None
+        self.topology = _Topology(self)
+        self.pathfinder = _Pathfinder(self)
 
     def add_grid(self, location: _Location, *, may_siren: object = True) -> _Grid:
         grid = _Grid(location, may_siren=may_siren)
@@ -93,15 +114,6 @@ class _Map:
         if self.covered_result:
             return self.covered_result
         return _Selected([grid])
-
-    def find_path_initial(self, grid: object, *, has_ambush: object) -> None:
-        self.find_path_initial_calls.append((grid, has_ambush))
-        if grid is self.find_path_failure:
-            msg = "path projection failed"
-            raise RuntimeError(msg)
-
-    def grid_connection_initial(self, **kwargs: object) -> None:
-        self.grid_connection_calls.append(kwargs)
 
     def __getitem__(self, location: _Location) -> _Grid:
         return self.grids[location]
@@ -209,7 +221,7 @@ def test_track_movable_predicts_missing_siren(monkeypatch: pytest.MonkeyPatch) -
     assert predicted.is_siren is True
     assert predicted.is_enemy is True
     assert predicted.is_movable is True
-    assert runtime.map.find_path_initial_calls[-1] == (runtime.fleet_current, False)
+    assert runtime.map.path_project_calls[-1] == (runtime.fleet_current, False)
 
 
 def test_track_movable_restores_wall_and_fleet_path_after_projection_failure(
@@ -224,14 +236,14 @@ def test_track_movable_restores_wall_and_fleet_path_after_projection_failure(
     lost = runtime.map.add_grid((6, 0))
     runtime.map.set_select({"is_siren": True}, _Selected([]))
     runtime.map.set_select({"may_siren": True}, _Selected([lost]))
-    runtime.map.find_path_failure = lost
+    runtime.map.path_project_failure = lost
     monkeypatch.setattr(scanner_module, "match_movable", lambda **_kwargs: ([], []))
 
     with pytest.raises(RuntimeError, match="path projection failed"):
         _track(runtime, request)
 
-    assert runtime.map.grid_connection_calls == [
+    assert runtime.map.topology_rebuild_calls == [
         {"wall": False, "portal": True},
         {"wall": True, "portal": True},
     ]
-    assert runtime.map.find_path_initial_calls[-1] == (runtime.fleet_current, False)
+    assert runtime.map.path_project_calls[-1] == (runtime.fleet_current, False)
