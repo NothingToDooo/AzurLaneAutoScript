@@ -11,13 +11,12 @@ from module.exception import MapDetectionError, MapEnemyMoved, MapWalkError
 from module.handler.ambush import AmbushHandler
 from module.logger import logger
 from module.map.camera import Camera, FullScanOptions
+from module.map.fleet_turn import FleetTurnController, FleetTurnEvent, FleetTurnRules
 from module.map.map_grids import SelectedGrids
 from module.map.utils import location_ensure, match_movable
 
 if TYPE_CHECKING:
     from module.combat.combat import CombatEnd
-    from module.config.config import AzurLaneConfig
-    from module.device.device import Device
     from module.map.map_base import CampaignMap
     from module.map.type_alias import FleetLocation, GridLocation, GridMode
     from module.map_detection.grid import Grid
@@ -43,7 +42,7 @@ class _GotoState:
     arrived: bool = False
 
 
-class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - 待拆分轮次状态与舰队定位。
+class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - 待拆分扫描、定位与导航状态。
     fleet_1_location: FleetLocation = ()
     fleet_2_location: FleetLocation = ()
     fleet_submarine_location: FleetLocation = ()
@@ -52,6 +51,7 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
     siren_count = 0
     fleet_ammo = 5
     ammo_count = 3
+    _turn_controller: FleetTurnController
 
     @staticmethod
     def _require_fleet_location(location: FleetLocation | None) -> GridLocation:
@@ -161,112 +161,6 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
     def switch_to(self) -> None:
         pass
 
-    def __init__(
-        self,
-        config: AzurLaneConfig,
-        device: Device,
-    ) -> None:
-        self.round = 0
-        self.enemy_round: dict[int, int] = {}
-        super().__init__(config=config, device=device)
-
-    def round_next(self) -> bool:
-        """舰队到达后推进地图行动轮次。"""
-        if not self.config.MAP_HAS_MOVABLE_ENEMY and not self.config.MAP_HAS_MAZE:
-            return False
-        self.round += 1
-        logger.info(f"Round: {self.round}, enemy_round: {self.enemy_round}")
-        return True
-
-    def round_battle(self) -> bool:
-        """清理敌人后更新敌方行动轮次。"""
-        if not self.config.MAP_HAS_MOVABLE_ENEMY:
-            return False
-        if not self.map.select(is_siren=True):
-            if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-                if not self.map.select(is_enemy=True):
-                    self.enemy_round = {}
-            else:
-                self.enemy_round = {}
-        try:
-            data = self.map.spawn_data[self.battle_count]
-        except IndexError:
-            data = {}
-        enemy = data.get("siren", 0)
-        if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-            enemy += data.get("enemy", 0)
-        if enemy > 0:
-            r = self.round
-            self.enemy_round[r] = self.enemy_round.get(r, 0) + enemy
-        return True
-
-    def round_reset(self) -> None:
-        """进图后重置地图行动轮次。"""
-        self.round = 0
-        self.enemy_round = {}
-
-    @property
-    def round_enemy_turn(self) -> tuple[int, ...]:
-        """返回各类敌人的移动间隔元组，单位为玩家行动次数。"""
-        if self.config.MAP_HAS_MOVABLE_ENEMY:
-            if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-                return tuple(set(list(self.config.MOVABLE_ENEMY_TURN) + list(self.config.MOVABLE_NORMAL_ENEMY_TURN)))
-            return self.config.MOVABLE_ENEMY_TURN
-        if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-            return self.config.MOVABLE_NORMAL_ENEMY_TURN
-        return ()
-
-    @property
-    def round_is_new(self) -> bool:
-        """敌人移动后返回 True；通常间隔为 2，SIREN_CA 的间隔为 3。"""
-        if not self.config.MAP_HAS_MOVABLE_ENEMY:
-            return False
-        for enemy in self.enemy_round:
-            for turn in self.round_enemy_turn:
-                if self.round - enemy > 0 and (self.round - enemy) % turn == 0:
-                    return True
-
-        return False
-
-    @property
-    def round_wait(self) -> float:
-        """返回等待敌人和迷宫移动的秒数。"""
-        second = 0
-        if self.config.MAP_HAS_MOVABLE_ENEMY:
-            count = 0
-            for enemy, c in self.enemy_round.items():
-                for turn in self.round_enemy_turn:
-                    if self.round + 1 - enemy > 0 and (self.round + 1 - enemy) % turn == 0:
-                        count += c
-                        break
-            second += count * self.config.MAP_SIREN_MOVE_WAIT
-
-        if self.config.MAP_HAS_MAZE and (self.round + 1) % 3 == 0:
-            second += 1.0
-
-        if self.config.MAP_HAS_BOUNCING_ENEMY:
-            for route in self.map.bouncing_enemy_data:
-                if route.select(may_bouncing_enemy=True):
-                    second += self.config.MAP_SIREN_MOVE_WAIT
-
-        return second
-
-    @property
-    def round_maze_changed(self) -> bool:
-        """返回本轮开始时迷宫是否变化。"""
-        if not self.config.MAP_HAS_MAZE:
-            return False
-        return self.round != 0 and self.round % 3 == 0
-
-    def maze_active_on(self, grid: GridInfo | str | GridLocation) -> bool:
-        if not self.config.MAP_HAS_MAZE:
-            return False
-
-        grid = self.map[location_ensure(grid)]
-        if not grid.is_maze:
-            return False
-        return self.round % self.map.maze_round in grid.maze_round
-
     movable_before: SelectedGrids[GridInfo]
     movable_before_normal: SelectedGrids[GridInfo]
 
@@ -304,6 +198,7 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         may_submarine_icon: bool,
     ) -> _GotoState:
         extra = self._goto_walk_extra(grid)
+        movement_wait = self._turn_controller.movement_wait
         return _GotoState(
             location=location,
             expected=expected,
@@ -311,9 +206,9 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
             is_portal=is_portal,
             may_submarine_icon=may_submarine_icon,
             extra=extra,
-            arrive_timer=Timer(0.5 + self.round_wait + extra, count=2),
-            arrive_unexpected_timer=Timer(1.5 + self.round_wait + extra, count=6),
-            ambushed_retry=Timer(0.5 + self.round_wait + extra, count=2),
+            arrive_timer=Timer(0.5 + movement_wait + extra, count=2),
+            arrive_unexpected_timer=Timer(1.5 + movement_wait + extra, count=6),
+            ambushed_retry=Timer(0.5 + movement_wait + extra, count=2),
             walk_timeout=Timer(20).start(),
         )
 
@@ -497,16 +392,16 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         if state.result_mystery == "get_carrier":
             self.full_scan_carrier()
         if state.result == "combat":
-            self.round_battle()
+            self._turn_controller.battle_resolved(self.battle_count)
             self.predict()
-        self.round_next()
-        if self.round_is_new:
+        turn_event = self._turn_controller.fleet_arrived()
+        if turn_event is FleetTurnEvent.ENEMY_MOVED:
             if state.result != "combat":
                 self.predict()
             self.full_scan_movable(enemy_cleared=state.result == "combat")
             self.find_path_initial()
             raise MapEnemyMoved
-        if self.round_maze_changed:
+        if turn_event is FleetTurnEvent.MAZE_CHANGED:
             self.find_path_initial()
             raise MapEnemyMoved
         self.find_path_initial()
@@ -584,7 +479,7 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         return self.map.find_path(location, step=step, turning_optimize=turning_optimize)
 
     def _goto_wait_maze(self, node: GridLocation) -> None:
-        if not self.maze_active_on(node):
+        if not self._turn_controller.maze_active_on(node):
             return
 
         logger.info(f"Maze is active on {location2node(node)}, bouncing to wait")
@@ -1045,6 +940,18 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
             fortress=self.config.MAP_HAS_FORTRESS,
             bouncing_enemy=self.config.MAP_HAS_BOUNCING_ENEMY,
         )
+        self._turn_controller = FleetTurnController(
+            FleetTurnRules(
+                movable_enemy=self.config.MAP_HAS_MOVABLE_ENEMY,
+                movable_normal_enemy=self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY,
+                maze=self.config.MAP_HAS_MAZE,
+                bouncing_enemy=self.config.MAP_HAS_BOUNCING_ENEMY,
+                movable_enemy_turns=self.config.MOVABLE_ENEMY_TURN,
+                movable_normal_enemy_turns=self.config.MOVABLE_NORMAL_ENEMY_TURN,
+                enemy_move_wait=self.config.MAP_SIREN_MOVE_WAIT,
+            ),
+            self.map,
+        )
 
     def map_control_init(self) -> None:
         """初始化阵型、血量、等级和相机，并执行首次地图扫描。"""
@@ -1063,8 +970,7 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         self.find_submarine()
         self.find_path_initial()
         self.map.show_cost()
-        self.round_reset()
-        self.round_battle()
+        self._turn_controller.initialize(self.battle_count)
 
     def handle_clear_mode_config_cover(self) -> bool:
         if not self.map_is_clear_mode:

@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, override
 
 from module.map.fleet import Fleet
+from module.map.fleet_turn import FleetTurnController, FleetTurnRules
 from module.map.map_base import CampaignMap
 from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER, CampaignMapObserver
 from module.map_detection.grid import Grid
@@ -65,6 +66,7 @@ class _CombatFleet(Fleet):
         self.map = CampaignMap("fleet-observer-test")
         self.map.shape = "A1"
         self.map.spawn_data = []
+        self._turn_controller = FleetTurnController(FleetTurnRules(), self.map)
         self._map_observer = observer
         self.battle_count = 0
         self.fleet_ammo = 5

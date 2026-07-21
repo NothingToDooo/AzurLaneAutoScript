@@ -1,11 +1,17 @@
-from typing import TYPE_CHECKING, override
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast, override
 
-from module.exception import MapWalkError
+import pytest
+
+from module.exception import MapEnemyMoved, MapWalkError
 from module.map.fleet import Fleet
+from module.map.fleet_turn import FleetTurnEvent
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from typing import Any
 
+    from module.map.fleet_turn import FleetTurnController
     from module.map.type_alias import GridLocation
     from module.map_detection.grid_info import GridInfo
 
@@ -17,6 +23,7 @@ class _Config:
     MAP_HAS_PORTAL = False
     MAP_HAS_MAZE = False
     MAP_HAS_AMBUSH = False
+    MAP_HAS_DECOY_ENEMY = False
 
 
 class _GridList:
@@ -48,6 +55,10 @@ class _GridList:
 class _Cell:
     def __init__(self) -> None:
         self.maze_nearby = _GridList([(0, 1)])
+        self.is_fleet = False
+
+    def wipe_out(self) -> None:
+        pass
 
 
 class _Map:
@@ -73,6 +84,25 @@ class _Map:
         return self.cells[location]
 
 
+class _TurnController:
+    movement_wait = 0.0
+
+    def __init__(self, trace: list[object]) -> None:
+        self.trace = trace
+        self.maze_nodes: set[GridLocation] = set()
+        self.event = FleetTurnEvent.STABLE
+
+    def battle_resolved(self, battle_count: int) -> None:
+        self.trace.append(("battle_resolved", battle_count))
+
+    def fleet_arrived(self) -> FleetTurnEvent:
+        self.trace.append(("fleet_arrived",))
+        return self.event
+
+    def maze_active_on(self, location: GridLocation) -> bool:
+        return location in self.maze_nodes
+
+
 class _Fleet(Fleet):
     config: _Config
     map: _Map
@@ -80,9 +110,14 @@ class _Fleet(Fleet):
     def __init__(self) -> None:
         self.config = _Config()
         self.map = _Map()
-        self.calls: list[tuple[str, GridInfo | str | GridLocation, str] | tuple[str]] = []
-        self.maze_nodes: set[GridLocation] = set()
+        self.calls: list[object] = []
+        self.turns = _TurnController(self.calls)
+        self._turn_controller = cast("FleetTurnController", self.turns)
         self.fail_once: set[GridInfo | str | GridLocation] = set()
+        self.predict_error: BaseException | None = None
+        self.fleet_current_index = 1
+        self.fleet_1_location = (0, 0)
+        self.battle_count = 1
 
     @property
     def fleet_step(self) -> int:
@@ -97,12 +132,18 @@ class _Fleet(Fleet):
             raise MapWalkError(message)
 
     @override
-    def maze_active_on(self, grid: GridInfo | str | GridLocation) -> bool:
-        return grid in self.maze_nodes
-
-    @override
     def predict(self) -> None:
         self.calls.append(("predict",))
+        if self.predict_error is not None:
+            raise self.predict_error
+
+    @override
+    def full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
+        self.calls.append(("full_scan_movable", enemy_cleared))
+
+    @override
+    def find_path_initial(self) -> None:
+        self.calls.append(("find_path_initial",))
 
     @override
     def ensure_edge_insight(
@@ -155,12 +196,58 @@ def test_goto_waits_on_active_maze_before_walking_node() -> None:
     fleet = _Fleet()
     maze = (1, 1)
     fleet.config.MAP_HAS_MAZE = True
-    fleet.maze_nodes = {maze}
+    fleet.turns.maze_nodes = {maze}
     fleet.map.path_results[((4, 5), 3, False)] = [maze]
 
     fleet.goto((4, 5))
 
     assert fleet.calls == [("_goto", (0, 1), "")] * 10 + [("_goto", maze, "")]
+
+
+def test_goto_finish_keeps_battle_prediction_before_turn_advance() -> None:
+    fleet = _Fleet()
+    prediction_error = RuntimeError("prediction failed")
+    fleet.predict_error = prediction_error
+    state = cast(
+        "Any",
+        SimpleNamespace(
+            location=(1, 0),
+            result="combat",
+            result_mystery="",
+            expected="combat",
+        ),
+    )
+
+    with pytest.raises(RuntimeError) as raised:
+        fleet._goto_finish(state)  # ruff:ignore[private-member-access] - 验证轮次提交与预测的真实顺序。
+
+    assert raised.value is prediction_error
+    assert fleet.calls == [("battle_resolved", 1), ("predict",)]
+
+
+def test_goto_finish_handles_enemy_turn_after_battle_prediction() -> None:
+    fleet = _Fleet()
+    fleet.turns.event = FleetTurnEvent.ENEMY_MOVED
+    state = cast(
+        "Any",
+        SimpleNamespace(
+            location=(1, 0),
+            result="combat",
+            result_mystery="",
+            expected="combat",
+        ),
+    )
+
+    with pytest.raises(MapEnemyMoved):
+        fleet._goto_finish(state)  # ruff:ignore[private-member-access] - 验证轮次事件驱动真实扫描顺序。
+
+    assert fleet.calls == [
+        ("battle_resolved", 1),
+        ("predict",),
+        ("fleet_arrived",),
+        ("full_scan_movable", True),
+        ("find_path_initial",),
+    ]
 
 
 def test_goto_retries_from_failed_node_after_walk_error() -> None:
