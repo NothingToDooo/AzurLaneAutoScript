@@ -125,8 +125,8 @@ class AlasGUI(Frame):
         self._config_save_lock = RLock()
         self._saving_config = False
         self._config_listeners_initialized = False
-        self.alas_name = ""
-        self.alas_config = AzurLaneConfig("template")
+        self.process_manager = ProcessManager.instance()
+        self.runtime_view_active = False
         self.initial()
         self.rendered_state: int | None = None
         self.load_home = False
@@ -143,7 +143,7 @@ class AlasGUI(Frame):
             buttons=[{"label": t("Gui.Aside.Home"), "value": "Home", "color": "aside"}],
             onclick=[self.ui_develop],
         )
-        put_scope("aside_instance", [put_scope("alas-instance", [])])
+        put_scope("aside_runtime", [put_scope("alas-runtime", [])])
         self.set_aside_status()
         put_icon_buttons(
             Icon.SETTING,
@@ -157,14 +157,14 @@ class AlasGUI(Frame):
             onclick=[lambda: go_app("manage", new_window=False)],
         )
 
-    @use_scope("aside_instance")
+    @use_scope("aside_runtime")
     def set_aside_status(self) -> None:
-        state = ProcessManager.instance().state
+        state = self.process_manager.state
         if state == self.rendered_state and not self.load_home:
             return
         self.rendered_state = state
         self.load_home = False
-        with use_scope("alas-instance", clear=True):
+        with use_scope("alas-runtime", clear=True):
             icon_html = Icon.RUN
             if state == 1 and self.af_flag:
                 icon_html = icon_html[:31] + " anim-rotate" + icon_html[31:]
@@ -270,13 +270,14 @@ class AlasGUI(Frame):
             if self.set_group(group, arg_dict, config, task, resolved_fields):
                 self.set_navigator(group)
 
-    def _resolve_task_settings(self, task: str) -> tuple[MutableDeepData, ResolvedTaskConfig]:
-        config = read_config_file(self.alas_name)
+    @staticmethod
+    def _resolve_task_settings(task: str) -> tuple[MutableDeepData, ResolvedTaskConfig]:
+        config = read_config_file("alas")
         snapshot = resolve_task_config(
             task_name=task,
-            bind_chain=self.alas_config.task_bind_chain(task),
+            bind_chain=AzurLaneConfig.task_bind_chain(task),
             data=config,
-            overrides=self.alas_config.overridden,
+            overrides={},
         )
         return config, snapshot
 
@@ -385,9 +386,9 @@ class AlasGUI(Frame):
             BinarySwitchOptions(
                 label_on=t("Gui.Button.Stop"),
                 label_off=t("Gui.Button.Start"),
-                onclick_on=self.alas.request_stop,
-                onclick_off=self.alas.start_default,
-                get_state=lambda: self.alas.alive,
+                onclick_on=self.process_manager.request_stop,
+                onclick_off=self.process_manager.start_default,
+                get_state=lambda: self.process_manager.alive,
                 color_on="off",
                 color_off="on",
                 scope="scheduler_btn",
@@ -429,7 +430,7 @@ class AlasGUI(Frame):
         self.task_handler.add(switch_scheduler.g(), 1, pending_delete=True)
         self.task_handler.add(switch_log_scroll.g(), 1, pending_delete=True)
         self.task_handler.add(self.alas_update_overview_task, 10, pending_delete=True)
-        self.task_handler.add(log.put_log(self.alas), 0.25, pending_delete=True)
+        self.task_handler.add(log.put_log(self.process_manager), 0.25, pending_delete=True)
 
     def _init_config_listeners(self) -> None:
         if self._config_listeners_initialized:
@@ -512,7 +513,7 @@ class AlasGUI(Frame):
         if updates:
             # 先校验输入，避免无效设置导致正在运行的任务被停止。
             build_candidate()
-            manager = ProcessManager.instance()
+            manager = self.process_manager
             with manager.hold_start():
                 if manager.alive:
                     logger.info("Stop alas before writing configuration")
@@ -568,7 +569,7 @@ class AlasGUI(Frame):
         running, pending, waiting = split_overview_tasks(
             list(ready),
             list(waiting_items),
-            is_alive=self.alas.alive,
+            is_alive=self.process_manager.alive,
         )
         self.put_overview_task_section("running_tasks", running)
         self.put_overview_task_section("pending_tasks", pending)
@@ -621,9 +622,9 @@ class AlasGUI(Frame):
             BinarySwitchOptions(
                 label_on=t("Gui.Button.Stop"),
                 label_off=t("Gui.Button.Start"),
-                onclick_on=self.alas.request_stop,
-                onclick_off=lambda: self.alas.start(task),
-                get_state=lambda: self.alas.alive,
+                onclick_on=self.process_manager.request_stop,
+                onclick_off=lambda: self.process_manager.start(task),
+                get_state=lambda: self.process_manager.alive,
                 color_on="off",
                 color_off="on",
                 scope="scheduler_btn",
@@ -679,7 +680,7 @@ class AlasGUI(Frame):
 
         self.task_handler.add(switch_scheduler.g(), 1, pending_delete=True)
         self.task_handler.add(switch_log_scroll.g(), 1, pending_delete=True)
-        self.task_handler.add(log.put_log(self.alas), 0.25, pending_delete=True)
+        self.task_handler.add(log.put_log(self.process_manager), 0.25, pending_delete=True)
 
     @use_scope("menu", clear=True)
     def dev_set_menu(self) -> None:
@@ -710,23 +711,22 @@ class AlasGUI(Frame):
         self.init_aside(name="Home")
         self.set_title(t("Gui.Aside.Home"))
         self.dev_set_menu()
-        self.alas_name = ""
-        if hasattr(self, "alas"):
-            del self.alas
+        self.runtime_view_active = False
         self.state_switch.switch()
 
     def ui_alas(self) -> None:
-        if self.alas_name == "alas":
+        if self.runtime_view_active:
             self.expand_menu()
             return
         self.init_aside(name="alas")
         clear("content")
-        self.alas_name = "alas"
-        self.alas = ProcessManager.instance()
-        self.alas_config = AzurLaneConfig("alas")
+        self.runtime_view_active = True
         self.state_switch.switch()
         self.initial()
         self.alas_set_menu()
+
+    def _header_runtime_state(self) -> int:
+        return self.process_manager.state if self.runtime_view_active else 0
 
     def show(self) -> None:
         self._show()
@@ -735,9 +735,7 @@ class AlasGUI(Frame):
         self.init_aside(name="Home")
         self.dev_set_menu()
         self.init_menu(name="HomePage")
-        self.alas_name = ""
-        if hasattr(self, "alas"):
-            del self.alas
+        self.runtime_view_active = False
         self.set_status(0)
 
         def set_theme(theme: str) -> None:
@@ -809,7 +807,7 @@ class AlasGUI(Frame):
 
         self.state_switch = Switch(
             status=self.set_status,
-            get_state=lambda: getattr(getattr(self, "alas", -1), "state", 0),
+            get_state=self._header_runtime_state,
             name="state",
         )
 
