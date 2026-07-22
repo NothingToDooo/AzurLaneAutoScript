@@ -419,27 +419,7 @@ def test_exercise_confirmed_battle_persists_refresh_progress_and_requeues() -> N
 
 
 @pytest.mark.parametrize("task_name", ["daily", "hard", "exercise"])
-def test_encounter_abort_before_run_prevents_workflow_side_effects(task_name: str) -> None:
-    abort = AbortToken()
-    abort.request("manual stop")
-    if task_name == "daily":
-        workflow = _Workflow(DailyReport(0, 0))
-        task = DailyTask(workflow, _daily_settings())
-    elif task_name == "hard":
-        workflow = _Workflow(_hard_report())
-        task = HardTask(workflow, _hard_settings())
-    else:
-        workflow = _Workflow(_exercise_report(attempts_remaining=0))
-        task = ExerciseTask(workflow, _exercise_settings())
-
-    with pytest.raises(AbortRequested, match="manual stop"):
-        task.run(_context(task_name, abort))
-
-    assert workflow.execute_calls == 0
-
-
-@pytest.mark.parametrize("task_name", ["daily", "hard", "exercise"])
-def test_encounter_abort_after_workflow_discards_schedule_effects(task_name: str) -> None:
+def test_encounter_late_abort_preserves_the_completed_report_and_stops_the_next_entry(task_name: str) -> None:
     abort = AbortToken()
 
     def on_execute() -> None:
@@ -448,15 +428,49 @@ def test_encounter_abort_after_workflow_discards_schedule_effects(task_name: str
     if task_name == "daily":
         workflow = _Workflow(DailyReport(0, 0), on_execute=on_execute)
         task = DailyTask(workflow, _daily_settings())
+        expected = TaskResult(
+            outcome=Deferred("daily attempts are exhausted"),
+            effects=(RescheduleSelf(_SERVER_UPDATE_AT),),
+        )
     elif task_name == "hard":
         workflow = _Workflow(_hard_report(), on_execute=on_execute)
         task = HardTask(workflow, _hard_settings())
+        expected = TaskResult(
+            outcome=Succeeded(),
+            effects=(
+                RescheduleSelf(_SERVER_UPDATE_AT),
+                WakeTask(REWARD_TASK_ID, _OBSERVED_AT, WakePolicy.FORCE_ENABLE),
+            ),
+        )
     else:
-        workflow = _Workflow(_exercise_report(attempts_remaining=0), on_execute=on_execute)
+        workflow = _Workflow(
+            _exercise_report(
+                attempts_remaining=9,
+                attempts_completed=1,
+                opponent_refreshes_used=2,
+            ),
+            on_execute=on_execute,
+        )
         task = ExerciseTask(workflow, _exercise_settings())
+        expected = TaskResult(
+            outcome=Deferred("exercise attempts remain"),
+            effects=(RescheduleSelf(_OBSERVED_AT),),
+            state_effects=(
+                UpsertTaskState(
+                    "exercise",
+                    EXERCISE_PROGRESS_KEY,
+                    EXERCISE_PROGRESS_SCHEMA_VERSION,
+                    {"opponent_refreshes_used": 2},
+                ),
+            ),
+        )
+
+    context = _context(task_name, abort)
+
+    assert task.run(context) == expected
 
     with pytest.raises(AbortRequested, match="stop after workflow"):
-        task.run(_context(task_name, abort))
+        task.run(context)
 
     assert workflow.execute_calls == 1
 

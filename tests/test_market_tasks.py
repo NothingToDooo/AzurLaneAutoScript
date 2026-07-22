@@ -332,7 +332,7 @@ def test_market_abort_before_run_prevents_external_side_effects(task_name: str) 
 
 
 @pytest.mark.parametrize("task_name", ["awaken", "shipyard", "gacha", "shop_frequent", "shop_once"])
-def test_market_abort_after_workflow_discards_schedule_result(task_name: str) -> None:
+def test_market_abort_after_completed_workflow_preserves_schedule_and_stops_next_entry(task_name: str) -> None:
     abort = AbortToken()
 
     def request_abort() -> None:
@@ -340,6 +340,12 @@ def test_market_abort_after_workflow_discards_schedule_result(task_name: str) ->
 
     task, workflow = _build_task(task_name, after_execute=request_abort)
 
+    result = task.run(_context(task_name, abort))
+
+    assert result == TaskResult(
+        outcome=Succeeded(),
+        effects=(RescheduleSelf(_NEXT_SERVER_UPDATE_AT),),
+    )
     with pytest.raises(AbortRequested, match="stop after workflow"):
         task.run(_context(task_name, abort))
 

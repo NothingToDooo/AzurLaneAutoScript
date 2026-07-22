@@ -125,7 +125,6 @@ class AwakenTask(Task):
         if not isinstance(report, AwakenReport):
             message = "AwakenWorkflow.execute() must return an AwakenReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         self._validate_report(report)
         return TaskResult(
             outcome=Succeeded(),
@@ -231,7 +230,6 @@ class ShipyardTask(Task):
         if not isinstance(report, ShipyardReport):
             message = "ShipyardWorkflow.execute() must return a ShipyardReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         return TaskResult(
             outcome=Succeeded(),
             effects=(RescheduleSelf(self._settings.schedule.next_after(context.started_at)),),
@@ -305,7 +303,6 @@ class GachaTask(Task):
         if not isinstance(report, GachaReport):
             message = "GachaWorkflow.execute() must return a GachaReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         return TaskResult(
             outcome=Succeeded(),
             effects=(RescheduleSelf(self._settings.schedule.next_after(context.started_at)),),
@@ -469,7 +466,6 @@ class ShopFrequentTask(Task):
         if not isinstance(report, ShopFrequentReport):
             message = "ShopFrequentWorkflow.execute() must return a ShopFrequentReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         return TaskResult(
             outcome=Succeeded(),
             effects=(RescheduleSelf(self._settings.schedule.next_after(context.started_at)),),
@@ -516,7 +512,6 @@ class ShopOnceTask(Task):
         if not isinstance(report, ShopOnceReport):
             message = "ShopOnceWorkflow.execute() must return a ShopOnceReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         return TaskResult(
             outcome=Succeeded(),
             effects=(RescheduleSelf(self._settings.schedule.next_after(context.started_at)),),

@@ -840,12 +840,45 @@ def test_abort_before_execution_prevents_workflow_side_effects() -> None:
     assert workflow.calls == 0
 
 
-def test_abort_at_workflow_safe_point_discards_schedule_effects() -> None:
+def test_abort_after_safe_workflow_return_preserves_checkpoint_and_stops_next_entry() -> None:
     abort = AbortToken()
-    workflow = _Workflow(_report(), on_execute=lambda: _request_abort(abort))
+    cursor = WorldMissionCursor(WorldMissionEvidenceKind.PINNED_ZONE, 3)
+    workflow = _Workflow(
+        _report(
+            WorldTaskStatus.IN_PROGRESS,
+            completed_units=1,
+            cursor=cursor,
+        ),
+        on_execute=lambda: _request_abort(abort),
+    )
+    task = _task("opsi_daily", workflow)
+
+    result = task.run(_context("opsi_daily", abort=abort))
+
+    progress = WorldProgress(
+        task_id=TaskId("opsi_daily"),
+        operation=WorldOperation.DAILY,
+        completed_units=1,
+        cycle_anchor=_SERVER_UPDATE_AT,
+        settings_revision=1,
+        content_revision="content-1",
+        cursor=cursor,
+    )
+    assert result == TaskResult(
+        outcome=Deferred("operation siren completed one safe unit"),
+        effects=(RescheduleSelf(_OBSERVED_AT),),
+        state_effects=(
+            UpsertTaskState(
+                "opsi_daily",
+                "world_progress",
+                1,
+                progress.to_payload(),
+            ),
+        ),
+    )
 
     with pytest.raises(AbortRequested, match="stop after current action"):
-        _task("opsi_daily", workflow).run(_context("opsi_daily", abort=abort))
+        task.run(_context("opsi_daily", abort=abort))
 
     assert workflow.calls == 1
 

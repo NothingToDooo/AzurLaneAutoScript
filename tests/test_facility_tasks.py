@@ -373,66 +373,63 @@ def test_tactical_without_running_training_uses_failure_retry() -> None:
     )
 
 
-@pytest.mark.parametrize("task_name", ["research", "commission", "tactical"])
-def test_facility_abort_before_run_prevents_external_side_effects(task_name: str) -> None:
-    abort = AbortToken()
-    abort.request("manual stop")
-    if task_name == "research":
-        workflow = _ResearchWorkflow(ResearchReport(observed_at=_OBSERVED_AT, available_slots=5, first_finish_at=None))
-        task = ResearchTask(workflow, _research_settings())
-    elif task_name == "commission":
-        workflow = _CommissionWorkflow(_commission_report())
-        task = CommissionTask(
-            workflow,
-            _commission_settings(),
-        )
-    else:
-        workflow = _TacticalWorkflow(TacticalReport(observed_at=_OBSERVED_AT, finish_at=None))
-        task = TacticalTask(workflow, _tactical_settings())
-
-    with pytest.raises(AbortRequested, match="manual stop"):
-        task.run(_context(task_name, abort))
-
-    assert workflow.execute_calls == 0
-
-
-def test_research_abort_after_workflow_discards_schedule_result() -> None:
+def test_research_late_abort_preserves_schedule_and_stops_the_next_entry() -> None:
     abort = AbortToken()
     workflow = _ResearchWorkflow(
         ResearchReport(observed_at=_OBSERVED_AT, available_slots=5, first_finish_at=None),
         on_execute=lambda: _request_abort(abort, "stop after research"),
     )
+    task = ResearchTask(workflow, _research_settings())
+    context = _context("research", abort)
+
+    assert task.run(context) == TaskResult(
+        outcome=Deferred("no research project is running"),
+        effects=(RescheduleSelf(_SERVER_UPDATE_AT),),
+    )
 
     with pytest.raises(AbortRequested, match="stop after research"):
-        ResearchTask(workflow, _research_settings()).run(_context("research", abort))
-
+        task.run(context)
     assert workflow.execute_calls == 1
 
 
-def test_commission_abort_after_workflow_discards_all_schedule_results() -> None:
+def test_commission_late_abort_preserves_all_schedules_and_stops_the_next_entry() -> None:
     abort = AbortToken()
     workflow = _CommissionWorkflow(
         _commission_report(daily_pending=1, filtered_urgent_pending=1),
         on_execute=lambda: _request_abort(abort, "stop after commission"),
     )
-    settings = _commission_settings(enabled=True)
+    task = CommissionTask(workflow, _commission_settings(enabled=True))
+    context = _context("commission", abort)
+
+    assert task.run(context) == TaskResult(
+        outcome=Retryable("no commission is running"),
+        effects=(
+            RescheduleSelf(_OBSERVED_AT + timedelta(minutes=30)),
+            RescheduleTask(TaskId("gems_farming"), _OBSERVED_AT + timedelta(hours=2)),
+        ),
+    )
 
     with pytest.raises(AbortRequested, match="stop after commission"):
-        CommissionTask(workflow, settings).run(_context("commission", abort))
-
+        task.run(context)
     assert workflow.execute_calls == 1
 
 
-def test_tactical_abort_after_workflow_discards_schedule_result() -> None:
+def test_tactical_late_abort_preserves_schedule_and_stops_the_next_entry() -> None:
     abort = AbortToken()
     workflow = _TacticalWorkflow(
         TacticalReport(observed_at=_OBSERVED_AT, finish_at=None),
         on_execute=lambda: _request_abort(abort, "stop after tactical"),
     )
+    task = TacticalTask(workflow, _tactical_settings())
+    context = _context("tactical", abort)
+
+    assert task.run(context) == TaskResult(
+        outcome=Retryable("no tactical training is running"),
+        effects=(RescheduleSelf(_OBSERVED_AT + timedelta(minutes=20)),),
+    )
 
     with pytest.raises(AbortRequested, match="stop after tactical"):
-        TacticalTask(workflow, _tactical_settings()).run(_context("tactical", abort))
-
+        task.run(context)
     assert workflow.execute_calls == 1
 
 

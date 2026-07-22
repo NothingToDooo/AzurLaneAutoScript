@@ -566,61 +566,20 @@ def test_private_quarters_rejects_report_that_hides_requested_interaction() -> N
         PrivateQuartersTask(_Workflow(report), _private_quarters_settings()).run(_context("private_quarters"))
 
 
-@pytest.mark.parametrize(
-    "task_name",
-    ["dorm", "meowfficer", "guild", "reward", "freebies", "private_quarters"],
-)
-def test_composite_task_abort_before_run_prevents_external_side_effects(task_name: str) -> None:
+def test_freebies_abort_before_run_prevents_external_side_effects() -> None:
     abort = AbortToken()
     abort.request("manual stop")
     call_log: list[str] = []
-    task: Task
-    if task_name == "dorm":
-        task = DormTask(
-            cast("DormWorkflow", _Workflow(_dorm_report(), call_log=call_log)),
-            _dorm_settings(),
-        )
-    elif task_name == "meowfficer":
-        task = MeowfficerTask(
-            _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False), call_log=call_log),
-            _meowfficer_settings(),
-        )
-    elif task_name == "guild":
-        task = GuildTask(
-            _Workflow(
-                GuildReport(observed_at=_OBSERVED_AT, logistics_succeeded=True, operation_succeeded=True),
-                call_log=call_log,
-            ),
-            _guild_settings(),
-        )
-    elif task_name == "reward":
-        task = RewardTask(
-            _Workflow(RewardReport(_OBSERVED_AT), call_log=call_log),
-            _reward_settings(),
-        )
-    elif task_name == "freebies":
-        task = FreebiesTask(
-            battle_pass=_FreebieCollector("collector", call_log),
-            data_key=_DataKeyCollector("collector", call_log),
-            mail=_MailCollector("collector", call_log),
-            supply_pack=_SupplyPackCollector("collector", call_log),
-            settings=_freebies_settings(),
-        )
-    else:
-        task = PrivateQuartersTask(
-            _Workflow(
-                PrivateQuartersReport(
-                    observed_at=_OBSERVED_AT,
-                    shop_attempted=True,
-                    interaction_status=PrivateQuartersInteractionStatus.COMPLETED,
-                ),
-                call_log=call_log,
-            ),
-            _private_quarters_settings(),
-        )
+    task = FreebiesTask(
+        battle_pass=_FreebieCollector("collector", call_log),
+        data_key=_DataKeyCollector("collector", call_log),
+        mail=_MailCollector("collector", call_log),
+        supply_pack=_SupplyPackCollector("collector", call_log),
+        settings=_freebies_settings(),
+    )
 
     with pytest.raises(AbortRequested, match="manual stop"):
-        task.run(_context(task_name, abort))
+        task.run(_context("freebies", abort))
 
     assert call_log == []
 
@@ -646,16 +605,69 @@ def test_freebies_abort_between_collectors_stops_remaining_work_and_discards_sch
     assert call_log == ["battle_pass"]
 
 
-def test_reward_abort_after_workflow_discards_schedule_result() -> None:
+@pytest.mark.parametrize(
+    ("task_name", "build_task", "report", "due_at"),
+    [
+        (
+            "dorm",
+            lambda workflow: DormTask(cast("DormWorkflow", workflow), _dorm_settings()),
+            _dorm_report(),
+            _OBSERVED_AT + timedelta(minutes=417),
+        ),
+        (
+            "meowfficer",
+            lambda workflow: MeowfficerTask(cast("MeowfficerWorkflow", workflow), _meowfficer_settings()),
+            MeowfficerReport(_OBSERVED_AT, training_active=False),
+            _SERVER_UPDATE_AT,
+        ),
+        (
+            "guild",
+            lambda workflow: GuildTask(cast("GuildWorkflow", workflow), _guild_settings()),
+            GuildReport(observed_at=_OBSERVED_AT, logistics_succeeded=True, operation_succeeded=True),
+            _SERVER_UPDATE_AT,
+        ),
+        (
+            "reward",
+            lambda workflow: RewardTask(cast("RewardWorkflow", workflow), _reward_settings()),
+            RewardReport(_OBSERVED_AT),
+            _OBSERVED_AT + timedelta(hours=1),
+        ),
+        (
+            "private_quarters",
+            lambda workflow: PrivateQuartersTask(
+                cast("PrivateQuartersWorkflow", workflow),
+                _private_quarters_settings(),
+            ),
+            PrivateQuartersReport(
+                observed_at=_OBSERVED_AT,
+                shop_attempted=True,
+                interaction_status=PrivateQuartersInteractionStatus.COMPLETED,
+            ),
+            _SERVER_UPDATE_AT,
+        ),
+    ],
+)
+def test_composite_workflow_late_abort_preserves_schedule_and_stops_the_next_entry(
+    task_name: str,
+    build_task: Callable[[_Workflow[object, object]], Task],
+    report: object,
+    due_at: datetime,
+) -> None:
     abort = AbortToken()
-    workflow: _Workflow[RewardSettings, RewardReport] = _Workflow(
-        RewardReport(_OBSERVED_AT),
-        on_execute=lambda: _request_abort(abort, "stop after reward"),
+    workflow = _Workflow[object, object](
+        report,
+        on_execute=lambda: _request_abort(abort, "stop after workflow"),
+    )
+    task = build_task(workflow)
+    context = _context(task_name, abort)
+
+    assert task.run(context) == TaskResult(
+        outcome=Succeeded(),
+        effects=(RescheduleSelf(due_at),),
     )
 
-    with pytest.raises(AbortRequested, match="stop after reward"):
-        RewardTask(workflow, _reward_settings()).run(_context("reward", abort))
-
+    with pytest.raises(AbortRequested, match="stop after workflow"):
+        task.run(context)
     assert workflow.calls == 1
 
 
