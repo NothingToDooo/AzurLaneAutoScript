@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
     from module.device.device import Device
     from module.map.map_base import CampaignMap
-    from module.map.type_alias import FleetLocation, GridLocation
+    from module.map.type_alias import GridLocation
     from module.map_detection.grid import Grid
     from module.os.radar import RadarGrid, RadarSelection
 
@@ -137,10 +137,6 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         self.lv_reset()
         self.lv_get()
         self.ensure_edge_insight(preset=self.map.in_map_swipe_preset_data, swipe_limit=(6, 5))
-
-    def find_current_fleet(self) -> FleetLocation:
-        self.navigation.seed_surface(fleet_1=self.camera)
-        return self.navigation.current_location
 
     _os_map_event_handled = False
 

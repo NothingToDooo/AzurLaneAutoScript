@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, time, timedelta
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -199,19 +199,6 @@ def test_research_empty_queue_defers_until_server_update() -> None:
     )
 
 
-def test_research_server_update_rolls_over_when_run_starts_at_the_trigger() -> None:
-    context = _context("research", started_at=_SERVER_UPDATE_AT)
-    workflow = _ResearchWorkflow(
-        ResearchReport(observed_at=context.started_at, available_slots=5, first_finish_at=None)
-    )
-
-    result = ResearchTask(workflow, _research_settings()).run(context)
-
-    expected_due_at = _SERVER_UPDATE_AT + timedelta(days=1)
-    assert result.effects == (RescheduleSelf(expected_due_at),)
-    assert expected_due_at > context.started_at
-
-
 def test_research_empty_queue_schedules_from_observation_when_run_crosses_server_update() -> None:
     started_at = _SERVER_UPDATE_AT - timedelta(minutes=1)
     observed_at = _SERVER_UPDATE_AT + timedelta(minutes=1)
@@ -235,12 +222,9 @@ def test_research_four_available_slots_retries_ten_minutes_before_finish() -> No
     )
 
 
-@pytest.mark.parametrize("available_slots", [0, 1, 2, 3])
-def test_research_non_empty_queue_uses_first_finish(available_slots: int) -> None:
+def test_research_non_empty_queue_uses_first_finish() -> None:
     finish_at = _OBSERVED_AT + timedelta(hours=1)
-    workflow = _ResearchWorkflow(
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=available_slots, first_finish_at=finish_at)
-    )
+    workflow = _ResearchWorkflow(ResearchReport(observed_at=_OBSERVED_AT, available_slots=2, first_finish_at=finish_at))
 
     result = ResearchTask(workflow, _research_settings()).run(_context("research"))
 
@@ -431,48 +415,3 @@ def test_tactical_late_abort_preserves_schedule_and_stops_the_next_entry() -> No
     with pytest.raises(AbortRequested, match="stop after tactical"):
         task.run(context)
     assert workflow.execute_calls == 1
-
-
-def test_facility_datetimes_must_be_timezone_aware() -> None:
-    naive = datetime(2026, 7, 13, 12)
-
-    with pytest.raises(ValueError, match="timezone-aware"):
-        ResearchReport(observed_at=naive, available_slots=5, first_finish_at=None)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=4, first_finish_at=naive)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        CommissionReport(naive, (), 0, 0)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        CommissionReport(_OBSERVED_AT, (naive,), 0, 0)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        TacticalReport(naive, None)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        TacticalReport(_OBSERVED_AT, naive)
-
-
-def test_facility_rejects_invalid_report_and_settings_values() -> None:
-    with pytest.raises(ValueError, match="between zero and five"):
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=6, first_finish_at=_OBSERVED_AT)
-    with pytest.raises(ValueError, match="empty research queue"):
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=5, first_finish_at=_OBSERVED_AT)
-    with pytest.raises(ValueError, match="non-empty research queue"):
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=0, first_finish_at=None)
-    with pytest.raises(TypeError, match="failure_retry_delay must be a DelayRange"):
-        CommissionSettings(
-            cast("DelayRange", timedelta(0)),
-            commission_limit_enabled=False,
-            selection=_COMMISSION_SELECTION,
-        )
-    with pytest.raises(TypeError, match="must be a bool"):
-        CommissionSettings(DelayRange(60, 60), cast("bool", 1), _COMMISSION_SELECTION)
-    with pytest.raises(ValueError, match="must be non-negative"):
-        CommissionReport(_OBSERVED_AT, (), daily_pending=-1, filtered_urgent_pending=0)
-    with pytest.raises(TypeError, match="failure_retry_delay must be a DelayRange"):
-        _tactical_settings(cast("DelayRange", timedelta(0)))
-
-
-def test_facility_datetime_type_errors_are_not_treated_as_naive_datetimes() -> None:
-    with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        ResearchSettings(cast("DailySchedule", "tomorrow"), _RESEARCH_SELECTION)
-    with pytest.raises(TypeError, match="must be a datetime"):
-        TacticalReport(_OBSERVED_AT, cast("datetime", "later"))

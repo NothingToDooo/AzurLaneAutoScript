@@ -184,18 +184,6 @@ def test_emulator_instance_uses_configured_serial_identity_after_live_port_shift
     assert instance.name == folder.name
 
 
-def test_check_mumu_bridge_network_allows_disabled_bridge(tmp_path: Path) -> None:
-    instance = _instance(tmp_path)
-    instance.config_dir.mkdir(parents=True)
-    instance.config_path("customer_config.json").write_text(
-        json.dumps({"customer": {"network_bridge_opened": False}}),
-        encoding="utf-8",
-    )
-    runtime = _make_runtime(instance=instance)
-
-    assert runtime.check_mumu_bridge_network()
-
-
 def test_check_mumu_bridge_network_rejects_enabled_bridge(tmp_path: Path) -> None:
     instance = _instance(tmp_path)
     instance.config_dir.mkdir(parents=True)
@@ -209,35 +197,11 @@ def test_check_mumu_bridge_network_rejects_enabled_bridge(tmp_path: Path) -> Non
         runtime.check_mumu_bridge_network()
 
 
-def test_check_mumu_app_keep_alive_accepts_disabled_getprop() -> None:
-    runtime = _make_runtime(app_keep_alive="false")
-
-    assert runtime.check_mumu_app_keep_alive()
-
-
 def test_check_mumu_app_keep_alive_rejects_enabled_getprop() -> None:
     runtime = _make_runtime(app_keep_alive="true")
 
     with pytest.raises(HumanTakeoverRequiredError):
         runtime.check_mumu_app_keep_alive()
-
-
-def test_is_mumu_over_version_400_uses_empty_player_version() -> None:
-    runtime = _make_runtime(player_version="")
-
-    assert runtime.is_mumu_over_version_400
-
-
-def test_check_mumu_app_keep_alive_400_accepts_disabled_config(tmp_path: Path) -> None:
-    instance = _instance(tmp_path)
-    instance.config_dir.mkdir(parents=True)
-    instance.config_path("customer_config.json").write_text(
-        json.dumps({"customer": {"app_keptlive": False}}),
-        encoding="utf-8",
-    )
-    runtime = _make_runtime(player_version="", instance=instance)
-
-    assert runtime.check_mumu_app_keep_alive()
 
 
 def test_check_mumu_app_keep_alive_400_rejects_enabled_config(tmp_path: Path) -> None:

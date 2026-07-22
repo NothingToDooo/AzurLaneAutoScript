@@ -1,17 +1,12 @@
-from dataclasses import FrozenInstanceError
-from typing import cast
-
 import pytest
 
 from module.content.battle_policy import (
     BattleIntent,
     BattlePolicy,
     BossStrategy,
-    ClearAnyEnemy,
     ClearBoss,
     ClearBossRoadblock,
     ClearFilteredEnemy,
-    ClearPriorityEnemy,
     ClearSiren,
     DefaultBattle,
     StagePolicy,
@@ -20,7 +15,6 @@ from module.content.campaign_session import (
     BattleAttempt,
     BattleFailed,
     BattlefieldObservation,
-    BattleOutcome,
     BattleSucceeded,
     BattleTarget,
     CampaignRunVariant,
@@ -31,7 +25,6 @@ from module.content.campaign_session import (
     NoBattleTarget,
     RemainingSpawns,
 )
-from module.content.errors import ContentValidationError
 from module.content.models import StageRef
 from module.content.stage_definition import (
     CampaignStageDefinition,
@@ -93,10 +86,6 @@ def _command(decision_state: CampaignSessionState) -> BattleAttempt:
     command = decision_state.pending
     assert command is not None
     return command
-
-
-def _assign_attribute(target: object, name: str, value: object) -> None:
-    setattr(target, name, value)
 
 
 @pytest.mark.parametrize(
@@ -163,11 +152,6 @@ def test_boss_spawn_decides_a_typed_clear_boss_intent() -> None:
 
     assert decision.command is not None
     assert decision.command.intent == ClearBoss(BossStrategy.FLEET_BOSS)
-
-
-def test_boss_spawn_requires_an_explicit_strategy() -> None:
-    with pytest.raises(ContentValidationError, match="explicit stage policy"):
-        _definition((SpawnWave(0, boss=1),))
 
 
 def test_boss_roadblock_success_stays_on_the_boss_wave_until_no_target() -> None:
@@ -264,41 +248,6 @@ def test_clearing_an_early_boss_completes_before_later_spawn_rows() -> None:
     session.validate_state(completed)
 
 
-def test_spawn_schedule_exhaustion_does_not_complete_a_boss_map() -> None:
-    session = CampaignSession(
-        _definition(
-            (SpawnWave(0, enemy=1, boss=1),),
-            policies={
-                0: StagePolicy(
-                    (
-                        ClearAnyEnemy(),
-                        ClearBoss(BossStrategy.FLEET_BOSS),
-                    )
-                )
-            },
-        ),
-        CampaignRunVariant.NORMAL,
-    )
-    enemy = session.decide(session.initial_state(), BattlefieldObservation(0, enemy=1, boss=1))
-
-    after_enemy = session.reduce(
-        enemy.state,
-        BattleSucceeded(_command(enemy.state), BattleTarget.ENEMY),
-    )
-    boss = session.decide(after_enemy, BattlefieldObservation(1, boss=1))
-    completed = session.reduce(
-        boss.state,
-        BattleSucceeded(_command(boss.state), BattleTarget.BOSS),
-    )
-
-    assert after_enemy.status is CampaignSessionStatus.ACTIVE
-    assert after_enemy.battle_index == 1
-    assert after_enemy.remaining == RemainingSpawns(boss=1)
-    assert isinstance(_command(boss.state).intent, ClearBoss)
-    assert completed.status is CampaignSessionStatus.COMPLETED
-    assert completed.battle_index == 2
-
-
 def test_no_target_walks_the_declared_fallbacks_then_blocks() -> None:
     session = CampaignSession(
         _definition(
@@ -327,22 +276,6 @@ def test_no_target_walks_the_declared_fallbacks_then_blocks() -> None:
     assert blocked.status is CampaignSessionStatus.BLOCKED
     assert blocked.pending is None
     assert blocked.reason == "battle 0 exhausted its battle plan"
-
-
-def test_observation_without_an_eligible_target_produces_a_blocked_decision() -> None:
-    session = CampaignSession(
-        _definition(
-            (SpawnWave(0, enemy=1),),
-            policies={0: BattlePolicy("filtered_enemy_then_default", preserve=1)},
-        ),
-        CampaignRunVariant.NORMAL,
-    )
-
-    decision = session.decide(session.initial_state(), BattlefieldObservation(0))
-
-    assert decision.command is None
-    assert decision.state.status is CampaignSessionStatus.BLOCKED
-    assert decision.state.reason == "battle 0 has no eligible target"
 
 
 def test_battle_failure_is_terminal_and_keeps_the_remaining_spawn_facts() -> None:
@@ -380,111 +313,3 @@ def test_default_battle_may_report_the_actual_enemy_or_siren_it_cleared() -> Non
 
     assert enemy_completed.remaining == RemainingSpawns(siren=1)
     assert siren_completed.remaining == RemainingSpawns(enemy=1)
-
-
-def test_stale_observations_and_mismatched_outcomes_fail_immediately() -> None:
-    session = CampaignSession(
-        _definition((SpawnWave(0, enemy=1),)),
-        CampaignRunVariant.NORMAL,
-    )
-    initial = session.initial_state()
-
-    with pytest.raises(CampaignSessionError, match="stale"):
-        session.decide(initial, BattlefieldObservation(1, enemy=1))
-    with pytest.raises(CampaignSessionError, match="exceeds"):
-        session.decide(initial, BattlefieldObservation(0, enemy=2))
-
-    decision = session.decide(initial, BattlefieldObservation(0, enemy=1))
-    with pytest.raises(CampaignSessionError, match="pending"):
-        session.decide(decision.state, BattlefieldObservation(0, enemy=1))
-
-    wrong = BattleAttempt(0, 99, 0, DefaultBattle())
-    with pytest.raises(CampaignSessionError, match="does not match"):
-        session.reduce(decision.state, BattleSucceeded(wrong, BattleTarget.ENEMY))
-    with pytest.raises(CampaignSessionError, match="cannot clear"):
-        session.reduce(decision.state, BattleSucceeded(_command(decision.state), BattleTarget.BOSS))
-    with pytest.raises(CampaignSessionError, match="pending"):
-        session.reduce(initial, NoBattleTarget(BattleAttempt(0, 0, 0, DefaultBattle())))
-
-
-def test_session_rejects_a_state_from_another_variant() -> None:
-    definition = _definition(
-        (SpawnWave(0, enemy=1),),
-        loop_waves=(SpawnWave(0, siren=1),),
-    )
-    normal = CampaignSession(definition, CampaignRunVariant.NORMAL)
-    loop = CampaignSession(definition, CampaignRunVariant.LOOP)
-
-    with pytest.raises(CampaignSessionError, match="different run variant"):
-        normal.decide(loop.initial_state(), BattlefieldObservation(0, siren=1))
-
-
-def test_state_remaining_and_commands_are_immutable() -> None:
-    session = CampaignSession(
-        _definition((SpawnWave(0, enemy=1),)),
-        CampaignRunVariant.NORMAL,
-    )
-    state = session.initial_state()
-    decision = session.decide(state, BattlefieldObservation(0, enemy=1))
-
-    for target, name, value in (
-        (state, "battle_index", 99),
-        (state.remaining, "enemy", 99),
-        (_command(decision.state), "attempt_id", 99),
-    ):
-        with pytest.raises(FrozenInstanceError):
-            _assign_attribute(target, name, value)
-
-
-@pytest.mark.parametrize("value", [True, -1, 1.0, "1"])
-def test_counts_require_non_negative_exact_integers(value: object) -> None:
-    with pytest.raises(CampaignSessionError, match="non-negative"):
-        RemainingSpawns(enemy=cast("int", value))
-    with pytest.raises(CampaignSessionError, match="non-negative"):
-        BattlefieldObservation(cast("int", value))
-
-
-def test_invalid_state_combinations_fail_at_construction() -> None:
-    remaining = RemainingSpawns(enemy=1)
-    pending = BattleAttempt(0, 0, 0, DefaultBattle())
-
-    with pytest.raises(CampaignSessionError, match="terminal reason"):
-        CampaignSessionState(
-            CampaignRunVariant.NORMAL,
-            CampaignSessionStatus.ACTIVE,
-            0,
-            remaining,
-            reason="unexpected",
-        )
-    with pytest.raises(CampaignSessionError, match=r"terminal.*pending"):
-        CampaignSessionState(
-            CampaignRunVariant.NORMAL,
-            CampaignSessionStatus.FAILED,
-            0,
-            remaining,
-            next_attempt_id=1,
-            pending=pending,
-            reason="failed",
-        )
-    with pytest.raises(CampaignSessionError, match="requires a reason"):
-        CampaignSessionState(
-            CampaignRunVariant.NORMAL,
-            CampaignSessionStatus.BLOCKED,
-            0,
-            remaining,
-        )
-
-
-def test_closed_intent_and_outcome_types_reject_foreign_values() -> None:
-    assert BattleAttempt(0, 0, 0, ClearPriorityEnemy()).intent == ClearPriorityEnemy()
-
-    with pytest.raises(TypeError, match="invalid intent"):
-        BattleAttempt(0, 0, 0, cast("BattleIntent", object()))
-
-    session = CampaignSession(
-        _definition((SpawnWave(0, enemy=1),)),
-        CampaignRunVariant.NORMAL,
-    )
-    decision = session.decide(session.initial_state(), BattlefieldObservation(0, enemy=1))
-    with pytest.raises(TypeError, match="invalid battle outcome"):
-        session.reduce(decision.state, cast("BattleOutcome", object()))

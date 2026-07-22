@@ -1,48 +1,10 @@
 from types import SimpleNamespace
 from typing import TypedDict, Unpack
 
+import pytest
+
 from module.research.project import ResearchProject
-from module.research.research import ResearchProjectInput, RewardResearch
-from module.research.selector import ResearchPriority, ResearchSelector
-
-
-class _ResearchSelectContext(RewardResearch):
-    def __init__(self) -> None:
-        self.enforce = False
-        self.calls = []
-        self.reset_result = False
-        self.start_result = None
-        self.delay_result = False
-
-    def research_enforce(self, *, add_queue: bool = True) -> bool:
-        self.calls.append(("enforce", add_queue))
-        return True
-
-    def research_reset(self, *, skip_first_screenshot: bool = True) -> bool:
-        del skip_first_screenshot
-        self.calls.append(("reset", None))
-        return self.reset_result
-
-    def research_sort_shortest(self, *, enforce: bool) -> ResearchPriority:
-        self.calls.append(("sort_shortest", enforce))
-        return []
-
-    def research_sort_cheapest(self, *, enforce: bool) -> ResearchPriority:
-        self.calls.append(("sort_cheapest", enforce))
-        return []
-
-    def research_project_start_with_requirements(
-        self,
-        project: ResearchProjectInput,
-        *,
-        add_queue: bool = True,
-    ) -> bool | None:
-        self.calls.append(("start", project, add_queue))
-        return self.start_result
-
-    def research_delay_check(self) -> bool:
-        self.calls.append(("delay", None))
-        return self.delay_result
+from module.research.selector import ResearchSelector
 
 
 class _ResearchCheckContext(ResearchSelector):
@@ -84,99 +46,30 @@ def _project(**kwargs: Unpack[_ProjectOverrides]) -> ResearchProject:
     return project
 
 
-def test_research_select_empty_priority_enforces_filter() -> None:
-    context = _ResearchSelectContext()
-
-    assert context.research_select([], add_queue=False) is True
-    assert context.calls == [("enforce", False)]
-
-
-def test_research_select_reset_returns_false_after_reset() -> None:
-    context = _ResearchSelectContext()
-    context.reset_result = True
-
-    assert context.research_select(["reset"]) is False
-    assert context.calls == [("reset", None)]
-
-
-def test_research_select_shortest_preset_runs_nested_selection() -> None:
-    context = _ResearchSelectContext()
-
-    assert context.research_select(["shortest"]) is True
-    assert context.calls == [
-        ("sort_shortest", False),
-        ("enforce", True),
-    ]
-
-
-def test_research_select_enforces_cube_and_cognition_projects() -> None:
-    context = _ResearchSelectContext()
-    project = _project(genre="C")
-
-    assert context.research_select([project]) is True
-    assert context.calls == [("enforce", True)]
-
-
-def test_research_select_allows_delay_when_start_conditions_are_missing() -> None:
-    context = _ResearchSelectContext()
-    context.start_result = False
-    context.delay_result = True
-    project = _project(genre="B")
-
-    assert context.research_select([project]) is True
-    assert context.calls == [
-        ("start", project, True),
-        ("delay", None),
-    ]
-
-
-def test_research_check_rejects_invalid_project() -> None:
+@pytest.mark.parametrize(
+    ("project_overrides", "config_overrides", "has_boxes", "enforce", "expected"),
+    [
+        ({}, {}, True, False, True),
+        ({"valid": False}, {}, True, False, False),
+        ({"need_cube": True}, {"Research_UseCube": "do_not_use"}, True, False, False),
+        ({"need_coin": True}, {"Research_UseCoin": "only_no_project"}, True, False, False),
+        ({"need_coin": True}, {"Research_UseCoin": "only_no_project"}, True, True, True),
+        ({"need_part": True, "duration": 0.5}, {"Research_UsePart": "only_05_hour"}, True, False, True),
+        ({"genre": "B"}, {}, True, False, False),
+        ({"genre": "E", "equipment_amount": 1}, {}, False, False, False),
+    ],
+)
+def test_research_project_selection_rules(
+    project_overrides: _ProjectOverrides,
+    config_overrides: dict[str, str],
+    *,
+    has_boxes: bool,
+    enforce: bool,
+    expected: bool,
+) -> None:
     context = _ResearchCheckContext()
+    context.storage_has_boxes = has_boxes
+    for name, value in config_overrides.items():
+        setattr(context.config, name, value)
 
-    assert context.check_for_test(_project(valid=False)) is False
-
-
-def test_research_check_accepts_normal_project() -> None:
-    context = _ResearchCheckContext()
-
-    assert context.check_for_test(_project()) is True
-
-
-def test_research_check_rejects_disabled_resource() -> None:
-    context = _ResearchCheckContext()
-    context.config.Research_UseCube = "do_not_use"
-
-    assert context.check_for_test(_project(need_cube=True)) is False
-
-
-def test_research_check_rejects_resource_when_only_no_project_without_enforce() -> None:
-    context = _ResearchCheckContext()
-    context.config.Research_UseCoin = "only_no_project"
-    project = _project(need_coin=True)
-
-    assert context.check_for_test(project) is False
-    assert context.check_for_test(project, enforce=True) is True
-
-
-def test_research_check_allows_only_half_hour_resource_without_enforce() -> None:
-    context = _ResearchCheckContext()
-    context.config.Research_UsePart = "only_05_hour"
-
-    assert context.check_for_test(_project(need_part=True, duration=1)) is False
-    assert context.check_for_test(_project(need_part=True, duration=0.5)) is True
-    assert context.check_for_test(_project(need_part=True, duration=1), enforce=True) is True
-
-
-def test_research_check_rejects_blocked_genres() -> None:
-    context = _ResearchCheckContext()
-
-    assert context.check_for_test(_project(genre="B")) is False
-    assert context.check_for_test(_project(genre="t")) is False
-
-
-def test_research_check_rejects_equipment_research_without_boxes() -> None:
-    context = _ResearchCheckContext()
-    context.storage_has_boxes = False
-
-    assert context.check_for_test(_project(genre="E", equipment_amount=1)) is False
-    assert context.check_for_test(_project(genre="E", equipment_amount=0)) is True
+    assert context.check_for_test(_project(**project_overrides), enforce=enforce) is expected

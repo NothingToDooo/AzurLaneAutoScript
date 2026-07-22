@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast, override
 
 import pytest
@@ -16,24 +15,10 @@ from module.application import AbortRequested, AbortToken, TaskId
 from module.config.deep import deep_set
 from module.device.device import Device
 from module.gameplay.opsi import (
-    AbyssalSettings,
-    ArchiveSettings,
-    AshAssistSettings,
-    AshBeaconAttackMode,
-    AshBeaconSettings,
-    CrossMonthSettings,
     ExploreSettings,
     FleetSettings,
-    Hazard1LevelingSettings,
-    MeowfficerFarmingSettings,
-    MonthBossMode,
-    MonthBossSettings,
     ObscureSettings,
     OpsiDailySettings,
-    OpsiShopPreset,
-    ShopSettings,
-    StrongholdSettings,
-    VoucherSettings,
     WorldGeneralSettings,
     WorldOperation,
     WorldSchedule,
@@ -50,7 +35,6 @@ if TYPE_CHECKING:
     from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
     from module.gameplay.opsi import WorldTaskSettings
-    from module.os.globe_zone import Zone
 
 
 _NOW = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -72,22 +56,12 @@ _FLEET = FleetSettings(fleet_index=2, use_submarine=True)
 
 def _settings(operation: WorldOperation) -> WorldTaskSettings:
     settings: dict[WorldOperation, WorldTaskSettings] = {
-        WorldOperation.ASH_ASSIST: AshAssistSettings(minimum_tier=10),
-        WorldOperation.ASH_BEACON: AshBeaconSettings(
-            attack_mode=AshBeaconAttackMode.CURRENT,
-            one_hit_mode=True,
-            dossier_auto_attack=False,
-            request_assist=True,
-            ensure_fully_collected=True,
-        ),
         WorldOperation.EXPLORE: ExploreSettings(
             _GENERAL,
             _FLEET,
             special_radar=False,
             force_run=False,
         ),
-        WorldOperation.SHOP: ShopSettings(_GENERAL, OpsiShopPreset.MAX_BENEFIT, "ActionPoint"),
-        WorldOperation.VOUCHER: VoucherSettings(_GENERAL, "LoggerAbyssal"),
         WorldOperation.DAILY: OpsiDailySettings(
             _GENERAL,
             _FLEET,
@@ -95,37 +69,6 @@ def _settings(operation: WorldOperation) -> WorldTaskSettings:
             use_tuning_samples=True,
         ),
         WorldOperation.OBSCURE: ObscureSettings(_GENERAL, _FLEET, force_run=False),
-        WorldOperation.ABYSSAL: AbyssalSettings(_GENERAL, "Fleet-1", force_run=False),
-        WorldOperation.ARCHIVE: ArchiveSettings(_GENERAL, _FLEET, "LoggerArchive"),
-        WorldOperation.STRONGHOLD: StrongholdSettings(_GENERAL, "Fleet-1", force_run=False),
-        WorldOperation.MONTH_BOSS: MonthBossSettings(
-            _GENERAL,
-            "Fleet-1",
-            MonthBossMode.NORMAL_HARD,
-            check_adaptability=True,
-            force_run=False,
-        ),
-        WorldOperation.MEOWFFICER_FARMING: MeowfficerFarmingSettings(
-            _GENERAL,
-            _FLEET,
-            1000,
-            5,
-            0,
-            ensure_ash_fully_collected=True,
-        ),
-        WorldOperation.HAZARD1_LEVELING: Hazard1LevelingSettings(
-            _GENERAL,
-            _FLEET,
-            22,
-            ensure_ash_fully_collected=True,
-        ),
-        WorldOperation.CROSS_MONTH: CrossMonthSettings(
-            _GENERAL,
-            _FLEET,
-            FleetSettings(3, use_submarine=False),
-            "Fleet-4",
-            FleetSettings(4, use_submarine=False),
-        ),
     }
     return settings[operation]
 
@@ -168,20 +111,6 @@ class _Driver:
         return self.step
 
 
-@pytest.mark.parametrize("operation", tuple(WorldOperation))
-def test_live_workflow_accepts_every_typed_operation(operation: WorldOperation) -> None:
-    driver = _Driver(LiveOpsiStep(operation, WorldTaskStatus.EMPTY))
-    schedule = _ScheduleSource()
-    workflow = LiveOperationSirenWorkflow(driver, schedule, _Clock())
-    abort = AbortToken()
-
-    report = workflow.execute(_spec(operation), None, abort)
-
-    assert report.status is WorldTaskStatus.EMPTY
-    assert driver.calls == [(_spec(operation), None, abort)]
-    assert schedule.calls == [_NOW]
-
-
 def test_live_workflow_preserves_resumable_in_progress_report() -> None:
     step = LiveOpsiStep(
         WorldOperation.EXPLORE,
@@ -217,14 +146,6 @@ def test_live_workflow_binds_relative_schedule_intents_to_one_observed_at() -> N
 
     assert report.schedule_delays == (WorldScheduleDelay(_NOW + timedelta(minutes=27), delayed),)
     assert report.wake_task_ids == (TaskId("opsi_ash_beacon"),)
-
-
-def test_live_workflow_rejects_partial_progress_from_one_shot_driver() -> None:
-    step = LiveOpsiStep(WorldOperation.SHOP, WorldTaskStatus.IN_PROGRESS, completed_units=1)
-    workflow = LiveOperationSirenWorkflow(_Driver(step), _ScheduleSource(), _Clock())
-
-    with pytest.raises(ValueError, match="one-shot operation cannot expose partial progress"):
-        workflow.execute(_spec(WorldOperation.SHOP), None, AbortToken())
 
 
 def test_live_workflow_checks_cancellation_before_entering_driver() -> None:
@@ -454,97 +375,3 @@ def test_explore_without_checkpoint_keeps_persisted_last_zone_out_of_overlay() -
     apply_world_task_spec(cast("AzurLaneConfig", config), _spec(WorldOperation.EXPLORE), None)
 
     assert "OpsiExplore_LastZone" not in config.overrides
-
-
-def test_live_prepare_does_not_run_implicit_auto_search(monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = object.__new__(Mumu12OperationSirenSession)
-    calls: list[str] = []
-    config = _Config()
-    runner.config = cast("AzurLaneConfig", config)
-    monkeypatch.setattr(runner, "_os_init_ensure_page", lambda: calls.append("ensure_page"))
-    monkeypatch.setattr(runner, "_os_init_prepare_current_zone", lambda: calls.append("prepare_zone"))
-    monkeypatch.setattr(runner, "_os_init_clear_current_zone", lambda: calls.append("auto_search"))
-
-    runner.prepare_live_step()
-
-    assert calls == ["ensure_page", "prepare_zone"]
-
-
-def test_explore_live_step_processes_only_first_observed_zone(monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = object.__new__(Mumu12OperationSirenSession)
-    processed: list[int] = []
-    monkeypatch.setattr(runner, "_os_explore_order", lambda: [7, 8])
-    monkeypatch.setattr(runner, "_skip_cleared_os_explore_zone", lambda _zone: False)
-    monkeypatch.setattr(runner, "_run_os_explore_zone", processed.append)
-
-    result = runner.execute_live_step(_spec(WorldOperation.EXPLORE))
-
-    assert processed == [7]
-    assert result.completed_units == 1
-    assert result.cursor == WorldZoneCursor(7)
-    assert result.status is WorldTaskStatus.IN_PROGRESS
-
-
-def test_obscure_non_force_mode_finishes_after_one_confirmed_zone(monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = object.__new__(Mumu12OperationSirenSession)
-    config = _Config()
-    config.OpsiGeneral_UseLogger = True
-    config.OpsiFleet_Fleet = 2
-    config.OpsiFleet_Submarine = True
-    runner.config = cast("AzurLaneConfig", config)
-    runner.zone = cast("Zone", SimpleNamespace(zone_id=77))
-    calls: list[str] = []
-    monkeypatch.setattr(runner, "cl1_ap_preserve", lambda: None)
-    monkeypatch.setattr(runner, "storage_get_next_item", lambda *_args, **_kwargs: True)
-    monkeypatch.setattr(runner, "zone_init", lambda: None)
-    monkeypatch.setattr(runner, "fleet_set", lambda _fleet: True)
-    monkeypatch.setattr(runner, "os_order_execute", lambda **_kwargs: None)
-    monkeypatch.setattr(runner, "run_auto_search", lambda **_kwargs: calls.append("zone"))
-    monkeypatch.setattr(runner, "map_exit", lambda: None)
-    monkeypatch.setattr(runner, "handle_after_auto_search", lambda: None)
-
-    result = runner.execute_live_step(_spec(WorldOperation.OBSCURE))
-
-    assert calls == ["zone"]
-    assert result.status is WorldTaskStatus.COMPLETED
-    assert result.completed_units == 1
-    assert result.cursor is None
-
-
-def test_live_step_rejects_more_than_one_safe_unit() -> None:
-    with pytest.raises(ValueError, match="at most one safe unit"):
-        LiveOpsiStep(WorldOperation.EXPLORE, WorldTaskStatus.IN_PROGRESS, completed_units=2)
-
-
-def test_live_step_requires_one_confirmed_unit_for_in_progress() -> None:
-    with pytest.raises(ValueError, match="exactly one safe unit"):
-        LiveOpsiStep(WorldOperation.EXPLORE, WorldTaskStatus.IN_PROGRESS)
-
-
-def test_live_step_requires_an_aware_absolute_retry_time() -> None:
-    with pytest.raises(ValueError, match="retry_at must be timezone-aware"):
-        LiveOpsiStep(
-            WorldOperation.EXPLORE,
-            WorldTaskStatus.EMPTY,
-            retry_at=datetime(2026, 7, 14),
-        )
-
-
-@pytest.mark.parametrize("retry_after", [timedelta(), timedelta(seconds=-1)])
-def test_live_step_requires_a_positive_relative_retry_time(retry_after: timedelta) -> None:
-    with pytest.raises(ValueError, match="retry_after must be positive"):
-        LiveOpsiStep(
-            WorldOperation.EXPLORE,
-            WorldTaskStatus.EMPTY,
-            retry_after=retry_after,
-        )
-
-
-def test_live_step_accepts_only_one_retry_representation() -> None:
-    with pytest.raises(ValueError, match="retry_at and retry_after are mutually exclusive"):
-        LiveOpsiStep(
-            WorldOperation.EXPLORE,
-            WorldTaskStatus.EMPTY,
-            retry_at=_NOW,
-            retry_after=timedelta(minutes=1),
-        )

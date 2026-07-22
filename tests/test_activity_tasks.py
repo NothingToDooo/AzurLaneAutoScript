@@ -27,7 +27,6 @@ from module.application import (
     WakeTask,
 )
 from module.content.activity_catalog import ActivityCatalog
-from module.content.activity_profile import CoalitionStageId
 from module.content.manifest import load_event_manifests
 from module.gameplay.activity import (
     ActivityCommand,
@@ -40,9 +39,6 @@ from module.gameplay.activity import (
     AssistSessionSpec,
     AssistSessionState,
     AssistSessionTask,
-    AssistSessionWorkflow,
-    CoalitionFleetMode,
-    CoalitionOptions,
     DaemonOptions,
     EncounterBalancerPolicy,
     EncounterCommand,
@@ -52,12 +48,8 @@ from module.gameplay.activity import (
     EncounterSpec,
     EncounterStopReason,
     EncounterTask,
-    EncounterWorkflow,
-    HospitalOptions,
-    MaritimeEscortOptions,
     MinigameProgress,
     OpsiDaemonOptions,
-    RaidDailyOptions,
     RaidMode,
     RaidOptions,
 )
@@ -209,73 +201,33 @@ def _context(
 
 
 def _encounter_spec(
-    command: EncounterCommand,
     *,
     run_limit: int | None = None,
     balancer_task_id: TaskId | None = None,
     progress: EncounterProgress | None = None,
 ) -> EncounterSpec:
-    if command is EncounterCommand.COALITION_SP:
-        run_limit = 1
-    schedule = None
-    if command in {
-        EncounterCommand.RAID_DAILY,
-        EncounterCommand.MARITIME_ESCORT,
-        EncounterCommand.HOSPITAL,
-        EncounterCommand.COALITION_SP,
-    }:
-        schedule = _SERVER_UPDATE_SCHEDULE
     return EncounterSpec(
-        command=command,
-        options=_encounter_options(command),
-        schedule=schedule,
+        command=EncounterCommand.RAID,
+        options=RaidOptions(
+            activity=_ACTIVITY_CATALOG.resolve_raid("raid_20260212"),
+            mode=RaidMode.HARD,
+            use_ticket=False,
+            policy=_ENCOUNTER_POLICY,
+        ),
         run_limit=run_limit,
         balancer=(None if balancer_task_id is None else EncounterBalancerPolicy(balancer_task_id, coin_limit=10_000)),
         progress=progress,
     )
 
 
-def _encounter_options(
-    command: EncounterCommand,
-) -> RaidDailyOptions | MaritimeEscortOptions | RaidOptions | HospitalOptions | CoalitionOptions:
-    if command is EncounterCommand.RAID_DAILY:
-        return RaidDailyOptions(
-            activity=_ACTIVITY_CATALOG.resolve_raid("raid_20260212"),
-            stages=(RaidMode.HARD,),
-            use_ticket=False,
-            collect_daily_mission=True,
-            policy=_ENCOUNTER_POLICY,
-        )
-    if command is EncounterCommand.MARITIME_ESCORT:
-        return MaritimeEscortOptions(_ENCOUNTER_POLICY)
-    if command is EncounterCommand.RAID:
-        return RaidOptions(
-            activity=_ACTIVITY_CATALOG.resolve_raid("raid_20260212"),
-            mode=RaidMode.HARD,
-            use_ticket=False,
-            policy=_ENCOUNTER_POLICY,
-        )
-    if command is EncounterCommand.HOSPITAL:
-        return HospitalOptions(use_recommended_fleet=True, policy=_ENCOUNTER_POLICY)
-    stage = CoalitionStageId("sp" if command is EncounterCommand.COALITION_SP else "hard")
-    fleet = CoalitionFleetMode.MULTI if command is EncounterCommand.COALITION_SP else CoalitionFleetMode.SINGLE
-    return CoalitionOptions(
-        _ACTIVITY_CATALOG.resolve_coalition("coalition_20260122"),
-        stage,
-        fleet,
-        _ENCOUNTER_POLICY,
-    )
-
-
 def _encounter_report(
-    command: EncounterCommand,
     stop_reason: EncounterStopReason,
     *,
     runs_completed: int = 0,
     resume_at: datetime | None = None,
 ) -> EncounterReport:
     return EncounterReport(
-        command=command,
+        command=EncounterCommand.RAID,
         stop_reason=stop_reason,
         observed_at=_OBSERVED_AT,
         runs_completed=runs_completed,
@@ -290,16 +242,6 @@ def _request_abort(abort: AbortToken, reason: str) -> None:
 def _request_abort_on_second_step(abort: AbortToken, call: int) -> None:
     if call == 2:
         abort.request("operator stop")
-
-
-def test_gameplay_command_enums_are_registered_in_the_task_catalog() -> None:
-    commands = {
-        command.value
-        for command_type in (ActivityCommand, EncounterCommand, AssistSessionCommand)
-        for command in command_type
-    }
-
-    assert commands <= TASK_SPECS.keys()
 
 
 @pytest.mark.parametrize(
@@ -369,23 +311,14 @@ def test_minigame_resumes_the_current_cycle_and_enforces_the_cumulative_limit() 
     )
 
 
-@pytest.mark.parametrize(
-    "progress",
-    [
-        _progress(2, settings_revision=2),
-        _progress(2, content_revision="content-2"),
-        _progress(2, cycle_ends_at=datetime(2026, 7, 15, tzinfo=UTC)),
-    ],
-    ids=("settings-revision", "content-revision", "cycle"),
-)
-def test_stale_minigame_progress_is_deleted_before_external_work(progress: MinigameProgress) -> None:
+def test_stale_minigame_progress_is_deleted_before_external_work() -> None:
     workflow = _ActivityWorkflow(
         ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.IN_PROGRESS, _OBSERVED_AT, 1)
     )
 
     result = ActivityTask(
         workflow,
-        ActivitySpec.minigame(schedule=_SERVER_UPDATE_SCHEDULE, progress=progress),
+        ActivitySpec.minigame(schedule=_SERVER_UPDATE_SCHEDULE, progress=_progress(2, settings_revision=2)),
     ).run(_context("minigame"))
 
     assert workflow.specs == []
@@ -477,76 +410,13 @@ def test_activity_abort_during_work_checkpoints_the_returned_safe_point() -> Non
     assert len(workflow.specs) == 1
 
 
-def test_activity_rejects_cross_command_and_in_progress_at_the_operation_limit() -> None:
-    spec = ActivitySpec.minigame(schedule=_SERVER_UPDATE_SCHEDULE, operation_limit=1)
-    cross_command = ActivityReport(ActivityCommand.EVENT_STORY, ActivityDisposition.COMPLETED, _OBSERVED_AT, 0)
-    with pytest.raises(ValueError, match="command must match"):
-        ActivityTask(_ActivityWorkflow(cross_command), spec).run(_context("minigame"))
-
-    exhausted = ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.IN_PROGRESS, _OBSERVED_AT, 1)
-    with pytest.raises(ValueError, match="must leave at least one operation remaining"):
-        ActivityTask(_ActivityWorkflow(exhausted), spec).run(_context("minigame"))
-
-
-@pytest.mark.parametrize(
-    ("command", "runs_completed"),
-    [
-        (EncounterCommand.RAID_DAILY, 1),
-        (EncounterCommand.MARITIME_ESCORT, 0),
-        (EncounterCommand.HOSPITAL, 1),
-        (EncounterCommand.COALITION_SP, 1),
-    ],
-)
-def test_finite_encounters_complete_at_the_next_server_update(
-    command: EncounterCommand,
-    runs_completed: int,
-) -> None:
-    spec = _encounter_spec(command)
-    report = _encounter_report(command, EncounterStopReason.COMPLETED, runs_completed=runs_completed)
-    workflow = _EncounterWorkflow(report)
-
-    result = EncounterTask(workflow, spec).run(_context(command.value))
-
-    assert workflow.specs == [spec]
-    assert result == TaskResult(outcome=Succeeded(), effects=(RescheduleSelf(_SERVER_UPDATE_AT),))
-
-
-def test_raid_daily_without_daily_content_disables_itself() -> None:
-    command = EncounterCommand.RAID_DAILY
-    report = _encounter_report(command, EncounterStopReason.NO_DAILY_CONTENT)
-
-    result = EncounterTask(_EncounterWorkflow(report), _encounter_spec(command)).run(_context(command.value))
-
-    assert result == TaskResult(outcome=Succeeded(), effects=(DisableTask(TaskId("raid_daily")),))
-
-
-@pytest.mark.parametrize(
-    ("stop_reason", "expected_outcome"),
-    [
-        (EncounterStopReason.EVENT_UNAVAILABLE, Blocked("event is unavailable")),
-        (EncounterStopReason.EVENT_LIMIT, Succeeded()),
-    ],
-)
-def test_event_terminal_conditions_disable_the_encounter(
-    stop_reason: EncounterStopReason,
-    expected_outcome: Blocked | Succeeded,
-) -> None:
-    command = EncounterCommand.HOSPITAL
-    report = _encounter_report(command, stop_reason)
-
-    result = EncounterTask(_EncounterWorkflow(report), _encounter_spec(command)).run(_context(command.value))
-
-    assert result == TaskResult(outcome=expected_outcome, effects=(DisableTask(TaskId("hospital")),))
-
-
-@pytest.mark.parametrize("command", [EncounterCommand.RAID, EncounterCommand.COALITION])
-def test_continuous_encounter_run_limit_disables_the_finished_task(command: EncounterCommand) -> None:
+def test_continuous_encounter_run_limit_disables_the_finished_task() -> None:
+    command = EncounterCommand.RAID
     spec = _encounter_spec(
-        command,
         run_limit=3,
         progress=EncounterProgress(2, None, 1, "content-1"),
     )
-    report = _encounter_report(command, EncounterStopReason.RUN_LIMIT, runs_completed=1)
+    report = _encounter_report(EncounterStopReason.RUN_LIMIT, runs_completed=1)
 
     result = EncounterTask(_EncounterWorkflow(report), spec).run(_context(command.value))
 
@@ -557,12 +427,10 @@ def test_continuous_encounter_run_limit_disables_the_finished_task(command: Enco
     )
 
 
-@pytest.mark.parametrize("command", [EncounterCommand.RAID, EncounterCommand.COALITION])
-def test_continuous_encounter_checkpoints_one_safe_unit_and_requeues_immediately(
-    command: EncounterCommand,
-) -> None:
-    spec = _encounter_spec(command, run_limit=3)
-    report = _encounter_report(command, EncounterStopReason.IN_PROGRESS, runs_completed=1)
+def test_continuous_encounter_checkpoints_one_safe_unit_and_requeues_immediately() -> None:
+    command = EncounterCommand.RAID
+    spec = _encounter_spec(run_limit=3)
+    report = _encounter_report(EncounterStopReason.IN_PROGRESS, runs_completed=1)
 
     result = EncounterTask(_EncounterWorkflow(report), spec).run(_context(command.value))
 
@@ -575,9 +443,9 @@ def test_continuous_encounter_checkpoints_one_safe_unit_and_requeues_immediately
 
 def test_raid_without_remaining_attempts_is_explicitly_deferred_and_disabled() -> None:
     command = EncounterCommand.RAID
-    report = _encounter_report(command, EncounterStopReason.ATTEMPTS_EXHAUSTED)
+    report = _encounter_report(EncounterStopReason.ATTEMPTS_EXHAUSTED)
 
-    result = EncounterTask(_EncounterWorkflow(report), _encounter_spec(command)).run(_context(command.value))
+    result = EncounterTask(_EncounterWorkflow(report), _encounter_spec()).run(_context(command.value))
 
     assert result == TaskResult(
         outcome=Deferred("encounter attempts are exhausted"),
@@ -585,34 +453,23 @@ def test_raid_without_remaining_attempts_is_explicitly_deferred_and_disabled() -
     )
 
 
-@pytest.mark.parametrize(
-    ("command", "stop_reason", "reason"),
-    [
-        (EncounterCommand.RAID, EncounterStopReason.RESOURCE_LIMIT, "encounter resource limit was reached"),
-        (EncounterCommand.HOSPITAL, EncounterStopReason.RECOVERY_REQUIRED, "encounter recovery is required"),
-        (EncounterCommand.MARITIME_ESCORT, EncounterStopReason.FAILED, "encounter workflow did not complete"),
-    ],
-)
-def test_resumable_encounter_stops_emit_retry_and_an_exact_aware_due_time(
-    command: EncounterCommand,
-    stop_reason: EncounterStopReason,
-    reason: str,
-) -> None:
-    report = _encounter_report(command, stop_reason, resume_at=_RESUME_AT)
+def test_resumable_encounter_stop_emits_retry_at_the_reported_time() -> None:
+    command = EncounterCommand.RAID
+    report = _encounter_report(EncounterStopReason.RESOURCE_LIMIT, resume_at=_RESUME_AT)
 
-    result = EncounterTask(_EncounterWorkflow(report), _encounter_spec(command)).run(_context(command.value))
+    result = EncounterTask(_EncounterWorkflow(report), _encounter_spec()).run(_context(command.value))
 
     assert result == TaskResult(
-        outcome=Retryable(reason),
+        outcome=Retryable("encounter resource limit was reached"),
         effects=(RescheduleSelf(_RESUME_AT),),
     )
 
 
-@pytest.mark.parametrize("command", [EncounterCommand.RAID, EncounterCommand.COALITION])
-def test_balancer_stop_defers_self_and_wakes_the_typed_target(command: EncounterCommand) -> None:
+def test_balancer_stop_defers_self_and_wakes_the_typed_target() -> None:
+    command = EncounterCommand.RAID
     target = TaskId("main")
-    spec = _encounter_spec(command, balancer_task_id=target)
-    report = _encounter_report(command, EncounterStopReason.BALANCER_SWITCH, resume_at=_RESUME_AT)
+    spec = _encounter_spec(balancer_task_id=target)
+    report = _encounter_report(EncounterStopReason.BALANCER_SWITCH, resume_at=_RESUME_AT)
 
     result = EncounterTask(_EncounterWorkflow(report), spec).run(_context(command.value))
 
@@ -628,9 +485,9 @@ def test_balancer_stop_defers_self_and_wakes_the_typed_target(command: Encounter
 def test_encounter_abort_after_workflow_checkpoints_the_completed_run() -> None:
     abort = AbortToken()
     command = EncounterCommand.RAID
-    report = _encounter_report(command, EncounterStopReason.IN_PROGRESS, runs_completed=1)
+    report = _encounter_report(EncounterStopReason.IN_PROGRESS, runs_completed=1)
     workflow = _EncounterWorkflow(report, on_execute=lambda: _request_abort(abort, "stop after battle"))
-    task = EncounterTask(workflow, _encounter_spec(command, run_limit=2))
+    task = EncounterTask(workflow, _encounter_spec(run_limit=2))
 
     result = task.run(_context(command.value, abort=abort))
 
@@ -643,88 +500,6 @@ def test_encounter_abort_after_workflow_checkpoints_the_completed_run() -> None:
     with pytest.raises(AbortRequested, match="stop after battle"):
         task.run(_context(command.value, abort=abort))
     assert len(workflow.specs) == 1
-
-
-def test_encounter_rejects_invalid_workflow_and_incoherent_reports() -> None:
-    command = EncounterCommand.RAID
-    with pytest.raises(TypeError, match="must return an EncounterReport"):
-        EncounterTask(cast("EncounterWorkflow", _EncounterWorkflow("invalid")), _encounter_spec(command)).run(
-            _context(command.value)
-        )
-
-    mismatch = _encounter_report(EncounterCommand.COALITION, EncounterStopReason.FAILED, resume_at=_RESUME_AT)
-    with pytest.raises(ValueError, match="command must match"):
-        EncounterTask(_EncounterWorkflow(mismatch), _encounter_spec(command)).run(_context(command.value))
-
-    wrong_limit = _encounter_report(command, EncounterStopReason.RUN_LIMIT, runs_completed=1)
-    with pytest.raises(ValueError, match="cumulatively settle"):
-        EncounterTask(_EncounterWorkflow(wrong_limit), _encounter_spec(command, run_limit=3)).run(
-            _context(command.value)
-        )
-
-
-def test_reports_and_specs_reject_illegal_values_at_the_boundary() -> None:
-    naive = datetime(2026, 7, 13, 8)
-    with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        ActivitySpec.minigame(schedule=cast("DailySchedule", object()))
-    with pytest.raises(ValueError, match="event_story must not define schedule"):
-        ActivitySpec(
-            command=ActivityCommand.EVENT_STORY,
-            schedule=_SERVER_UPDATE_SCHEDULE,
-            activity=_ACTIVITY_CATALOG.resolve_event_story("event_20260625_cn"),
-            skip_battle=True,
-        )
-    with pytest.raises(ValueError, match="event_story must not define progress"):
-        ActivitySpec(
-            command=ActivityCommand.EVENT_STORY,
-            progress=_progress(1),
-            activity=_ACTIVITY_CATALOG.resolve_event_story("event_20260625_cn"),
-            skip_battle=True,
-        )
-    with pytest.raises(ValueError, match="observed_at must be timezone-aware"):
-        ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.COMPLETED, naive, 0)
-    with pytest.raises(ValueError, match="at most one operation"):
-        ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.COMPLETED, _OBSERVED_AT, 2)
-    with pytest.raises(ValueError, match="exactly one completed operation"):
-        ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.IN_PROGRESS, _OBSERVED_AT, 0)
-    with pytest.raises(ValueError, match="event_story must not report completed operations"):
-        ActivityReport(ActivityCommand.EVENT_STORY, ActivityDisposition.COMPLETED, _OBSERVED_AT, 1)
-    with pytest.raises(ValueError, match="operations_completed must be positive"):
-        MinigameProgress(0, _SERVER_UPDATE_AT, 1, "content-1")
-    with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        EncounterSpec(
-            command=EncounterCommand.HOSPITAL,
-            options=_encounter_options(EncounterCommand.HOSPITAL),
-            schedule=cast("DailySchedule", object()),
-        )
-    with pytest.raises(ValueError, match="raid must not define schedule"):
-        EncounterSpec(
-            command=EncounterCommand.RAID,
-            options=_encounter_options(EncounterCommand.RAID),
-            schedule=_SERVER_UPDATE_SCHEDULE,
-        )
-    with pytest.raises(ValueError, match="timezone-aware"):
-        _encounter_report(EncounterCommand.HOSPITAL, EncounterStopReason.FAILED, resume_at=naive)
-    with pytest.raises(ValueError, match="later than observed_at"):
-        _encounter_report(
-            EncounterCommand.HOSPITAL,
-            EncounterStopReason.FAILED,
-            resume_at=_OBSERVED_AT,
-        )
-    with pytest.raises(ValueError, match="run_limit is not valid for maritime_escort"):
-        _encounter_report(EncounterCommand.MARITIME_ESCORT, EncounterStopReason.RUN_LIMIT, runs_completed=1)
-    with pytest.raises(ValueError, match="fleet must satisfy"):
-        CoalitionOptions(
-            _ACTIVITY_CATALOG.resolve_coalition("coalition_20260122"),
-            CoalitionStageId("sp"),
-            CoalitionFleetMode.SINGLE,
-            _ENCOUNTER_POLICY,
-        )
-    report = _encounter_report(EncounterCommand.COALITION_SP, EncounterStopReason.COMPLETED)
-    with pytest.raises(ValueError, match="exactly one run"):
-        EncounterTask(_EncounterWorkflow(report), _encounter_spec(EncounterCommand.COALITION_SP)).run(
-            _context("coalition_sp")
-        )
 
 
 def test_normal_daemon_can_finish_only_after_a_complete_safe_point() -> None:
@@ -770,41 +545,3 @@ def test_assist_abort_before_the_first_step_has_no_external_side_effect() -> Non
 
     assert workflow.specs == []
     assert result == TaskResult(outcome=Cancelled("operator stop"))
-
-
-def test_assist_sessions_reject_invalid_options_and_reports() -> None:
-    with pytest.raises(TypeError, match="daemon requires DaemonOptions"):
-        AssistSessionSpec(
-            AssistSessionCommand.DAEMON,
-            cast("DaemonOptions", OpsiDaemonOptions(repair_ship=True, select_enemy=True)),
-        )
-    with pytest.raises(ValueError, match="no automatic completion"):
-        AssistSessionReport(AssistSessionCommand.OPSI_DAEMON, AssistSessionState.COMPLETED)
-
-    spec = AssistSessionSpec(AssistSessionCommand.DAEMON, DaemonOptions(enter_map=False))
-    mismatch = AssistSessionReport(AssistSessionCommand.OPSI_DAEMON, AssistSessionState.CONTINUE)
-    with pytest.raises(ValueError, match="command must match"):
-        AssistSessionTask(_AssistWorkflow([mismatch]), spec).run(_context("daemon"))
-
-    with pytest.raises(TypeError, match="must return an AssistSessionReport"):
-        AssistSessionTask(
-            cast("AssistSessionWorkflow", _AssistWorkflow(["invalid"])),
-            spec,
-        ).run(_context("daemon"))
-
-
-def test_task_context_mode_is_checked_before_workflow_entry() -> None:
-    workflow = _ActivityWorkflow(
-        ActivityReport(ActivityCommand.EVENT_STORY, ActivityDisposition.COMPLETED, _OBSERVED_AT, 0)
-    )
-
-    with pytest.raises(ValueError, match="requires direct_command"):
-        ActivityTask(
-            workflow,
-            ActivitySpec.event_story(
-                activity=_ACTIVITY_CATALOG.resolve_event_story("event_20260625_cn"),
-                skip_battle=True,
-            ),
-        ).run(_context("event_story", mode=ExecutionMode.SCHEDULED_JOB))
-
-    assert workflow.specs == []

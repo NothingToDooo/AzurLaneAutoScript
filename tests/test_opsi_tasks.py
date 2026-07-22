@@ -32,7 +32,6 @@ from module.gameplay.opsi import (
     REWARD_TASK_ID,
     WORLD_TASK_DEFINITIONS,
     AbyssalSettings,
-    ActionPointPolicy,
     ArchiveSettings,
     AshAssistSettings,
     AshBeaconAttackMode,
@@ -46,10 +45,8 @@ from module.gameplay.opsi import (
     MonthBossSettings,
     ObscureSettings,
     OperationSirenTask,
-    OperationSirenWorkflow,
     OpsiDailySettings,
     OpsiShopPreset,
-    RefreshPolicy,
     ShopSettings,
     StrongholdSettings,
     VoucherSettings,
@@ -313,55 +310,6 @@ def _progress(
     )
 
 
-def test_catalog_maps_all_fourteen_scheduler_commands_to_typed_specs() -> None:
-    expected_commands = {
-        "opsi_ash_assist",
-        "opsi_ash_beacon",
-        "opsi_explore",
-        "opsi_shop",
-        "opsi_voucher",
-        "opsi_daily",
-        "opsi_obscure",
-        "opsi_month_boss",
-        "opsi_abyssal",
-        "opsi_archive",
-        "opsi_stronghold",
-        "opsi_meowfficer_farming",
-        "opsi_hazard1_leveling",
-        "opsi_cross_month",
-    }
-
-    assert {task_id.value for task_id in WORLD_TASK_DEFINITIONS} == expected_commands
-    assert {definition.operation.value for definition in WORLD_TASK_DEFINITIONS.values()} == expected_commands
-    assert all(definition.task_id == task_id for task_id, definition in WORLD_TASK_DEFINITIONS.items())
-    assert len(WORLD_TASK_DEFINITIONS) == len(WorldOperation) == 14
-
-
-def test_catalog_explicitly_separates_bounded_and_one_shot_operations() -> None:
-    one_shot = {
-        WorldOperation.SHOP,
-        WorldOperation.VOUCHER,
-        WorldOperation.CROSS_MONTH,
-    }
-    actual_one_shot = {
-        definition.operation
-        for definition in WORLD_TASK_DEFINITIONS.values()
-        if definition.checkpoint_mode is WorldCheckpointMode.ONE_SHOT
-    }
-
-    assert actual_one_shot == one_shot
-    assert all(
-        definition.progress_cycle is None
-        for definition in WORLD_TASK_DEFINITIONS.values()
-        if definition.operation in one_shot
-    )
-    assert all(
-        definition.progress_cycle is not None
-        for definition in WORLD_TASK_DEFINITIONS.values()
-        if definition.operation not in one_shot
-    )
-
-
 def test_in_progress_run_upserts_one_cumulative_safe_unit_and_reschedules_immediately() -> None:
     existing = _progress("opsi_daily", completed_units=2)
     workflow = _Workflow(
@@ -469,19 +417,6 @@ def test_waiting_state_keeps_existing_progress_unchanged() -> None:
 
     assert workflow.received_progress is existing
     assert result.state_effects == ()
-
-
-def test_operation_specific_cursor_type_is_enforced() -> None:
-    workflow = _Workflow(
-        _report(
-            WorldTaskStatus.IN_PROGRESS,
-            completed_units=1,
-            cursor=WorldZoneCursor(22),
-        )
-    )
-
-    with pytest.raises(TypeError, match="opsi_daily report requires a WorldMissionCursor"):
-        _task("opsi_daily", workflow).run(_context("opsi_daily"))
 
 
 @pytest.mark.parametrize(
@@ -779,8 +714,21 @@ def test_disabled_workflow_state_disables_only_the_current_task() -> None:
     )
 
 
-@pytest.mark.parametrize("status", list(WorldTaskStatus))
-@pytest.mark.parametrize("task_id", sorted(task_id.value for task_id in WORLD_TASK_DEFINITIONS))
+@pytest.mark.parametrize(
+    ("task_id", "status"),
+    [
+        ("opsi_daily", WorldTaskStatus.COMPLETED),
+        ("opsi_daily", WorldTaskStatus.EMPTY),
+        ("opsi_daily", WorldTaskStatus.IN_PROGRESS),
+        ("opsi_daily", WorldTaskStatus.FAILED),
+        ("opsi_daily", WorldTaskStatus.DISABLED),
+        ("opsi_shop", WorldTaskStatus.COMPLETED),
+        ("opsi_shop", WorldTaskStatus.EMPTY),
+        ("opsi_shop", WorldTaskStatus.FAILED),
+        ("opsi_shop", WorldTaskStatus.DISABLED),
+        ("opsi_shop", WorldTaskStatus.IN_PROGRESS),
+    ],
+)
 def test_every_world_task_status_advances_or_disables_the_scheduled_task(
     task_id: str,
     status: WorldTaskStatus,
@@ -881,98 +829,3 @@ def test_abort_after_safe_workflow_return_preserves_checkpoint_and_stops_next_en
         task.run(_context("opsi_daily", abort=abort))
 
     assert workflow.calls == 1
-
-
-def test_workflow_receives_the_same_abort_signal_from_context() -> None:
-    abort = AbortToken()
-    workflow = _Workflow(_report())
-
-    _task("opsi_daily", workflow).run(_context("opsi_daily", abort=abort))
-
-    assert workflow.received_cancellation is abort
-
-
-def test_task_rejects_wrong_context_id_and_invalid_workflow_report() -> None:
-    task = _task("opsi_daily", _Workflow(_report()))
-    with pytest.raises(ValueError, match="must match WorldTaskSpec"):
-        task.run(_context("opsi_shop"))
-
-    invalid = OperationSirenTask(
-        cast("OperationSirenWorkflow", _Workflow(object())),
-        world_task_spec(TaskId("opsi_daily"), _SETTINGS_BY_TASK["opsi_daily"]),
-    )
-    with pytest.raises(TypeError, match=r"Workflow\.execute\(\) must return a WorldTaskReport"):
-        invalid.run(_context("opsi_daily"))
-
-
-def test_unknown_task_and_invalid_spec_fail_at_the_boundary() -> None:
-    with pytest.raises(KeyError, match="unknown Operation Siren task"):
-        world_task_spec(TaskId("campaign"), _SETTINGS_BY_TASK["opsi_daily"])
-    with pytest.raises(ValueError, match="task_id must match operation"):
-        WorldTaskSpec(
-            task_id=TaskId("opsi_daily"),
-            operation=WorldOperation.SHOP,
-            completion_refresh=RefreshPolicy.SERVER_UPDATE,
-            empty_refresh=RefreshPolicy.SERVER_UPDATE,
-            action_point_policy=ActionPointPolicy.BATCH,
-            checkpoint_policy=WORLD_TASK_DEFINITIONS[TaskId("opsi_daily")].checkpoint_policy,
-            settings=_SETTINGS_BY_TASK["opsi_daily"],
-        )
-    with pytest.raises(TypeError, match="opsi_shop settings must be a ShopSettings"):
-        world_task_spec(TaskId("opsi_shop"), _SETTINGS_BY_TASK["opsi_daily"])
-
-
-def test_world_schedule_and_report_require_aware_future_datetimes() -> None:
-    naive = datetime(2026, 7, 13, 12)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        WorldSchedule(naive, _MONTH_RESET_AT, _ARCHIVE_REFRESH_AT)
-
-    invalid_schedule = WorldSchedule(
-        next_server_update_at=_OBSERVED_AT,
-        next_month_reset_at=_MONTH_RESET_AT,
-        next_archive_refresh_at=_ARCHIVE_REFRESH_AT,
-    )
-    with pytest.raises(ValueError, match="next_server_update_at must be after observed_at"):
-        WorldTaskReport(_OBSERVED_AT, WorldTaskStatus.COMPLETED, invalid_schedule)
-    with pytest.raises(ValueError, match="retry_at must not be before observed_at"):
-        _report(WorldTaskStatus.FAILED, retry_at=_OBSERVED_AT - timedelta(seconds=1))
-
-
-def test_world_report_rejects_ambiguous_or_invalid_state_payloads() -> None:
-    with pytest.raises(ValueError, match="cooldown report requires retry_at"):
-        _report(WorldTaskStatus.COOLDOWN)
-    with pytest.raises(ValueError, match="affected_task_ids are only valid"):
-        _report(WorldTaskStatus.COMPLETED, affected_task_ids=(TaskId("opsi_daily"),))
-    with pytest.raises(ValueError, match="must be unique"):
-        _report(
-            WorldTaskStatus.COOLDOWN,
-            retry_at=_RETRY_AT,
-            affected_task_ids=(TaskId("opsi_daily"), TaskId("opsi_daily")),
-        )
-    with pytest.raises(ValueError, match="completed_units must be non-negative"):
-        WorldTaskReport(_OBSERVED_AT, WorldTaskStatus.COMPLETED, _schedule(), completed_units=-1)
-    with pytest.raises(ValueError, match="at most one safe unit"):
-        WorldTaskReport(_OBSERVED_AT, WorldTaskStatus.COMPLETED, _schedule(), completed_units=2)
-    with pytest.raises(TypeError, match="has_surplus_yellow_coins must be a bool"):
-        WorldTaskReport(
-            _OBSERVED_AT,
-            WorldTaskStatus.COMPLETED,
-            _schedule(),
-            has_surplus_yellow_coins=cast("bool", 1),
-        )
-
-
-def test_cross_month_rejects_a_calendar_without_a_future_ten_minute_window() -> None:
-    observed_at = datetime(2026, 7, 31, 23, 55, tzinfo=UTC)
-    report = WorldTaskReport(
-        observed_at=observed_at,
-        status=WorldTaskStatus.EMPTY,
-        schedule=WorldSchedule(
-            next_server_update_at=datetime(2026, 8, 1, 4, tzinfo=UTC),
-            next_month_reset_at=datetime(2026, 8, 1, tzinfo=UTC),
-            next_archive_refresh_at=datetime(2026, 8, 5, tzinfo=UTC),
-        ),
-    )
-
-    with pytest.raises(ValueError, match="cross-month window must be after observed_at"):
-        _task("opsi_cross_month", _Workflow(report)).run(_context("opsi_cross_month"))

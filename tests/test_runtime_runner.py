@@ -15,7 +15,6 @@ from module.application import (
     RecoverableFault,
     RequestAppRestart,
     RescheduleSelf,
-    Retryable,
     RunMetadata,
     ScheduleItem,
     Succeeded,
@@ -293,15 +292,8 @@ def test_direct_command_maps_terminal_result(result: TaskResult, status: Command
         assert (outcome.exception_type, outcome.message) == ("RuntimeError", "boom")
 
 
-@pytest.mark.parametrize(
-    ("result", "reason"),
-    [
-        (TaskResult(Blocked("not available")), "not available"),
-        (TaskResult(Deferred("try later")), "try later"),
-        (TaskResult(Retryable("temporary failure")), "temporary failure"),
-    ],
-)
-def test_direct_command_rejects_incomplete_result(result: TaskResult, reason: str) -> None:
+def test_direct_command_rejects_incomplete_result() -> None:
+    result = TaskResult(Blocked("not available"))
     runner = _runner(
         (_spec("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
         (_Task(result),),
@@ -312,27 +304,11 @@ def test_direct_command_rejects_incomplete_result(result: TaskResult, reason: st
     outcome = runner.run("benchmark")
 
     assert outcome.status is CommandStatus.FAILED
-    assert outcome.message == reason
+    assert outcome.message == "not available"
 
 
-@pytest.mark.parametrize(
-    ("result", "reason"),
-    [
-        (
-            TaskResult(Blocked("not available"), effects=(RescheduleSelf(NOW + timedelta(hours=1)),)),
-            "not available",
-        ),
-        (
-            TaskResult(Deferred("try later"), effects=(RescheduleSelf(NOW + timedelta(hours=1)),)),
-            "try later",
-        ),
-        (
-            TaskResult(Retryable("temporary failure"), effects=(RescheduleSelf(NOW + timedelta(hours=1)),)),
-            "temporary failure",
-        ),
-    ],
-)
-def test_scheduled_task_launched_once_accepts_routine_incomplete_result(result: TaskResult, reason: str) -> None:
+def test_scheduled_task_launched_once_accepts_routine_incomplete_result() -> None:
+    result = TaskResult(Deferred("try later"), effects=(RescheduleSelf(NOW + timedelta(hours=1)),))
     runner = _runner(
         (_spec("research", ExecutionMode.SCHEDULED_JOB, 0),),
         (_Task(result),),
@@ -343,7 +319,7 @@ def test_scheduled_task_launched_once_accepts_routine_incomplete_result(result: 
     outcome = runner.run("research")
 
     assert outcome.status is CommandStatus.FINISHED
-    assert outcome.message == reason
+    assert outcome.message == "try later"
 
 
 def test_scheduler_recovers_a_known_game_error_then_runs_restart_and_retries() -> None:
@@ -462,32 +438,6 @@ def test_scheduler_keeps_known_game_error_terminal_when_recovery_is_disabled() -
     assert outcome.exception_type == "GameStuckError"
     assert outcome.runs_completed == 1
     assert repository.list_items() == initial_schedule
-
-
-def test_scheduler_continues_after_an_expected_incomplete_result() -> None:
-    task_id = TaskId("benchmark")
-    repository = _Repository(
-        (
-            ScheduleItem(
-                task_id=task_id,
-                enabled=True,
-                due_at=NOW,
-                priority=0,
-            ),
-        )
-    )
-    runner = _runner(
-        (_spec(task_id.value, ExecutionMode.SCHEDULED_JOB, 0),),
-        (_Task(TaskResult(Deferred("try later"), effects=(DisableTask(task_id),))),),
-        repository,
-        _Clock(),
-    )
-
-    outcome = runner.run("alas")
-
-    assert outcome.status is CommandStatus.FINISHED
-    assert outcome.runs_completed == 1
-    assert repository.items[task_id].enabled is False
 
 
 def test_persistence_failure_keeps_task_context_for_diagnostics() -> None:

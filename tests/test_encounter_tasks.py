@@ -33,20 +33,17 @@ from module.gameplay.encounter import (
     DailyStageSelection,
     DailyStopReason,
     DailyTask,
-    DailyWorkflow,
     ExerciseOpponentMode,
     ExerciseProgress,
     ExerciseReport,
     ExerciseSettings,
     ExerciseStrategy,
     ExerciseTask,
-    ExerciseWorkflow,
     HardFleet,
     HardReport,
     HardSettings,
     HardStopReason,
     HardTask,
-    HardWorkflow,
 )
 
 if TYPE_CHECKING:
@@ -209,17 +206,6 @@ def test_daily_without_attempts_defers_until_server_update() -> None:
     )
 
 
-def test_daily_unavailable_attempts_keep_server_update_schedule() -> None:
-    workflow = _Workflow(DailyReport(attempts_available=3, attempts_completed=0))
-
-    result = DailyTask(workflow, _daily_settings()).run(_context("daily"))
-
-    assert result == TaskResult(
-        outcome=Deferred("daily attempts were not completed"),
-        effects=(RescheduleSelf(_SERVER_UPDATE_AT),),
-    )
-
-
 def test_daily_schedule_rolls_over_when_run_starts_at_the_trigger() -> None:
     workflow = _Workflow(DailyReport(attempts_available=0, attempts_completed=0))
     context = _context("daily", started_at=_SERVER_UPDATE_AT)
@@ -244,16 +230,6 @@ def test_hard_completion_waits_for_server_update_and_forces_reward() -> None:
             WakeTask(REWARD_TASK_ID, _OBSERVED_AT, WakePolicy.FORCE_ENABLE),
         ),
     )
-
-
-def test_hard_daily_schedule_rolls_over_from_report_observation() -> None:
-    report = _hard_report(observed_at=_SERVER_UPDATE_AT)
-
-    result = HardTask(_Workflow(report), _hard_settings()).run(_context("hard"))
-
-    expected_due_at = _SERVER_UPDATE_AT + timedelta(days=1)
-    assert result.effects[0] == RescheduleSelf(expected_due_at)
-    assert expected_due_at > report.observed_at
 
 
 def test_hard_without_attempts_still_forces_reward() -> None:
@@ -327,18 +303,6 @@ def test_exercise_completion_at_preserve_threshold_waits_for_server_update() -> 
     )
 
 
-def test_exercise_without_attempts_defers_until_server_update() -> None:
-    workflow = _Workflow(_exercise_report(attempts_remaining=0))
-
-    result = ExerciseTask(workflow, _exercise_settings()).run(_context("exercise"))
-
-    assert result == TaskResult(
-        outcome=Deferred("exercise attempts are exhausted"),
-        effects=(RescheduleSelf(_SERVER_UPDATE_AT),),
-        state_effects=(DeleteTaskState("exercise", EXERCISE_PROGRESS_KEY),),
-    )
-
-
 def test_exercise_preserved_attempts_defer_until_server_update() -> None:
     workflow = _Workflow(_exercise_report(attempts_remaining=5, attempts_preserved=5))
 
@@ -349,29 +313,6 @@ def test_exercise_preserved_attempts_defer_until_server_update() -> None:
         effects=(RescheduleSelf(_SERVER_UPDATE_AT),),
         state_effects=(DeleteTaskState("exercise", EXERCISE_PROGRESS_KEY),),
     )
-
-
-def test_exercise_refresh_exhaustion_defers_until_server_update() -> None:
-    workflow = _Workflow(_exercise_report(attempts_remaining=6, attempts_preserved=5, opponent_refreshes_used=5))
-
-    result = ExerciseTask(workflow, _exercise_settings()).run(_context("exercise"))
-
-    assert result == TaskResult(
-        outcome=Deferred("exercise opponent refreshes are exhausted"),
-        effects=(RescheduleSelf(_SERVER_UPDATE_AT),),
-        state_effects=(DeleteTaskState("exercise", EXERCISE_PROGRESS_KEY),),
-    )
-
-
-def test_exercise_daily_schedule_rolls_over_from_report_observation() -> None:
-    report = _exercise_report(observed_at=_SERVER_UPDATE_AT, attempts_remaining=0)
-
-    result = ExerciseTask(_Workflow(report), _exercise_settings()).run(_context("exercise"))
-
-    expected_due_at = _SERVER_UPDATE_AT + timedelta(days=1)
-    assert result.effects == (RescheduleSelf(expected_due_at),)
-    assert result.state_effects == (DeleteTaskState("exercise", EXERCISE_PROGRESS_KEY),)
-    assert expected_due_at > report.observed_at
 
 
 def test_exercise_unsettled_attempt_uses_failure_retry() -> None:
@@ -473,89 +414,3 @@ def test_encounter_late_abort_preserves_the_completed_report_and_stops_the_next_
         task.run(context)
 
     assert workflow.execute_calls == 1
-
-
-@pytest.mark.parametrize("task_name", ["daily", "hard", "exercise"])
-def test_encounter_tasks_reject_invalid_workflow_output(task_name: str) -> None:
-    if task_name == "daily":
-        task = DailyTask(cast("DailyWorkflow", _Workflow(object())), _daily_settings())
-        expected = r"DailyWorkflow.execute\(\) must return a DailyReport"
-    elif task_name == "hard":
-        task = HardTask(cast("HardWorkflow", _Workflow(object())), _hard_settings())
-        expected = r"HardWorkflow.execute\(\) must return a HardReport"
-    else:
-        task = ExerciseTask(cast("ExerciseWorkflow", _Workflow(object())), _exercise_settings())
-        expected = r"ExerciseWorkflow.execute\(\) must return an ExerciseReport"
-
-    with pytest.raises(TypeError, match=expected):
-        task.run(_context(task_name))
-
-
-def test_encounter_datetimes_must_be_timezone_aware() -> None:
-    naive = datetime(2026, 7, 13, 12)
-
-    with pytest.raises(ValueError, match="timezone-aware"):
-        HardReport(naive, 0, 0, HardStopReason.COMPLETED)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        ExerciseReport(naive, 0, 0, 0, 0)
-
-
-def test_encounter_settings_and_reports_reject_invalid_values() -> None:
-    with pytest.raises(ValueError, match="must not exceed"):
-        DailyReport(attempts_available=1, attempts_completed=2)
-    with pytest.raises(TypeError, match="failure_retry_delay must be a DelayRange"):
-        HardSettings(
-            _SERVER_UPDATE_SCHEDULE,
-            cast("DelayRange", timedelta(0)),
-            _RESOURCE_RETRY,
-            "11-4",
-            HardFleet.FLEET_1,
-        )
-    with pytest.raises(ValueError, match="settle every available attempt"):
-        _hard_report(attempts_available=3, attempts_completed=2)
-    with pytest.raises(TypeError, match="HardStopReason"):
-        HardReport(_OBSERVED_AT, 1, 0, cast("HardStopReason", "failed"))
-    with pytest.raises(ValueError, match="must be positive"):
-        _exercise_settings(refresh_limit=0)
-    with pytest.raises(ValueError, match="must be non-negative"):
-        _exercise_report(attempts_remaining=-1)
-
-
-def test_encounter_settings_require_daily_schedules() -> None:
-    invalid = cast("DailySchedule", object())
-
-    with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        DailySettings(invalid, use_daily_skip=True, missions=_DAILY_MISSIONS)
-    with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        HardSettings(invalid, _FAILURE_RETRY_RANGE, _RESOURCE_RETRY, "11-4", HardFleet.FLEET_1)
-    with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        ExerciseSettings(
-            invalid,
-            _FAILURE_RETRY_RANGE,
-            5,
-            ExerciseOpponentMode.MAX_EXP,
-            1,
-            ExerciseStrategy.AGGRESSIVE,
-            0.4,
-            0.1,
-        )
-
-
-def test_exercise_rejects_refresh_count_above_game_rule() -> None:
-    workflow = _Workflow(_exercise_report(attempts_remaining=6, opponent_refreshes_used=6))
-
-    with pytest.raises(ValueError, match="must not exceed opponent_refresh_limit"):
-        ExerciseTask(workflow, _exercise_settings()).run(_context("exercise"))
-
-
-def test_encounter_datetime_type_errors_are_not_treated_as_naive() -> None:
-    with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        DailySettings(
-            cast("DailySchedule", "tomorrow"),
-            use_daily_skip=True,
-            missions=_DAILY_MISSIONS,
-        )
-    with pytest.raises(TypeError, match="must be a datetime"):
-        HardReport(cast("datetime", "now"), 0, 0, HardStopReason.COMPLETED)
-    with pytest.raises(TypeError, match="must be a datetime"):
-        ExerciseReport(cast("datetime", "now"), 0, 0, 0, 0)

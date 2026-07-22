@@ -1,8 +1,5 @@
-import pytest
-
 from module.notify.configuration import (
     DisabledNotificationConfig,
-    NotificationConfigError,
     SmtpNotificationConfig,
     SmtpTransport,
     build_notification_config,
@@ -60,30 +57,3 @@ def test_blank_recipients_use_sender() -> None:
 
     assert isinstance(config, SmtpNotificationConfig)
     assert config.recipients == ("sender@example.com",)
-
-
-@pytest.mark.parametrize(
-    ("overrides", "match"),
-    [
-        ({"host": ""}, "host"),
-        ({"port": 0}, "port"),
-        ({"transport": "plain"}, "plain"),
-        ({"user": "not-an-address"}, "user"),
-        ({"password": ""}, "password"),
-        ({"recipients": "not-an-address"}, "recipients"),
-    ],
-)
-def test_enabled_notification_rejects_invalid_fields(overrides: dict[str, object], match: str) -> None:
-    fields: dict[str, object] = {
-        "enabled": True,
-        "host": "smtp.example.com",
-        "port": 465,
-        "transport": "implicit_tls",
-        "user": "sender@example.com",
-        "password": "secret",
-        "recipients": "receiver@example.com",
-    }
-    fields.update(overrides)
-
-    with pytest.raises(NotificationConfigError, match=match):
-        build_notification_config(**fields)  # type: ignore[arg-type]

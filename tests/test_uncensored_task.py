@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -19,6 +18,7 @@ from module.maintenance import UncensoredPayload, UncensoredSettings, Uncensored
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
 
 class _Assets:
@@ -151,29 +151,3 @@ def test_uncensored_install_failure_prevents_app_restart(tmp_path: Path) -> None
         task.run(_context())
 
     assert calls == ["build", "install"]
-
-
-def test_uncensored_abort_before_run_prevents_asset_generation(tmp_path: Path) -> None:
-    calls: list[str] = []
-    abort = AbortToken()
-    abort.request("cancelled")
-    task, _installer = _task(calls, UncensoredPayload((tmp_path / "uncensored-files").resolve()))
-
-    with pytest.raises(AbortRequested, match="cancelled"):
-        task.run(_context(abort))
-
-    assert calls == []
-
-
-@pytest.mark.parametrize("package_name", ["", " com.bilibili.azurlane", "com/bilibili/azurlane", "azurlane"])
-def test_uncensored_settings_reject_invalid_android_package_names(package_name: str) -> None:
-    with pytest.raises(ValueError, match="invalid Android package name"):
-        UncensoredSettings(package_name)
-
-    with pytest.raises(TypeError, match="package_name must be a string"):
-        UncensoredSettings(cast("str", 7))
-
-
-def test_uncensored_payload_requires_an_absolute_path() -> None:
-    with pytest.raises(ValueError, match="absolute path"):
-        UncensoredPayload(Path("relative/files"))

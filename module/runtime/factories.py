@@ -241,17 +241,3 @@ def bind_tasks(
         for task_id, spec in spec_copy.items()
     }
     return MappingProxyType(bindings)
-
-
-def validate_task_bindings(bindings: Mapping[TaskId, TaskBinding]) -> None:
-    if not isinstance(bindings, Mapping):
-        message = "bindings must be a mapping"
-        raise TypeError(message)
-    for task_id, binding in bindings.items():
-        if not isinstance(task_id, TaskId) or not isinstance(binding, TaskBinding):
-            message = "bindings must map TaskId values to TaskBinding values"
-            raise TypeError(message)
-        if binding.spec.command != task_id.value:
-            message = f"binding key must match spec command: {task_id.value}"
-            raise FactoryCoverageError(message)
-        binding.build(TaskStateDocument.empty(task_id.value))

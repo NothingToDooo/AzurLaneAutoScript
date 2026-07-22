@@ -107,10 +107,6 @@ class CompiledCampaignSessionSource:
         self._definitions = {}
         self._sessions = {}
 
-    @property
-    def session_count(self) -> int:
-        return len(self._sessions)
-
     def validate_all(self) -> None:
         """显式编译全部关卡；生产运行不调用此入口。"""
 

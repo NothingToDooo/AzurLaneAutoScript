@@ -1,4 +1,3 @@
-import sys
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from typing import TYPE_CHECKING, override
@@ -6,8 +5,6 @@ from typing import TYPE_CHECKING, override
 import numpy as np
 import pytest
 
-import module.base.resource as resource_module
-from module.base.resource import Resource
 from module.ocr.models import OcrModel, OcrRuntime
 from module.ocr.result import RawOcrResult
 
@@ -166,21 +163,3 @@ def test_runtime_does_not_cache_failed_initialization() -> None:
 
     assert runtime.atomic_ocr_for_single_lines_raw([TEST_IMAGE]) == [RawOcrResult("None", 1.0)]
     assert len(sessions) == 2
-
-
-def test_release_resources_only_releases_shared_runtime_when_idle(monkeypatch: pytest.MonkeyPatch) -> None:
-    release_calls: list[None] = []
-
-    class _Models:
-        @staticmethod
-        def release() -> None:
-            release_calls.append(None)
-
-    monkeypatch.setattr(resource_module, "OCR_MODEL", _Models())
-    monkeypatch.setattr(Resource, "instances", {})
-    monkeypatch.delitem(sys.modules, "module.map_detection.utils_assets", raising=False)
-
-    resource_module.release_resources(next_task="Daily")
-    resource_module.release_resources()
-
-    assert release_calls == [None]

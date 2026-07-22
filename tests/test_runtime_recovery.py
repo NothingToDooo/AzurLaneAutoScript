@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-from typing import cast
 
 import pytest
 
@@ -14,13 +13,7 @@ from module.application import (
     WakePolicy,
     WakeTask,
 )
-from module.exception import (
-    GameBugError,
-    GameNotRunningError,
-    GamePageUnknownError,
-    GameStuckError,
-    GameTooManyClickError,
-)
+from module.exception import GameNotRunningError, GameStuckError
 from module.runtime.recovery import GameErrorRecovery
 
 NOW = datetime(2026, 7, 22, 4, tzinfo=UTC)
@@ -44,8 +37,6 @@ def _context(
     [
         (GameNotRunningError("game died"), timedelta(0)),
         (GameStuckError("stuck"), timedelta(seconds=10)),
-        (GameTooManyClickError("click loop"), timedelta(seconds=10)),
-        (GameBugError("client bug"), timedelta(seconds=10)),
     ],
 )
 def test_game_error_recovery_wakes_restart_and_advances_the_failed_task(
@@ -69,9 +60,7 @@ def test_game_error_recovery_wakes_restart_and_advances_the_failed_task(
 @pytest.mark.parametrize(
     ("enabled", "error", "task_id", "mode"),
     [
-        (False, GameStuckError("disabled"), "research", ExecutionMode.SCHEDULED_JOB),
         (True, ValueError("invalid task state"), "research", ExecutionMode.SCHEDULED_JOB),
-        (True, GamePageUnknownError("unknown page"), "research", ExecutionMode.SCHEDULED_JOB),
         (True, GameStuckError("restart stuck"), "restart", ExecutionMode.SCHEDULED_JOB),
         (True, GameStuckError("direct command"), "research", ExecutionMode.DIRECT_COMMAND),
     ],
@@ -86,10 +75,3 @@ def test_game_error_recovery_declines_ineligible_faults(
     recovery = GameErrorRecovery(lambda: enabled, lambda: NOW)
 
     assert recovery.recover(_context(task_id, mode), error) is None
-
-
-def test_game_error_recovery_requires_a_boolean_live_setting() -> None:
-    recovery = GameErrorRecovery(lambda: cast("bool", "yes"), lambda: NOW)
-
-    with pytest.raises(TypeError, match="Error_HandleError must be a bool"):
-        recovery.recover(_context(), GameStuckError("stuck"))

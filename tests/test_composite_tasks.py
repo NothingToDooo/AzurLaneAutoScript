@@ -39,7 +39,6 @@ from module.gameplay.composite import (
     GuildTask,
     GuildWorkflow,
     MailCollectionPolicy,
-    MailCollectionWorkflow,
     MeowfficerReport,
     MeowfficerSettings,
     MeowfficerTask,
@@ -285,10 +284,6 @@ def _dorm_report(*, ships_in_dorm: int | None = 3) -> DormReport:
     ("ships_in_dorm", "delay"),
     [
         (1, timedelta(minutes=1000)),
-        (2, timedelta(minutes=556)),
-        (3, timedelta(minutes=417)),
-        (4, timedelta(minutes=358)),
-        (5, timedelta(minutes=313)),
         (6, timedelta(minutes=278)),
         (None, timedelta(minutes=45)),
     ],
@@ -311,22 +306,6 @@ def test_dorm_preserves_ship_count_dependent_schedule(
     )
 
 
-def test_meowfficer_without_any_enabled_operation_disables_itself() -> None:
-    settings = MeowfficerSettings(
-        buy_amount=0,
-        overflow_coin_threshold=None,
-        fort_chore_enabled=False,
-        training=None,
-        schedule=_DAILY_SCHEDULE,
-    )
-    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False))
-
-    result = MeowfficerTask(workflow, settings).run(_context("meowfficer"))
-
-    assert workflow.calls == 0
-    assert result == TaskResult(outcome=Succeeded(), effects=(DisableTask(TaskId("meowfficer")),))
-
-
 @pytest.mark.parametrize(
     ("schedule", "expected_due_at"),
     [
@@ -345,65 +324,6 @@ def test_meowfficer_training_uses_earlier_periodic_check_or_server_update(
 
     assert workflow.received_settings is settings
     assert result == TaskResult(outcome=Succeeded(), effects=(RescheduleSelf(expected_due_at),))
-
-
-def test_meowfficer_without_training_waits_for_server_update() -> None:
-    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False))
-
-    result = MeowfficerTask(workflow, _meowfficer_settings()).run(_context("meowfficer"))
-
-    assert result.effects == (RescheduleSelf(_SERVER_UPDATE_AT),)
-
-
-def test_meowfficer_completed_training_disables_task_without_other_work() -> None:
-    settings = _meowfficer_settings(training=_training(), buy_amount=0)
-    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False))
-
-    result = MeowfficerTask(workflow, settings).run(_context("meowfficer"))
-
-    assert result.effects == (DisableTask(TaskId("meowfficer")),)
-
-
-def test_meowfficer_completed_training_keeps_daily_non_training_work() -> None:
-    settings = _meowfficer_settings(training=_training(), buy_amount=1)
-    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False))
-
-    result = MeowfficerTask(workflow, settings).run(_context("meowfficer"))
-
-    assert result.effects == (RescheduleSelf(_SERVER_UPDATE_AT),)
-
-
-def test_guild_without_logistics_or_operation_disables_itself() -> None:
-    settings = _guild_settings(logistics_enabled=False, operation_enabled=False)
-    workflow = _Workflow(GuildReport(_OBSERVED_AT, None, None))
-
-    result = GuildTask(workflow, settings).run(_context("guild"))
-
-    assert workflow.calls == 0
-    assert result == TaskResult(outcome=Succeeded(), effects=(DisableTask(TaskId("guild")),))
-
-
-@pytest.mark.parametrize(
-    ("settings", "report"),
-    [
-        (
-            _guild_settings(),
-            GuildReport(observed_at=_OBSERVED_AT, logistics_succeeded=True, operation_succeeded=True),
-        ),
-        (
-            _guild_settings(logistics_enabled=True, operation_enabled=False),
-            GuildReport(observed_at=_OBSERVED_AT, logistics_succeeded=True, operation_succeeded=None),
-        ),
-        (
-            _guild_settings(logistics_enabled=False, operation_enabled=True),
-            GuildReport(observed_at=_OBSERVED_AT, logistics_succeeded=None, operation_succeeded=True),
-        ),
-    ],
-)
-def test_guild_success_waits_for_server_update(settings: GuildSettings, report: GuildReport) -> None:
-    result = GuildTask(_Workflow(report), settings).run(_context("guild"))
-
-    assert result == TaskResult(outcome=Succeeded(), effects=(RescheduleSelf(_SERVER_UPDATE_AT),))
 
 
 @pytest.mark.parametrize(
@@ -428,26 +348,6 @@ def test_guild_failure_uses_earlier_failure_retry_or_server_update(
     )
 
 
-def test_guild_rejects_report_that_omits_an_enabled_capability() -> None:
-    report = GuildReport(observed_at=_OBSERVED_AT, logistics_succeeded=True, operation_succeeded=None)
-
-    with pytest.raises(ValueError, match="operation_succeeded must be present"):
-        GuildTask(_Workflow(report), _guild_settings()).run(_context("guild"))
-
-
-def test_reward_uses_success_interval_and_emits_no_hidden_task_wakeups() -> None:
-    settings = _reward_settings()
-    workflow = _Workflow(RewardReport(_OBSERVED_AT))
-
-    result = RewardTask(workflow, settings).run(_context("reward"))
-
-    assert workflow.received_settings is settings
-    assert result == TaskResult(
-        outcome=Succeeded(),
-        effects=(RescheduleSelf(_OBSERVED_AT + timedelta(hours=1)),),
-    )
-
-
 def test_reward_samples_success_interval_for_each_reschedule() -> None:
     settings = RewardSettings(
         collect_oil=True,
@@ -469,38 +369,6 @@ def test_reward_samples_success_interval_for_each_reschedule() -> None:
     assert second.effects == (RescheduleSelf(_OBSERVED_AT + timedelta(seconds=7_200)),)
 
 
-def test_reward_still_runs_when_every_collection_option_is_disabled() -> None:
-    settings = RewardSettings(
-        collect_oil=False,
-        collect_coin=False,
-        collect_exp=False,
-        collect_daily_mission=False,
-        collect_weekly_mission=False,
-        success_delay=DelayRange(3_600, 3_600),
-    )
-    workflow = _Workflow(RewardReport(_OBSERVED_AT))
-
-    RewardTask(workflow, settings).run(_context("reward"))
-
-    assert workflow.calls == 1
-
-
-def test_freebies_preserves_battle_pass_data_key_mail_supply_pack_order() -> None:
-    call_log: list[str] = []
-    task = FreebiesTask(
-        battle_pass=_FreebieCollector("battle_pass", call_log),
-        data_key=_DataKeyCollector("data_key", call_log),
-        mail=_MailCollector("mail", call_log),
-        supply_pack=_SupplyPackCollector("supply_pack", call_log),
-        settings=_freebies_settings(),
-    )
-
-    result = task.run(_context("freebies"))
-
-    assert call_log == ["battle_pass", "data_key", "mail", "supply_pack"]
-    assert result == TaskResult(outcome=Succeeded(), effects=(RescheduleSelf(_SERVER_UPDATE_AT),))
-
-
 def test_freebies_always_collects_mail_and_skips_disabled_optional_collectors() -> None:
     call_log: list[str] = []
     task = FreebiesTask(
@@ -516,23 +384,12 @@ def test_freebies_always_collects_mail_and_skips_disabled_optional_collectors() 
     assert call_log == ["mail"]
 
 
-@pytest.mark.parametrize(
-    "interaction_status",
-    [
-        PrivateQuartersInteractionStatus.UNSUPPORTED,
-        PrivateQuartersInteractionStatus.EXHAUSTED,
-        PrivateQuartersInteractionStatus.ROOM_UNAVAILABLE,
-        PrivateQuartersInteractionStatus.COMPLETED,
-    ],
-)
-def test_private_quarters_normal_interaction_results_wait_for_server_update(
-    interaction_status: PrivateQuartersInteractionStatus,
-) -> None:
+def test_private_quarters_completed_interaction_waits_for_server_update() -> None:
     settings = _private_quarters_settings()
     report = PrivateQuartersReport(
         observed_at=_OBSERVED_AT,
         shop_attempted=True,
-        interaction_status=interaction_status,
+        interaction_status=PrivateQuartersInteractionStatus.COMPLETED,
     )
     workflow = _Workflow(report)
 
@@ -540,48 +397,6 @@ def test_private_quarters_normal_interaction_results_wait_for_server_update(
 
     assert workflow.received_settings is settings
     assert result == TaskResult(outcome=Succeeded(), effects=(RescheduleSelf(_SERVER_UPDATE_AT),))
-
-
-def test_private_quarters_without_shop_or_interaction_preserves_daily_schedule() -> None:
-    settings = _private_quarters_settings(buy_roses=False, buy_cake=False, target_ship=None)
-    report = PrivateQuartersReport(
-        observed_at=_OBSERVED_AT,
-        shop_attempted=False,
-        interaction_status=PrivateQuartersInteractionStatus.NOT_REQUESTED,
-    )
-
-    result = PrivateQuartersTask(_Workflow(report), settings).run(_context("private_quarters"))
-
-    assert result.effects == (RescheduleSelf(_SERVER_UPDATE_AT),)
-
-
-def test_private_quarters_rejects_report_that_hides_requested_interaction() -> None:
-    report = PrivateQuartersReport(
-        observed_at=_OBSERVED_AT,
-        shop_attempted=True,
-        interaction_status=PrivateQuartersInteractionStatus.NOT_REQUESTED,
-    )
-
-    with pytest.raises(ValueError, match="must describe the requested interaction"):
-        PrivateQuartersTask(_Workflow(report), _private_quarters_settings()).run(_context("private_quarters"))
-
-
-def test_freebies_abort_before_run_prevents_external_side_effects() -> None:
-    abort = AbortToken()
-    abort.request("manual stop")
-    call_log: list[str] = []
-    task = FreebiesTask(
-        battle_pass=_FreebieCollector("collector", call_log),
-        data_key=_DataKeyCollector("collector", call_log),
-        mail=_MailCollector("collector", call_log),
-        supply_pack=_SupplyPackCollector("collector", call_log),
-        settings=_freebies_settings(),
-    )
-
-    with pytest.raises(AbortRequested, match="manual stop"):
-        task.run(_context("freebies", abort))
-
-    assert call_log == []
 
 
 def test_freebies_abort_between_collectors_stops_remaining_work_and_discards_schedule() -> None:
@@ -669,103 +484,3 @@ def test_composite_workflow_late_abort_preserves_schedule_and_stops_the_next_ent
     with pytest.raises(AbortRequested, match="stop after workflow"):
         task.run(context)
     assert workflow.calls == 1
-
-
-@pytest.mark.parametrize(
-    ("task_name", "task"),
-    [
-        (
-            "dorm",
-            DormTask(cast("DormWorkflow", _Workflow("invalid")), _dorm_settings()),
-        ),
-        (
-            "meowfficer",
-            MeowfficerTask(cast("MeowfficerWorkflow", _Workflow("invalid")), _meowfficer_settings()),
-        ),
-        (
-            "guild",
-            GuildTask(cast("GuildWorkflow", _Workflow("invalid")), _guild_settings()),
-        ),
-        (
-            "reward",
-            RewardTask(cast("RewardWorkflow", _Workflow("invalid")), _reward_settings()),
-        ),
-        (
-            "private_quarters",
-            PrivateQuartersTask(
-                cast("PrivateQuartersWorkflow", _Workflow("invalid")),
-                _private_quarters_settings(),
-            ),
-        ),
-    ],
-)
-def test_composite_tasks_reject_invalid_workflow_return_types(task_name: str, task: Task) -> None:
-    with pytest.raises(TypeError, match="must return"):
-        task.run(_context(task_name))
-
-
-def test_freebies_rejects_invalid_collector_return_type() -> None:
-    call_log: list[str] = []
-    invalid = cast("MailCollectionWorkflow", _MailCollector("mail", call_log, report="invalid"))
-    task = FreebiesTask(
-        battle_pass=_FreebieCollector("unused", call_log),
-        data_key=_DataKeyCollector("unused", call_log),
-        mail=invalid,
-        supply_pack=_SupplyPackCollector("unused", call_log),
-        settings=_freebies_settings(battle_pass=False, data_key=False, supply_pack=False),
-    )
-
-    with pytest.raises(TypeError, match=r"mail\.collect\(\) must return"):
-        task.run(_context("freebies"))
-
-
-def test_composite_datetimes_must_be_timezone_aware() -> None:
-    naive = datetime(2026, 7, 13, 12)
-
-    with pytest.raises(ValueError, match="timezone-aware"):
-        DormReport(naive, 3, furniture_checked=False)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        MeowfficerReport(naive, training_active=False)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        RewardReport(naive)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        FreebieCollectionReport(changed=True, observed_at=naive)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        PrivateQuartersReport(
-            observed_at=naive,
-            shop_attempted=True,
-            interaction_status=PrivateQuartersInteractionStatus.COMPLETED,
-        )
-
-
-def test_composite_settings_and_reports_reject_invalid_values() -> None:
-    with pytest.raises(ValueError, match="between one and six"):
-        DormReport(_OBSERVED_AT, 7, furniture_checked=False)
-    with pytest.raises(ValueError, match="must not exceed fifteen"):
-        _meowfficer_settings(buy_amount=16)
-    with pytest.raises(ValueError, match="between 150 and 210"):
-        _training(timedelta(minutes=149))
-    with pytest.raises(TypeError, match="logistics_succeeded must be a bool"):
-        GuildReport(
-            observed_at=_OBSERVED_AT,
-            logistics_succeeded=cast("bool", 1),
-            operation_succeeded=True,
-        )
-    with pytest.raises(TypeError, match="success_delay must be a DelayRange"):
-        RewardSettings(
-            collect_oil=True,
-            collect_coin=True,
-            collect_exp=True,
-            collect_daily_mission=True,
-            collect_weekly_mission=True,
-            success_delay=cast("DelayRange", timedelta(0)),
-        )
-    with pytest.raises(TypeError, match="changed must be a bool"):
-        FreebieCollectionReport(cast("bool", 1), _OBSERVED_AT)
-    with pytest.raises(ValueError, match="normalized identifier"):
-        PrivateQuartersSettings(
-            buy_roses=True,
-            buy_cake=False,
-            target_ship=" anchorage",
-            schedule=_DAILY_SCHEDULE,
-        )

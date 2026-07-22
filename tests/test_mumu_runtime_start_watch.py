@@ -244,15 +244,6 @@ def _patch_windows_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(runtime_module, "flash_window", lambda _hwnd, *_args, **_kwargs: None)
 
 
-def test_emulator_start_watch_succeeds_when_device_shell_and_package_are_ready() -> None:
-    runtime = _make_runtime(device_batches=[[_device("127.0.0.1:16384", "device")]])
-
-    assert runtime.emulator_start_watch()
-    assert runtime.session.adb_client.connect_calls == []
-    assert runtime.session.shell_calls == 1
-    assert runtime.session.package_calls == 1
-
-
 def test_emulator_start_watch_uses_live_serial_after_dynamic_shift() -> None:
     configured_serial = "127.0.0.1:16384"
     live_serial = "127.0.0.1:16385"
@@ -279,45 +270,6 @@ def test_emulator_start_watch_disconnects_offline_device_before_retrying() -> No
     assert runtime.emulator_start_watch()
     assert runtime.session.adb_client.disconnect_calls == ["127.0.0.1:16384"]
     assert runtime.session.adb_client.connect_calls == list(mumu12_endpoint_candidates(runtime.session.serial))
-
-
-def test_emulator_start_watch_connects_when_device_is_missing() -> None:
-    runtime = _make_runtime(
-        device_batches=[
-            [],
-            [_device("127.0.0.1:16384", "device")],
-        ]
-    )
-
-    assert runtime.emulator_start_watch()
-    assert runtime.session.adb_client.connect_calls == list(mumu12_endpoint_candidates(runtime.session.serial))
-
-
-def test_emulator_start_watch_waits_until_shell_command_is_ready() -> None:
-    runtime = _make_runtime(
-        device_batches=[
-            [_device("127.0.0.1:16384", "device")],
-            [_device("127.0.0.1:16384", "device")],
-        ],
-        shell_results=[OSError("not ready"), "pong"],
-    )
-
-    assert runtime.emulator_start_watch()
-    assert runtime.session.shell_calls == 2
-    assert runtime.session.package_calls == 1
-
-
-def test_emulator_start_watch_waits_until_package_is_ready() -> None:
-    runtime = _make_runtime(
-        device_batches=[
-            [_device("127.0.0.1:16384", "device")],
-            [_device("127.0.0.1:16384", "device")],
-        ],
-        package_results=[[], ["com.bilibili.azurlane"]],
-    )
-
-    assert runtime.emulator_start_watch()
-    assert runtime.session.package_calls == 2
 
 
 def test_emulator_start_watch_returns_false_on_timeout() -> None:

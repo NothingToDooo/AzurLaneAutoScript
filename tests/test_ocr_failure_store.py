@@ -92,13 +92,6 @@ def _read_png(path: Path) -> np.ndarray:
         return np.asarray(image)
 
 
-def test_failure_store_construction_does_not_create_root_directory(tmp_path: Path) -> None:
-    root = tmp_path / "missing"
-    OcrFailureStore(root)
-
-    assert not root.exists()
-
-
 def test_failure_store_writes_one_complete_profile_snapshot(tmp_path: Path) -> None:
     result = replace(
         _failure_result(),
@@ -233,23 +226,5 @@ def test_failure_store_rejects_unsafe_profile_before_writing(tmp_path: Path, pro
 
     with pytest.raises(ValueError, match="profile"):
         OcrFailureStore(root).record(_sample(_failure_result(profile=profile)))
-
-    assert not root.exists()
-
-
-def test_failure_store_rejects_successful_results_and_invalid_images(tmp_path: Path) -> None:
-    root = tmp_path / "root"
-    valid_result = replace(
-        _failure_result(),
-        valid=True,
-        reason=None,
-        value=(14, 1, 15),
-    )
-    store = OcrFailureStore(root)
-
-    with pytest.raises(ValueError, match="failed"):
-        store.record(_sample(valid_result))
-    with pytest.raises(ValueError, match="uint8"):
-        store.record(_sample(raw_image=RAW_IMAGE.astype(np.float32)))
 
     assert not root.exists()

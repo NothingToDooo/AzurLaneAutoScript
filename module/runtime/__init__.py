@@ -17,7 +17,6 @@ from module.runtime.factories import (
     TaskFactory,
     bind_tasks,
     require_task_settings,
-    validate_task_bindings,
 )
 from module.runtime.recovery import GameErrorRecovery
 from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner
@@ -58,5 +57,4 @@ __all__ = [
     "bind_tasks",
     "compile_task_settings",
     "require_task_settings",
-    "validate_task_bindings",
 ]

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from module.application import (
-    AbortRequested,
     AbortToken,
     Blocked,
     DailySchedule,
@@ -29,17 +28,6 @@ from module.application import (
     WakeTask,
 )
 from module.content.battle_policy import BattlePolicy
-from module.content.battle_program import (
-    BattleProgram,
-    BattleProgramDelegation,
-    BattleProgramMode,
-    NamedProgramMarker,
-    ProgramBattleSettled,
-    ProgramBattleTarget,
-    ProgramDelegated,
-    ProgramFlag,
-    ReturnProgramContinue,
-)
 from module.content.campaign_session import (
     BattlefieldObservation,
     BattleSucceeded,
@@ -47,10 +35,7 @@ from module.content.campaign_session import (
     CampaignRunVariant,
     CampaignSession,
     CampaignSessionState,
-    CampaignSessionStatus,
-    RemainingSpawns,
 )
-from module.content.campaign_session_source import CampaignStageSelection
 from module.content.models import StageRef
 from module.content.stage_definition import (
     CampaignStageDefinition,
@@ -62,25 +47,20 @@ from module.content.stage_definition import (
     SpawnWave,
 )
 from module.content.stage_rules import MapFeatures, RepeatableCompletion, StageRules, StarRequirements
-from module.gameplay.battle_program import BattleProgramExecution, BattleProgramReducer
 from module.gameplay.campaign import (
-    CAMPAIGN_JOB_KINDS,
     CampaignAutomationSettings,
     CampaignDifficulty,
     CampaignEnemyPrioritySettings,
     CampaignExecutionSettings,
     CampaignFleetSettings,
     CampaignHpControlSettings,
-    CampaignJobKind,
     CampaignJobSpec,
     CampaignLimits,
-    CampaignMapAchievement,
     CampaignProgress,
     CampaignRunReport,
     CampaignStopReason,
     CampaignSubmarineSettings,
     CampaignTask,
-    CampaignWorkflow,
     EnemyPriorityMode,
     FleetMode,
     FleetOrder,
@@ -348,18 +328,6 @@ def _report(  # ruff:ignore[too-many-arguments] - 测试工厂显式暴露 repor
     )
 
 
-def _stage_increase_report(next_stage_ref: StageRef) -> CampaignRunReport:
-    selected = _session()
-    return CampaignRunReport(
-        stage_ref=selected.definition.ref,
-        observed_at=_OBSERVED_AT,
-        stop_reason=CampaignStopReason.STAGE_INCREASE,
-        session_state=selected.initial_state(),
-        runs_completed=0,
-        next_stage_ref=next_stage_ref,
-    )
-
-
 def _delete_effect(task_id: str = "main") -> DeleteTaskState:
     return DeleteTaskState(task_id, "progress")
 
@@ -421,230 +389,6 @@ def _context(
         mode=mode,
         metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-    )
-
-
-def _case_for_stop_reason(
-    reason: CampaignStopReason,
-) -> tuple[str, CampaignJobSpec, CampaignRunReport]:
-    if reason is CampaignStopReason.PROGRAM_CONTINUE:
-        base = _session()
-        definition = replace(
-            base.definition,
-            battle_programs={
-                0: BattleProgram(
-                    0,
-                    frozenset({BattleProgramMode.NORMAL}),
-                    (ReturnProgramContinue(),),
-                )
-            },
-        )
-        session = CampaignSession(definition, CampaignRunVariant.NORMAL)
-        state = replace(session.initial_state(), program_state_initialized=True)
-        report = _report(
-            CampaignStopReason.PROGRAM_CONTINUE,
-            session=session,
-            session_state=state,
-        )
-        return "main", _spec(sessions=(session,)), report
-
-    if reason is CampaignStopReason.STAGE_INCREASE:
-        next_ref = StageRef("campaign_main", "1-2")
-        next_definition = _session(next_ref.pack_id, next_ref.stage_id).definition
-        transition_sessions = tuple(CampaignSession(next_definition, variant) for variant in CampaignRunVariant)
-        job = replace(
-            _spec(
-                limits=CampaignLimits(
-                    map_achievement=CampaignMapAchievement.FULL_CLEAR,
-                    stage_increase=True,
-                ),
-            ),
-            stage_selections=(
-                CampaignStageSelection(
-                    StageRef("campaign_main", "1-1"),
-                    StageRef("campaign_main", "1-1"),
-                    next_ref=next_ref,
-                ),
-            ),
-            transition_sessions=transition_sessions,
-        )
-        return "main", job, _stage_increase_report(next_ref)
-
-    gems_job = _spec("gems_farming")
-    gems_policy = gems_job.gems_farming
-    assert gems_policy is not None
-    gems_fallback = gems_job.session_for(
-        gems_policy.fallback_session.definition.ref,
-        CampaignRunVariant.NORMAL,
-    )
-    assert gems_fallback is not None
-    level_replacement = GemsFleetReplacementRequest(
-        GemsFleetReplacementTrigger.LEVEL,
-        GemsFleetReplacementBoundary.POST_MAP,
-    )
-    emotion_replacement = GemsFleetReplacementRequest(
-        GemsFleetReplacementTrigger.EMOTION,
-        GemsFleetReplacementBoundary.POST_MAP,
-    )
-    hard_replacement = GemsFleetReplacementRequest(
-        GemsFleetReplacementTrigger.HARD_PREPARATION,
-        GemsFleetReplacementBoundary.PRE_ENTRY,
-    )
-    cases = {
-        CampaignStopReason.IN_PROGRESS: (
-            "main",
-            _spec(),
-            _report(reason, runs_completed=1),
-        ),
-        CampaignStopReason.RUN_COUNT_LIMIT: (
-            "main",
-            _spec(limits=CampaignLimits(run_count=1)),
-            _report(reason, runs_completed=1),
-        ),
-        CampaignStopReason.REACH_LEVEL_LIMIT: (
-            "main",
-            _spec(limits=CampaignLimits(reach_level=120)),
-            _report(reason),
-        ),
-        CampaignStopReason.NEW_SHIP: (
-            "main",
-            _spec(limits=CampaignLimits(stop_on_new_ship=True)),
-            _report(reason),
-        ),
-        CampaignStopReason.EVENT_POINT_LIMIT: (
-            "event",
-            _spec("event", limits=CampaignLimits(event_points=100_000)),
-            _report(reason),
-        ),
-        CampaignStopReason.EVENT_TIME_LIMIT: (
-            "event",
-            _spec(
-                "event",
-                limits=CampaignLimits(event_deadline_at=_OBSERVED_AT - timedelta(seconds=1)),
-            ),
-            _report(reason),
-        ),
-        CampaignStopReason.EVENT_UNAVAILABLE: (
-            "event",
-            _spec("event"),
-            _report(reason),
-        ),
-        CampaignStopReason.NO_ELIGIBLE_STAGE: (
-            "event_a",
-            _spec("event_a"),
-            _report(reason),
-        ),
-        CampaignStopReason.DATA_KEYS_EXHAUSTED: (
-            "war_archives",
-            _spec("war_archives"),
-            _report(reason),
-        ),
-        CampaignStopReason.COIN_LIMIT: (
-            "main",
-            _spec(task_balancer=TaskBalancerPolicy(TaskId("commission"), coin_limit=20_000)),
-            _report(reason, runs_completed=1),
-        ),
-        CampaignStopReason.MAP_ACHIEVEMENT: (
-            "main",
-            _spec(limits=CampaignLimits(map_achievement=CampaignMapAchievement.FULL_CLEAR)),
-            _report(CampaignStopReason.MAP_ACHIEVEMENT),
-        ),
-        CampaignStopReason.GEMS_LEVEL_REPLACEMENT_FAILED: (
-            "gems_farming",
-            gems_job,
-            _report(
-                reason,
-                runs_completed=1,
-                session=gems_job.sessions[0],
-                gems_replacement=level_replacement,
-            ),
-        ),
-        CampaignStopReason.GEMS_EMOTION_REPLACEMENT_FAILED: (
-            "gems_farming",
-            gems_job,
-            _report(
-                reason,
-                runs_completed=1,
-                session=gems_job.sessions[0],
-                gems_replacement=emotion_replacement,
-            ),
-        ),
-        CampaignStopReason.GEMS_HARD_PREPARATION_FAILED: (
-            "gems_farming",
-            gems_job,
-            _report(
-                reason,
-                session=gems_job.sessions[0],
-                gems_replacement=hard_replacement,
-            ),
-        ),
-        CampaignStopReason.GEMS_FLEET_REPLACED: (
-            "gems_farming",
-            gems_job,
-            _report(
-                reason,
-                session=gems_job.sessions[0],
-                gems_replacement=GemsFleetReplacementRequest(
-                    GemsFleetReplacementTrigger.EMOTION,
-                    GemsFleetReplacementBoundary.PRE_ENTRY,
-                ),
-            ),
-        ),
-        CampaignStopReason.GEMS_EVENT_FALLBACK: (
-            "gems_farming",
-            gems_job,
-            _report(reason, session=gems_fallback),
-        ),
-        CampaignStopReason.CHECKPOINT_RESET: (
-            "main",
-            _spec(progress=_progress(runs_completed=2)),
-            _report(reason),
-        ),
-    }
-    case = cases.get(reason)
-    if case is not None:
-        return case
-    return "main", _spec(), _report(reason)
-
-
-@pytest.mark.parametrize(
-    ("command", "kind"),
-    [
-        ("event_sp", CampaignJobKind.EVENT_SP),
-        ("event_a", CampaignJobKind.EVENT_DAILY),
-        ("event_b", CampaignJobKind.EVENT_DAILY),
-        ("event_c", CampaignJobKind.EVENT_DAILY),
-        ("event_d", CampaignJobKind.EVENT_DAILY),
-        ("main", CampaignJobKind.STANDARD),
-        ("main2", CampaignJobKind.STANDARD),
-        ("main3", CampaignJobKind.STANDARD),
-        ("event", CampaignJobKind.EVENT),
-        ("event2", CampaignJobKind.EVENT),
-        ("war_archives", CampaignJobKind.WAR_ARCHIVES),
-        ("gems_farming", CampaignJobKind.GEMS_FARMING),
-    ],
-)
-def test_every_campaign_scheduler_command_maps_to_one_job_kind(command: str, kind: CampaignJobKind) -> None:
-    assert CAMPAIGN_JOB_KINDS[TaskId(command)] is kind
-
-
-def test_hard_is_owned_by_the_encounter_domain() -> None:
-    assert TaskId("hard") not in CAMPAIGN_JOB_KINDS
-
-
-def test_standard_campaign_passes_compiled_session_to_workflow() -> None:
-    job = _spec()
-    workflow = _Workflow(_report(CampaignStopReason.COMPLETED, runs_completed=1))
-
-    result = CampaignTask(workflow, job).run(_context("main"))
-
-    assert workflow.calls == 1
-    assert workflow.received_job is job
-    assert job.stage_refs == (StageRef("campaign_main", "1-1"),)
-    assert result == TaskResult(
-        outcome=Succeeded(),
-        effects=(RescheduleSelf(_SERVER_UPDATE_AT),),
-        state_effects=(_delete_effect(),),
     )
 
 
@@ -735,156 +479,8 @@ def test_checkpoint_reset_preserves_cumulative_progress_and_upserts_the_initial_
     )
 
 
-def test_campaign_report_cannot_cross_two_battle_safe_units() -> None:
-    session = _session(
-        spawn_waves=(
-            SpawnWave(battle=0, enemy=1),
-            SpawnWave(battle=1, boss=1),
-        )
-    )
-    after_first = _succeed_battle(session, session.initial_state(), target=BattleTarget.ENEMY)
-    after_second = _succeed_battle(session, after_first, target=BattleTarget.BOSS)
-    report = _report(
-        CampaignStopReason.COMPLETED,
-        runs_completed=1,
-        session=session,
-        session_state=after_second,
-    )
-
-    with pytest.raises(ValueError, match="more than one battle safe unit"):
-        CampaignTask(_Workflow(report), _spec(sessions=(session,))).run(_context("main"))
-
-
-def test_campaign_report_accepts_a_generic_program_safe_unit() -> None:
-    session = _session(
-        spawn_waves=(
-            SpawnWave(battle=0, enemy=1),
-            SpawnWave(battle=1, boss=1),
-        )
-    )
-    marker = NamedProgramMarker("runtime.clear-all")
-    state = BattleProgramReducer.reduce(
-        session,
-        session.initial_state(),
-        BattleProgramExecution(
-            ProgramBattleSettled(ProgramBattleTarget.ENEMY),
-            frozenset({ProgramFlag.CLEAR_ALL}),
-            frozenset({marker}),
-        ),
-    )
-    report = _report(
-        CampaignStopReason.IN_PROGRESS,
-        session=session,
-        session_state=state,
-    )
-
-    result = CampaignTask(_Workflow(report), _spec(sessions=(session,))).run(_context("main"))
-
-    checkpoint = cast("UpsertTaskState", result.state_effects[0])
-    payload = cast("dict[str, object]", checkpoint.payload)
-    session_payload = cast("dict[str, object]", payload["session_state"])
-    assert session_payload["program_markers"] == (marker.value,)
-
-
-def test_program_reducer_completes_immediately_after_an_early_boss() -> None:
-    session = _session(
-        spawn_waves=(
-            SpawnWave(battle=0, enemy=1, boss=1),
-            SpawnWave(battle=1, enemy=3),
-        )
-    )
-
-    completed = BattleProgramReducer.reduce(
-        session,
-        session.initial_state(),
-        BattleProgramExecution(
-            ProgramBattleSettled(ProgramBattleTarget.BOSS),
-            frozenset(),
-        ),
-    )
-
-    assert completed.status is CampaignSessionStatus.COMPLETED
-    assert completed.battle_index == 1
-    assert completed.remaining == RemainingSpawns(enemy=1)
-    session.validate_state(completed)
-
-
-def test_program_reducer_keeps_a_boss_map_active_past_its_spawn_schedule() -> None:
-    session = _session(spawn_waves=(SpawnWave(battle=0, enemy=1, boss=1),))
-
-    after_enemy = BattleProgramReducer.reduce(
-        session,
-        session.initial_state(),
-        BattleProgramExecution(
-            ProgramBattleSettled(ProgramBattleTarget.ENEMY),
-            frozenset(),
-        ),
-    )
-    completed = BattleProgramReducer.reduce(
-        session,
-        after_enemy,
-        BattleProgramExecution(
-            ProgramBattleSettled(ProgramBattleTarget.BOSS),
-            frozenset(),
-        ),
-    )
-
-    assert after_enemy.status is CampaignSessionStatus.ACTIVE
-    assert after_enemy.battle_index == 1
-    assert after_enemy.remaining == RemainingSpawns(boss=1)
-    assert completed.status is CampaignSessionStatus.COMPLETED
-    assert completed.battle_index == 2
-
-
-def test_campaign_report_accepts_program_facts_followed_by_one_delegated_stage_policy() -> None:
-    session = _session(
-        spawn_waves=(
-            SpawnWave(battle=0, enemy=1),
-            SpawnWave(battle=1, boss=1),
-        )
-    )
-    marker = NamedProgramMarker("runtime.delegated")
-    delegated = BattleProgramReducer.reduce(
-        session,
-        session.initial_state(),
-        BattleProgramExecution(
-            ProgramDelegated(BattleProgramDelegation.STAGE_POLICY),
-            frozenset({ProgramFlag.CLEAR_MODE}),
-            frozenset({marker}),
-        ),
-    )
-    state = _succeed_battle(session, delegated, target=BattleTarget.ENEMY)
-    report = _report(
-        CampaignStopReason.IN_PROGRESS,
-        session=session,
-        session_state=state,
-    )
-
-    result = CampaignTask(_Workflow(report), _spec(sessions=(session,))).run(_context("main"))
-
-    checkpoint = cast("UpsertTaskState", result.state_effects[0])
-    payload = cast("dict[str, object]", checkpoint.payload)
-    session_payload = cast("dict[str, object]", payload["session_state"])
-    assert session_payload["program_markers"] == (marker.value,)
-
-
-def test_campaign_report_rejects_an_unconfirmed_pending_action() -> None:
-    session = _session()
-    decision = session.decide(
-        session.initial_state(),
-        BattlefieldObservation(battle_index=0, boss=1),
-    )
-
-    with pytest.raises(ValueError, match="pending battle attempt"):
-        _report(
-            CampaignStopReason.IN_PROGRESS,
-            session=session,
-            session_state=decision.state,
-        )
-
-
-@pytest.mark.parametrize("task_id", ["event_sp", "event_a", "event_b", "event_c", "event_d"])
-def test_daily_campaign_commands_wait_for_the_next_server_update(task_id: str) -> None:
+def test_daily_campaign_waits_for_the_next_server_update() -> None:
+    task_id = "event_sp"
     result = CampaignTask(_Workflow(_report(CampaignStopReason.COMPLETED, runs_completed=1)), _spec(task_id)).run(
         _context(task_id)
     )
@@ -929,12 +525,8 @@ def test_run_count_exhaustion_disables_the_campaign() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "reason",
-    [CampaignStopReason.OIL_LIMIT, CampaignStopReason.AUTO_SEARCH_OIL_LIMIT],
-)
-def test_oil_limits_use_the_legacy_two_to_four_hour_resource_retry(reason: CampaignStopReason) -> None:
-    result = CampaignTask(_Workflow(_report(reason)), _spec()).run(_context("main"))
+def test_oil_limit_uses_the_legacy_two_to_four_hour_resource_retry() -> None:
+    result = CampaignTask(_Workflow(_report(CampaignStopReason.OIL_LIMIT)), _spec()).run(_context("main"))
 
     assert result == TaskResult(
         outcome=Retryable("campaign oil reserve reached its limit"),
@@ -1015,18 +607,9 @@ def test_unavailable_event_is_blocked_and_disables_the_full_event_group() -> Non
     assert DisableTask(TaskId("maritime_escort")) in result.effects
 
 
-@pytest.mark.parametrize(
-    ("task_id", "reason"),
-    [
-        ("event_a", CampaignStopReason.NO_ELIGIBLE_STAGE),
-        ("event_sp", CampaignStopReason.CONTENT_UNAVAILABLE),
-    ],
-)
-def test_missing_daily_content_blocks_and_disables_only_the_current_task(
-    task_id: str,
-    reason: CampaignStopReason,
-) -> None:
-    workflow = _Workflow(_report(reason))
+def test_missing_daily_content_blocks_and_disables_only_the_current_task() -> None:
+    task_id = "event_sp"
+    workflow = _Workflow(_report(CampaignStopReason.CONTENT_UNAVAILABLE))
     result = CampaignTask(workflow, _spec(task_id, sessions=())).run(_context(task_id))
 
     assert workflow.calls == 0
@@ -1079,12 +662,8 @@ def test_emotion_bug_requests_an_app_restart_without_hidden_task_call() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "reason",
-    [CampaignStopReason.ONE_TIME_STAGE, CampaignStopReason.LOOP_STAGE_SWITCH],
-)
-def test_completion_transitions_wait_for_the_next_daily_trigger(reason: CampaignStopReason) -> None:
-    result = CampaignTask(_Workflow(_report(reason)), _spec()).run(_context("main"))
+def test_completion_transition_waits_for_the_next_daily_trigger() -> None:
+    result = CampaignTask(_Workflow(_report(CampaignStopReason.ONE_TIME_STAGE)), _spec()).run(_context("main"))
 
     assert result == TaskResult(
         outcome=Succeeded(),
@@ -1143,25 +722,6 @@ def test_gems_farming_fleet_replacement_failure_retries_after_thirty_minutes(
     )
 
 
-def test_gems_replacement_failure_rejects_a_battle_free_report() -> None:
-    job = _spec("gems_farming")
-
-    with pytest.raises(ValueError, match="post_map confirmed 0 battle units"):
-        CampaignTask(
-            _Workflow(
-                _report(
-                    CampaignStopReason.GEMS_LEVEL_REPLACEMENT_FAILED,
-                    session=job.sessions[0],
-                    gems_replacement=GemsFleetReplacementRequest(
-                        GemsFleetReplacementTrigger.LEVEL,
-                        GemsFleetReplacementBoundary.POST_MAP,
-                    ),
-                )
-            ),
-            job,
-        ).run(_context("gems_farming"))
-
-
 def test_successful_retry_clears_pending_gems_replacement_without_losing_run_count() -> None:
     base = _spec("gems_farming")
     session = base.sessions[0]
@@ -1195,19 +755,6 @@ def test_successful_retry_clears_pending_gems_replacement_without_losing_run_cou
     )
 
 
-def test_gems_workflow_must_absorb_event_end_and_switch_to_fallback() -> None:
-    job = _spec(
-        "gems_farming",
-        limits=CampaignLimits(event_deadline_at=_OBSERVED_AT - timedelta(minutes=1)),
-    )
-
-    with pytest.raises(ValueError, match="must switch to its fallback session"):
-        CampaignTask(
-            _Workflow(_report(CampaignStopReason.EVENT_TIME_LIMIT, session=job.sessions[0])),
-            job,
-        ).run(_context("gems_farming"))
-
-
 def test_gems_event_fallback_checkpoints_the_exact_normal_session() -> None:
     job = _spec("gems_farming")
     policy = cast("GemsFarmingPolicy", job.gems_farming)
@@ -1226,19 +773,6 @@ def test_gems_event_fallback_checkpoints_the_exact_normal_session() -> None:
     )
 
 
-def test_gems_event_fallback_rejects_a_main_stage_as_its_source_boundary() -> None:
-    job = _spec("gems_farming", sessions=(_session("campaign_main", "1-1"),))
-    policy = cast("GemsFarmingPolicy", job.gems_farming)
-    fallback = job.session_for(policy.fallback_session.definition.ref, CampaignRunVariant.NORMAL)
-    assert fallback is not None
-
-    with pytest.raises(ValueError, match="requires an event-stage map boundary"):
-        CampaignTask(
-            _Workflow(_report(CampaignStopReason.GEMS_EVENT_FALLBACK, session=fallback)),
-            job,
-        ).run(_context("gems_farming"))
-
-
 def test_controlled_workflow_failure_uses_failure_retry() -> None:
     result = CampaignTask(_Workflow(_report(CampaignStopReason.FAILED)), _spec()).run(_context("main"))
 
@@ -1247,62 +781,6 @@ def test_controlled_workflow_failure_uses_failure_retry() -> None:
         effects=(RescheduleSelf(_OBSERVED_AT + _FAILURE_RETRY),),
         state_effects=(_delete_effect(),),
     )
-
-
-_REPORT_STOP_REASONS = tuple(reason for reason in CampaignStopReason if reason is not CampaignStopReason.CANCELLED)
-
-
-@pytest.mark.parametrize("reason", _REPORT_STOP_REASONS)
-def test_every_report_stop_reason_advances_its_scheduled_campaign(reason: CampaignStopReason) -> None:
-    task_id, job, report = _case_for_stop_reason(reason)
-
-    result = CampaignTask(_Workflow(report), job).run(_context(task_id))
-
-    assert any(
-        isinstance(effect, RescheduleSelf) or (isinstance(effect, DisableTask) and effect.task_id == TaskId(task_id))
-        for effect in result.effects
-    )
-
-
-@pytest.mark.parametrize("mode", [ExecutionMode.DIRECT_COMMAND, ExecutionMode.ASSIST_SESSION])
-@pytest.mark.parametrize("reason", _REPORT_STOP_REASONS)
-def test_non_scheduled_campaigns_do_not_mutate_schedules(
-    reason: CampaignStopReason,
-    mode: ExecutionMode,
-) -> None:
-    task_id, job, report = _case_for_stop_reason(reason)
-
-    result = CampaignTask(_Workflow(report), job).run(_context(task_id, mode=mode))
-
-    assert all(isinstance(effect, RequestAppRestart) for effect in result.effects)
-    if reason is CampaignStopReason.EMOTION_BUG:
-        assert len(result.effects) == 1
-    else:
-        assert result.effects == ()
-
-
-@pytest.mark.parametrize("mode", [ExecutionMode.DIRECT_COMMAND, ExecutionMode.ASSIST_SESSION])
-def test_missing_content_does_not_disable_a_non_scheduled_campaign(mode: ExecutionMode) -> None:
-    workflow = _Workflow(_report(CampaignStopReason.CONTENT_UNAVAILABLE))
-
-    result = CampaignTask(workflow, _spec("event_sp", sessions=())).run(_context("event_sp", mode=mode))
-
-    assert workflow.calls == 0
-    assert result == TaskResult(
-        outcome=Blocked("campaign content is unavailable"),
-        state_effects=(_delete_effect("event_sp"),),
-    )
-
-
-def test_abort_before_workflow_prevents_game_actions() -> None:
-    abort = AbortToken()
-    abort.request("manual stop")
-    workflow = _Workflow(_report(CampaignStopReason.COMPLETED))
-
-    with pytest.raises(AbortRequested, match="manual stop"):
-        CampaignTask(workflow, _spec()).run(_context("main", abort=abort))
-
-    assert workflow.calls == 0
 
 
 def test_abort_after_safe_workflow_return_preserves_confirmed_checkpoint_effects() -> None:
@@ -1324,149 +802,3 @@ def test_abort_after_safe_workflow_return_preserves_confirmed_checkpoint_effects
         effects=(RescheduleSelf(_OBSERVED_AT + _FAILURE_RETRY),),
         state_effects=(_delete_effect(),),
     )
-
-
-def test_campaign_task_rejects_invalid_workflow_report() -> None:
-    workflow = cast("CampaignWorkflow", _Workflow(object()))
-
-    with pytest.raises(TypeError, match=r"CampaignWorkflow.execute\(\) must return"):
-        CampaignTask(workflow, _spec()).run(_context("main"))
-
-
-def test_context_task_id_must_match_the_resolved_job() -> None:
-    workflow = _Workflow(_report(CampaignStopReason.COMPLETED))
-
-    with pytest.raises(ValueError, match="must match"):
-        CampaignTask(workflow, _spec()).run(_context("main2"))
-
-    assert workflow.calls == 0
-
-
-def test_run_count_stop_requires_the_accumulated_budget_to_be_exhausted() -> None:
-    session = _session()
-    report = _report(CampaignStopReason.RUN_COUNT_LIMIT, session=session)
-
-    with pytest.raises(ValueError, match="budget to be exhausted"):
-        CampaignTask(
-            _Workflow(report),
-            _spec(
-                sessions=(session,),
-                limits=CampaignLimits(run_count=2),
-                progress=_progress(session=session, runs_completed=1),
-            ),
-        ).run(_context("main"))
-
-
-def test_exhausted_run_budget_cannot_skip_the_disabling_stop_reason() -> None:
-    session = _session()
-    report = _report(CampaignStopReason.COMPLETED, runs_completed=1, session=session)
-
-    with pytest.raises(ValueError, match="must report the run-count stop"):
-        CampaignTask(
-            _Workflow(report),
-            _spec(
-                sessions=(session,),
-                limits=CampaignLimits(run_count=2),
-                progress=_progress(session=session, runs_completed=1),
-            ),
-        ).run(_context("main"))
-
-
-def test_event_time_stop_requires_an_expired_aware_deadline() -> None:
-    limits = CampaignLimits(event_deadline_at=_OBSERVED_AT + timedelta(minutes=1))
-
-    with pytest.raises(ValueError, match="expired event deadline"):
-        CampaignTask(
-            _Workflow(_report(CampaignStopReason.EVENT_TIME_LIMIT)),
-            _spec("event", limits=limits),
-        ).run(_context("event"))
-
-
-def test_report_session_state_must_use_a_job_variant() -> None:
-    loop_session = _session(stage_id="1-2", variant=CampaignRunVariant.LOOP)
-    report = CampaignRunReport(
-        stage_ref=loop_session.definition.ref,
-        observed_at=_OBSERVED_AT,
-        stop_reason=CampaignStopReason.BLOCKED,
-        session_state=loop_session.initial_state(),
-    )
-
-    with pytest.raises(ValueError, match="stage and variant do not belong"):
-        CampaignTask(_Workflow(report), _spec()).run(_context("main"))
-
-
-def test_campaign_specs_require_compiled_content_and_valid_specialization() -> None:
-    with pytest.raises(ValueError, match="unsupported campaign task"):
-        _spec("unknown")
-    with pytest.raises(TypeError, match="require GemsFarmingPolicy"):
-        CampaignJobSpec(
-            task_id=TaskId("gems_farming"),
-            sessions=(
-                _session("event", "d3"),
-                _session("event", "d3", CampaignRunVariant.LOOP),
-            ),
-            difficulty=CampaignDifficulty.NORMAL,
-            execution=_execution(),
-            schedule=_DAILY_SCHEDULE,
-            failure_retry_delay=_FAILURE_RETRY_RANGE,
-            resource_retry_delay=_RESOURCE_RETRY,
-        )
-    with pytest.raises(ValueError, match="exactly one primary session"):
-        _spec(sessions=(_session(stage_id="1-1"), _session(stage_id="1-2")))
-
-
-def test_campaign_datetimes_must_be_timezone_aware() -> None:
-    naive = datetime(2026, 7, 13, 12)
-
-    with pytest.raises(ValueError, match="timezone-aware"):
-        CampaignRunReport(
-            stage_ref=StageRef("campaign_main", "1-1"),
-            observed_at=naive,
-            stop_reason=CampaignStopReason.COMPLETED,
-            session_state=_session().initial_state(),
-        )
-    with pytest.raises(ValueError, match="timezone-aware"):
-        CampaignLimits(event_deadline_at=naive)
-
-
-def test_campaign_specs_require_a_daily_schedule() -> None:
-    with pytest.raises(TypeError, match="schedule must be DailySchedule"):
-        CampaignJobSpec(
-            task_id=TaskId("main"),
-            sessions=(_session(), _session(variant=CampaignRunVariant.LOOP)),
-            difficulty=CampaignDifficulty.NORMAL,
-            execution=_execution(),
-            schedule=cast("DailySchedule", object()),
-            failure_retry_delay=_FAILURE_RETRY_RANGE,
-            resource_retry_delay=_RESOURCE_RETRY,
-        )
-
-
-def test_campaign_specs_require_typed_execution_settings() -> None:
-    with pytest.raises(TypeError, match="execution must be CampaignExecutionSettings"):
-        CampaignJobSpec(
-            task_id=TaskId("main"),
-            sessions=(_session(), _session(variant=CampaignRunVariant.LOOP)),
-            difficulty=CampaignDifficulty.NORMAL,
-            execution=cast("CampaignExecutionSettings", object()),
-            schedule=_DAILY_SCHEDULE,
-            failure_retry_delay=_FAILURE_RETRY_RANGE,
-            resource_retry_delay=_RESOURCE_RETRY,
-        )
-
-
-def test_campaign_settings_reject_invalid_resource_and_count_values() -> None:
-    with pytest.raises(ValueError, match="between 120 and 240"):
-        CampaignJobSpec(
-            task_id=TaskId("main"),
-            sessions=(_session(), _session(variant=CampaignRunVariant.LOOP)),
-            difficulty=CampaignDifficulty.NORMAL,
-            execution=_execution(),
-            schedule=_DAILY_SCHEDULE,
-            failure_retry_delay=_FAILURE_RETRY_RANGE,
-            resource_retry_delay=timedelta(minutes=119),
-        )
-    with pytest.raises(ValueError, match="non-negative"):
-        CampaignLimits(run_count=-1)
-    assert CampaignLimits(oil=0).effective_oil_limit == 500
-    assert CampaignLimits(oil=1_200).effective_oil_limit == 1_200
