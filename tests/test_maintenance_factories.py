@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from pathlib import Path
-from types import MappingProxyType
 from typing import cast
 
 import pytest
@@ -20,12 +19,13 @@ from module.maintenance import (
     BenchmarkReport,
     BenchmarkScene,
     BenchmarkSelection,
+    BenchmarkSettings,
     MaintenanceServices,
     UncensoredPayload,
     build_maintenance_factories,
 )
-from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskStateDocument
-from module.task_registry import TASK_CATALOG
+from module.runtime import TaskBuildContext, TaskStateDocument
+from module.task_registry import TASK_SPECS
 
 _STARTED_AT = datetime(2026, 7, 15, 8, tzinfo=UTC)
 
@@ -90,12 +90,12 @@ def _services(shared: _Services) -> MaintenanceServices:
     )
 
 
-def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
+def _context(command: str, settings: object) -> TaskBuildContext:
     return TaskBuildContext(
-        definition=TASK_CATALOG[command],
+        spec=TASK_SPECS[command],
         settings_revision=5,
         content_revision="content-1",
-        settings=MappingProxyType(settings),
+        settings=settings,
         task_state=TaskStateDocument.empty(command),
     )
 
@@ -110,10 +110,10 @@ def _task_context(command: str) -> TaskContext:
     )
 
 
-def test_benchmark_factory_passes_decoded_scene_and_safe_stage_to_services() -> None:
+def test_benchmark_factory_passes_typed_settings_to_services() -> None:
     shared = _Services()
     task = build_maintenance_factories(_services(shared))["benchmark"].build(
-        _context("benchmark", {"scene": "click", "safe_stage": "13-4"})
+        _context("benchmark", BenchmarkSettings(scene=BenchmarkScene.CLICK, safe_stage="13-4"))
     )
 
     task.run(_task_context("benchmark"))
@@ -121,11 +121,13 @@ def test_benchmark_factory_passes_decoded_scene_and_safe_stage_to_services() -> 
     assert shared.calls == ["prepare:13-4", "measure:click", "present:1"]
 
 
-def test_maintenance_factory_rejects_schema_drift() -> None:
+def test_maintenance_factory_rejects_wrong_settings_type() -> None:
     factories = build_maintenance_factories(_services(_Services()))
 
-    with pytest.raises(SettingsDocumentError, match="unknown settings"):
-        factories["game_manager"].build(_context("game_manager", {"auto_restart": True, "obsolete": False}))
+    with pytest.raises(TypeError, match="game_manager settings must be GameManagerSettings"):
+        factories["game_manager"].build(
+            _context("game_manager", BenchmarkSettings(scene=BenchmarkScene.CLICK, safe_stage="13-4"))
+        )
 
 
 def test_maintenance_services_fail_fast_for_missing_ports() -> None:

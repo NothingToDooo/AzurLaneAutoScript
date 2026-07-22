@@ -9,14 +9,13 @@ from module.config.config_generated import ConfigOverrides, GeneratedConfig
 from module.config.config_manual import ManualConfig, OutputConfig
 from module.config.configuration_file import read_config_file, write_config_file
 from module.config.deep import deep_get, deep_set
-from module.config.resolved import ResolvedTaskConfig, resolve_task_config
+from module.config.resolved import ResolvedTaskConfig, resolve_task_config, task_bind_chain
 from module.config.utils import (
     DEFAULT_TIME,
     dict_to_kv,
     filepath_config,
 )
 from module.logger import logger
-from module.task_registry import get_task_by_config_name
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -135,29 +134,6 @@ class AzurLaneConfig(ManualConfig, GeneratedConfig):
             return func.command
         return func
 
-    @staticmethod
-    def _prepend_missing(items: list[str], item: str) -> None:
-        if item not in items:
-            items.insert(0, item)
-
-    @classmethod
-    def task_bind_chain(
-        cls,
-        func: Function | str,
-        func_list: Iterable[str] | None = None,
-    ) -> list[str]:
-        task = cls._task_name(func)
-        tasks = [] if func_list is None else list(func_list)
-
-        cls._prepend_missing(tasks, task)
-        definition = get_task_by_config_name(task)
-        if definition is not None:
-            for scope in reversed(definition.config_scopes):
-                cls._prepend_missing(tasks, scope)
-        cls._prepend_missing(tasks, "Alas")
-        cls._prepend_missing(tasks, "General")
-        return tasks
-
     def _runtime_overlay_values(self) -> dict[str, ConfigValue]:
         overlay = self.__dict__.get("_runtime_overlay")
         if isinstance(overlay, dict):
@@ -231,7 +207,7 @@ class AzurLaneConfig(ManualConfig, GeneratedConfig):
     def bind(self, func: Function | str, func_list: Iterable[str] | None = None) -> None:
         """按 General、Alas、任务通用作用域、当前任务、func_list 额外作用域依次绑定。"""
         task_name = self._task_name(func)
-        bind_chain = self.task_bind_chain(func, func_list=func_list)
+        bind_chain = task_bind_chain(task_name, () if func_list is None else func_list)
         logger.info(f"Bind task {bind_chain}")
         snapshot = resolve_task_config(
             task_name=task_name,

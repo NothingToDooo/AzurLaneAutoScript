@@ -37,9 +37,10 @@ from module.device.device import Device
 from module.diagnostics import ScreenshotHistory
 from module.equipment.equipment_code import EquipmentCodeHandler
 from module.notify.configuration import SmtpNotificationConfig, SmtpTransport
+from module.runtime.factories import ConfiguredTaskFactory, TaskBinding, validate_task_bindings
 from module.runtime.runner import CommandStatus, RuntimeRunner
 from module.state.config_repository import ConfigStateError, ConfigStateRepository
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -207,14 +208,14 @@ def test_scheduler_builder_builds_every_domain_from_personal_configuration(
     document = _template()
     config_factory, configs = _personal_config_factory(document)
 
-    compiled, registry, _repository, screenshots = _builder(config_factory=config_factory).build(
+    compiled, bindings, _repository, screenshots = _builder(config_factory=config_factory).build(
         document,
         clock=SystemLoopClock(),
     )
 
-    assert registry.content_revision_for("event_story") == "event-test"
-    assert registry.content_revision_for("main") == "campaign-test"
-    assert registry.content_revision_for("benchmark") == "builtin-content-v1"
+    assert bindings[TaskId("event_story")].content_revision == "event-test"
+    assert bindings[TaskId("main")].content_revision == "campaign-test"
+    assert bindings[TaskId("benchmark")].content_revision == "builtin-content-v1"
     assert isinstance(screenshots, ScreenshotHistory)
     assert configs[0].config_name == "alas"
     assert configs[0].Emulator_Serial == compiled.device_serial
@@ -239,7 +240,7 @@ def test_direct_benchmark_skips_campaign_content_and_builds_its_factory_once(
         lambda _services: {"benchmark": factory},
     )
 
-    compiled, registry, repository, _screenshots = PersonalRuntimeBuilder(
+    _compiled, bindings, repository, _screenshots = PersonalRuntimeBuilder(
         Path(),
         "benchmark",
         config_factory=config_factory,
@@ -248,9 +249,7 @@ def test_direct_benchmark_skips_campaign_content_and_builds_its_factory_once(
         campaign_revision=_ForbiddenRevision(),
     ).build(document, clock=SystemLoopClock())
     runner = RuntimeRunner(
-        factories=registry,
-        settings=compiled.tasks,
-        settings_revisions=compiled.task_revisions,
+        bindings=bindings,
         repository=repository,
         clock=SystemLoopClock(),
     )
@@ -259,7 +258,7 @@ def test_direct_benchmark_skips_campaign_content_and_builds_its_factory_once(
 
     assert outcome.status is CommandStatus.FINISHED
     assert outcome.last_task == "benchmark"
-    assert registry.task_ids == ("benchmark",)
+    assert tuple(bindings) == (TaskId("benchmark"),)
     assert factory.builds == 1
 
 
@@ -311,10 +310,10 @@ def test_complete_configuration_builds_the_exact_task_catalog(
         event_revision=_Revision("event-test"),
         campaign_revision=_Revision("campaign-test"),
     )
-    compiled, registry, _repository, _screenshots = builder.build(document, clock=SystemLoopClock())
+    _compiled, bindings, _repository, _screenshots = builder.build(document, clock=SystemLoopClock())
 
-    registry.validate_settings(compiled.tasks, compiled.task_revisions)
-    assert registry.task_ids == tuple(TASK_CATALOG)
+    validate_task_bindings(bindings)
+    assert tuple(task_id.value for task_id in bindings) == tuple(TASK_SPECS)
 
 
 def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications(
@@ -390,28 +389,67 @@ def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications
     ]
 
 
-def test_personal_configuration_validation_reuses_task_factory_contracts_without_connecting_device(
+def test_personal_configuration_validation_is_pure_and_skips_runtime_composition(
     monkeypatch: pytest.MonkeyPatch,
     production_default_event_packs: tuple[EventPack, ...],
 ) -> None:
     _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
-    tactical = cast("dict[str, object]", document["Tactical"])
-    student = cast("dict[str, object]", tactical["AddNewStudent"])
-    student["MinLevel"] = 0
 
-    def reject_device_init(_self: Device, _config: AzurLaneConfig) -> None:
-        message = "configuration validation must not initialize a device"
-        raise AssertionError(message)
+    def reject_runtime_composition(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("configuration validation must not compose runtime objects")
 
-    monkeypatch.setattr(Device, "__init__", reject_device_init)
+    monkeypatch.setattr(PersonalRuntimeBuilder, "build", reject_runtime_composition)
+    monkeypatch.setattr(PersonalRuntimeConfig, "__init__", reject_runtime_composition)
+    monkeypatch.setattr(ConfigStateRepository, "__init__", reject_runtime_composition)
+    monkeypatch.setattr(Device, "__init__", reject_runtime_composition)
+    monkeypatch.setattr(TaskBinding, "build", reject_runtime_composition)
+    monkeypatch.setattr(ConfiguredTaskFactory, "build", reject_runtime_composition)
+    monkeypatch.setattr(production_module, "bind_tasks", reject_runtime_composition)
+    for factory_builder in (
+        "build_activity_factories",
+        "build_campaign_factories",
+        "build_composite_factories",
+        "build_encounter_factories",
+        "build_facility_factories",
+        "build_market_factories",
+        "build_opsi_factories",
+        "build_maintenance_factories",
+    ):
+        monkeypatch.setattr(production_module, factory_builder, reject_runtime_composition)
+    for adapter_builder in (
+        "build_mumu12_activity_workflows",
+        "build_mumu12_campaign_dependencies",
+        "build_mumu12_composite_workflows",
+        "build_mumu12_encounter_workflows",
+        "build_mumu12_facility_workflows",
+        "build_mumu12_maintenance_services",
+        "build_mumu12_market_workflows",
+        "build_mumu12_opsi_workflows",
+    ):
+        monkeypatch.setattr(production_module, adapter_builder, reject_runtime_composition)
     monkeypatch.setattr(
         production_module,
         "atomic_write",
         lambda *_args, **_kwargs: pytest.fail("configuration validation must not write files"),
     )
 
-    with pytest.raises(ConfigurationCompileError, match=r"tasks\.tactical\.student\.minimum_level must be at least 1"):
+    compiled = validate_personal_configuration(document, project_root=Path())
+
+    assert set(compiled.tasks) == set(TASK_SPECS)
+
+
+def test_personal_configuration_validation_rejects_unknown_hard_stage(
+    monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
+) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
+    document = _template()
+    hard = cast("dict[str, object]", document["Hard"])
+    settings = cast("dict[str, object]", hard["Hard"])
+    settings["HardStage"] = "missing-hard-stage"
+
+    with pytest.raises(ConfigurationCompileError, match=r"\$\.tasks\.hard\.stage.*missing-hard-stage"):
         validate_personal_configuration(document, project_root=Path())
 
 
@@ -425,7 +463,7 @@ def test_personal_configuration_validation_wraps_unknown_content_reference(
     campaign = cast("dict[str, object]", event["Campaign"])
     campaign["Name"] = "missing-stage"
 
-    with pytest.raises(ConfigurationCompileError, match=r"compiled task settings are invalid:.*missing-stage"):
+    with pytest.raises(ConfigurationCompileError, match=r"\$\.tasks\.event\.stage_refs.*missing-stage"):
         validate_personal_configuration(document, project_root=Path())
 
 

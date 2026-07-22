@@ -47,6 +47,154 @@ def test_webui_clearup_uses_explicit_force_stop(monkeypatch: pytest.MonkeyPatch)
     assert calls == [None]
 
 
+def test_webui_sessions_share_the_fixed_process_manager(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = object()
+
+    def initialize_frame(_frame: object) -> None:
+        pass
+
+    monkeypatch.setattr(webui_app.Frame, "__init__", initialize_frame)
+    monkeypatch.setattr(AlasGUI, "initial", lambda _gui: None)
+    monkeypatch.setattr(webui_app.ProcessManager, "instance", lambda: manager)
+
+    first = AlasGUI()
+    second = AlasGUI()
+
+    assert first.process_manager is manager
+    assert second.process_manager is manager
+    assert first.runtime_view_active is False
+    assert second.runtime_view_active is False
+
+
+def test_task_settings_always_read_the_personal_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+    document = _template()
+    reads: list[str] = []
+
+    def read_configuration(name: str) -> dict[str, object]:
+        reads.append(name)
+        return document
+
+    monkeypatch.setattr(webui_app, "read_config_file", read_configuration)
+
+    config, snapshot = gui._resolve_task_settings("Event")  # ruff:ignore[private-member-access]
+
+    assert reads == ["alas"]
+    assert config is document
+    assert snapshot.task_name == "Event"
+    assert snapshot.bind_chain[:2] == ("General", "Alas")
+
+
+def test_reopening_runtime_view_only_expands_the_existing_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+    manager = object()
+    events: list[object] = []
+
+    class _StateSwitch:
+        @staticmethod
+        def switch() -> None:
+            events.append("switch")
+
+    vars(gui)["process_manager"] = manager
+    gui.runtime_view_active = False
+    vars(gui)["state_switch"] = _StateSwitch()
+    vars(gui)["init_aside"] = lambda *, name: events.append(("aside", name))
+    vars(gui)["initial"] = lambda: events.append("initial")
+    vars(gui)["alas_set_menu"] = lambda: events.append("menu")
+    vars(gui)["expand_menu"] = lambda: events.append("expand")
+    monkeypatch.setattr(webui_app, "clear", lambda scope: events.append(("clear", scope)))
+
+    gui.ui_alas()
+    gui.ui_alas()
+
+    assert gui.process_manager is manager
+    assert gui.runtime_view_active is True
+    assert events == [
+        ("aside", "alas"),
+        ("clear", "content"),
+        "switch",
+        "initial",
+        "menu",
+        "expand",
+    ]
+
+
+def test_home_view_hides_header_status_without_releasing_the_process_manager() -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+
+    class _Manager:
+        state = 3
+
+    class _StateSwitch:
+        calls = 0
+
+        def switch(self) -> None:
+            self.calls += 1
+
+    manager = _Manager()
+    state_switch = _StateSwitch()
+    aside_names: list[str] = []
+    vars(gui)["process_manager"] = manager
+    gui.runtime_view_active = True
+    gui.is_mobile = True
+    vars(gui)["state_switch"] = state_switch
+    vars(gui)["init_aside"] = lambda *, name: aside_names.append(name)
+    vars(gui)["set_title"] = lambda _title: None
+    vars(gui)["dev_set_menu"] = lambda: None
+
+    assert gui._header_runtime_state() == 3  # ruff:ignore[private-member-access]
+
+    gui.ui_develop()
+
+    assert gui.runtime_view_active is False
+    assert gui.process_manager is manager
+    assert gui._header_runtime_state() == 0  # ruff:ignore[private-member-access]
+    assert state_switch.calls == 1
+    assert aside_names == ["Home"]
+
+
+def test_app_manage_presents_and_exports_the_personal_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "alas.json"
+    config_path.write_bytes(b'{"personal": true}')
+    headings: list[str] = []
+    button_groups: list[list[dict[str, str]]] = []
+    callbacks: list[Callable[[], None]] = []
+    downloads: list[tuple[str, bytes]] = []
+
+    def personal_config_path(name: str) -> Path:
+        assert name == "alas"
+        return config_path
+
+    def capture_buttons(
+        *,
+        buttons: list[dict[str, str]],
+        onclick: list[Callable[[], None]],
+    ) -> None:
+        button_groups.append(buttons)
+        callbacks.extend(onclick)
+
+    webui_app.lang.reload()
+    monkeypatch.setattr(webui_app, "set_env", lambda **_kwargs: None)
+    monkeypatch.setattr(webui_app, "run_js", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(webui_app, "put_html", headings.append)
+    monkeypatch.setattr(webui_app, "put_buttons", capture_buttons)
+    monkeypatch.setattr(webui_app, "filepath_config", personal_config_path)
+    monkeypatch.setattr(webui_app, "download", lambda name, content: downloads.append((name, content)))
+
+    webui_app.app_manage()
+
+    assert headings == ["<h2>alas.json 导入/导出</h2>"]
+    assert [[button["label"] for button in group] for group in button_groups] == [["导入", "导出", "返回"]]
+    assert [[button["value"] for button in group] for group in button_groups] == [["import", "export", "back"]]
+
+    callbacks[1]()
+
+    assert downloads == [("alas.json", b'{"personal": true}')]
+
+
 def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.ALAS_ARGS = {}
@@ -264,10 +412,10 @@ def test_webui_field_save_accepts_scheduler_number_and_range(
         def hold_start() -> nullcontext[None]:
             return nullcontext()
 
+    vars(gui)["process_manager"] = _Manager()
     monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(document))
     monkeypatch.setattr(webui_app, "validate_personal_configuration", _record_validation(validated))
-    monkeypatch.setattr(webui_app.ProcessManager, "instance", _Manager)
     monkeypatch.setattr(
         webui_app,
         "write_config_file",
@@ -326,10 +474,10 @@ def test_webui_field_save_preserves_state_written_during_process_stop(
             self.alive = False
 
     manager = _Manager()
+    vars(gui)["process_manager"] = manager
     monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(next(reads)))
     monkeypatch.setattr(webui_app, "validate_personal_configuration", _record_validation(validated))
-    monkeypatch.setattr(webui_app.ProcessManager, "instance", lambda: manager)
 
     def write_config(_name: str, document: object) -> None:
         assert manager.holding_start
@@ -381,10 +529,10 @@ def test_webui_field_save_reloads_after_a_concurrent_process_exit(
         def hold_start() -> nullcontext[None]:
             return nullcontext()
 
+    vars(gui)["process_manager"] = _Manager()
     monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(next(reads)))
     monkeypatch.setattr(webui_app, "validate_personal_configuration", lambda _candidate: None)
-    monkeypatch.setattr(webui_app.ProcessManager, "instance", _Manager)
     monkeypatch.setattr(
         webui_app,
         "write_config_file",
@@ -427,6 +575,7 @@ def test_webui_field_save_revalidates_gameplay_fields_written_during_stop(
             self.alive = False
 
     manager = _Manager()
+    vars(gui)["process_manager"] = manager
 
     def validate_after_stop(candidate: ConfigurationDocument) -> None:
         validated.append(deepcopy(candidate))
@@ -435,7 +584,6 @@ def test_webui_field_save_revalidates_gameplay_fields_written_during_stop(
 
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(next(reads)))
     monkeypatch.setattr(webui_app, "validate_personal_configuration", validate_after_stop)
-    monkeypatch.setattr(webui_app.ProcessManager, "instance", lambda: manager)
     monkeypatch.setattr(
         webui_app,
         "write_config_file",

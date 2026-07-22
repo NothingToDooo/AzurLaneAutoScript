@@ -146,14 +146,14 @@ def _patch_timers(monkeypatch: pytest.MonkeyPatch, timers: Iterable[_Timer]) -> 
     monkeypatch.setattr(coalition_ui, "Timer", lambda *_args, **_kwargs: timer_queue.pop(0))
 
 
-def test_enter_map_clicks_stage_then_fleet_preparation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enter_coalition_map_clicks_stage_then_fleet_preparation(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_timers(monkeypatch, [_Timer([True, False]), _Timer(), _Timer([True])])
     coalition = _Coalition(_session("coalition_20230323", "tc3", CoalitionFleetMode.MULTI))
     coalition.battle_results = [False, False, True]
     coalition.in_coalition_results = [True, False]
     coalition.fleet_results = [True]
 
-    coalition.enter_map()
+    coalition.enter_coalition_map()
 
     assert coalition.device.clicks == [
         coalition_assets.FROSTFALL_TC3,
@@ -162,22 +162,22 @@ def test_enter_map_clicks_stage_then_fleet_preparation(monkeypatch: pytest.Monke
     assert coalition.fleet_preparation_calls == 1
 
 
-def test_enter_map_clicks_profile_difficulty(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enter_coalition_map_clicks_profile_difficulty(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_timers(monkeypatch, [_Timer([False]), _Timer([True]), _Timer()])
     coalition = _Coalition(_session("coalition_20251120", "area1-hard", CoalitionFleetMode.SINGLE))
     coalition.battle_results = [False, True]
     coalition.in_difficulty_results = [True]
 
-    coalition.enter_map()
+    coalition.enter_coalition_map()
 
     assert coalition.device.clicks == [coalition_assets.DAL_HARD]
 
 
-def test_enter_map_raises_after_stage_click_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enter_coalition_map_raises_after_stage_click_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_timers(monkeypatch, [_Timer([True] * 6), _Timer(), _Timer()])
     coalition = _Coalition(_session("coalition_20230323", "tc3", CoalitionFleetMode.MULTI))
     coalition.battle_results = [False] * 7
     coalition.in_coalition_results = [True] * 6
 
     with pytest.raises(HumanTakeoverRequiredError):
-        coalition.enter_map()
+        coalition.enter_coalition_map()

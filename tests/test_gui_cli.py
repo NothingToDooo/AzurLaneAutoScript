@@ -13,18 +13,33 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-def test_main_builds_webui_app_in_fresh_process() -> None:
+@pytest.fixture(autouse=True)
+def _isolate_process_setup(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        gui,
+        "configure_file_logging",
+        lambda root, *, name: Path(root) / "log" / f"{name}.txt",
+        raising=False,
+    )
+
+
+def test_main_builds_webui_app_in_fresh_process(tmp_path: Path) -> None:
     script = """
 import sys
+from pathlib import Path
 
+sys.path.insert(0, sys.argv[1])
 import gui
+
+starting_cwd = Path.cwd()
 
 
 def ignore_server_start(*_args: object, **_kwargs: object) -> None:
-    pass
+    assert Path.cwd() == starting_cwd
 
 
 gui.uvicorn.run = ignore_server_start
+gui.configure_file_logging = lambda root, name: Path(root) / "log" / f"{name}.txt"
 sys.argv = ["gui.py"]
 gui.main()
 """
@@ -32,32 +47,47 @@ gui.main()
     # 桌面测试宿主没有控制台，Windows 子进程必须隐藏以免弹出 PyWebIO Application 窗口。
     creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
     subprocess.run(  # ruff:ignore[subprocess-without-shell-equals-true] - 使用当前测试解释器启动隔离的导入环境。
-        [sys.executable, "-c", script],
+        [sys.executable, "-c", script, str(Path(__file__).resolve().parents[1])],
         check=True,
-        cwd=Path(__file__).resolve().parents[1],
+        cwd=tmp_path,
         creationflags=creationflags,
     )
 
 
-def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     application = object()
     calls: list[tuple[object, dict[str, object]]] = []
     auto_run_values: list[bool] = []
+    lifecycle: list[tuple[object, ...]] = []
 
     def build_app(*, auto_run: bool = False) -> object:
         auto_run_values.append(auto_run)
+        lifecycle.append(("build_app", auto_run))
         return application
 
     def run(app: object, **kwargs: object) -> None:
+        lifecycle.append(("uvicorn",))
         calls.append((app, kwargs))
 
+    def configure(root: Path, *, name: str) -> Path:
+        lifecycle.append(("configure_file_logging", root, name))
+        return root / "log" / f"{name}.txt"
+
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, "argv", ["gui.py"])
+    monkeypatch.setattr(gui, "configure_file_logging", configure)
     monkeypatch.setattr(gui.uvicorn, "run", run)
     monkeypatch.setattr(webui_app, "app", build_app)
 
     gui.main()
 
     assert auto_run_values == [False]
+    assert lifecycle == [
+        ("configure_file_logging", gui.PROJECT_ROOT, "gui"),
+        ("build_app", False),
+        ("uvicorn",),
+    ]
+    assert Path.cwd() == tmp_path
     assert calls == [
         (
             application,

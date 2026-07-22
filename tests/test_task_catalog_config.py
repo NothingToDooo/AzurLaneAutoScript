@@ -6,16 +6,20 @@ import pytest
 
 from module.application import ExecutionMode
 from module.base.filter import Filter
-from module.config.config import AzurLaneConfig, Function
+from module.config.config import Function
 from module.config.config_generated import GeneratedConfig
 from module.config.config_manual import ManualConfig
 from module.config.config_updater import ConfigGenerator
+from module.config.resolved import task_bind_chain
 from module.config.utils import LANGUAGES, filepath_args, filepath_i18n, read_file, write_file
 from module.task_registry import (
-    TASK_CATALOG,
-    TaskDefinition,
+    TASK_SPECS,
+    ContentRevisionPolicy,
+    TaskDomain,
+    TaskSpec,
     command_to_config_name,
-    get_task_definition,
+    get_task_by_config_name,
+    get_task_spec,
     get_tool_task_command,
 )
 
@@ -154,6 +158,83 @@ EXPECTED_EXECUTION_COMMANDS = {
     ExecutionMode.DIRECT_COMMAND: {"event_story", "azur_lane_uncensored", "game_manager", "benchmark"},
 }
 
+EXPECTED_DOMAINS = {
+    TaskDomain.MAINTENANCE: {"restart", "azur_lane_uncensored", "game_manager", "benchmark"},
+    TaskDomain.FACILITY: {"research", "commission", "tactical"},
+    TaskDomain.COMPOSITE: {"dorm", "meowfficer", "guild", "reward", "freebies", "private_quarters"},
+    TaskDomain.MARKET: {"awaken", "shipyard", "gacha", "shop_frequent", "shop_once"},
+    TaskDomain.ENCOUNTER: {"daily", "hard", "exercise"},
+    TaskDomain.CAMPAIGN: {
+        "main",
+        "main2",
+        "main3",
+        "event",
+        "event2",
+        "event_sp",
+        "event_a",
+        "event_b",
+        "event_c",
+        "event_d",
+        "war_archives",
+        "gems_farming",
+    },
+    TaskDomain.OPSI: {
+        "opsi_ash_assist",
+        "opsi_ash_beacon",
+        "opsi_explore",
+        "opsi_shop",
+        "opsi_voucher",
+        "opsi_daily",
+        "opsi_obscure",
+        "opsi_month_boss",
+        "opsi_abyssal",
+        "opsi_archive",
+        "opsi_stronghold",
+        "opsi_meowfficer_farming",
+        "opsi_hazard1_leveling",
+        "opsi_cross_month",
+    },
+    TaskDomain.ACTIVITY: {
+        "minigame",
+        "event_story",
+        "raid_daily",
+        "maritime_escort",
+        "raid",
+        "hospital",
+        "coalition",
+        "coalition_sp",
+        "daemon",
+        "opsi_daemon",
+    },
+}
+
+EXPECTED_CONTENT_POLICIES = {
+    ContentRevisionPolicy.EVENT: {
+        "event_story",
+        "raid_daily",
+        "maritime_escort",
+        "raid",
+        "hospital",
+        "coalition",
+        "coalition_sp",
+    },
+    ContentRevisionPolicy.CAMPAIGN: {
+        "hard",
+        "main",
+        "main2",
+        "main3",
+        "event",
+        "event2",
+        "event_sp",
+        "event_a",
+        "event_b",
+        "event_c",
+        "event_d",
+        "war_archives",
+        "gems_farming",
+    },
+}
+
 SCOPE_ONLY_NODES = {"Alas", "General", "EventGeneral", "OpsiGeneral"}
 
 
@@ -184,8 +265,17 @@ def _task_nodes() -> list[tuple[str, str, dict[str, MutableDeepValue]]]:
     return nodes
 
 
+def _task_command_pairs() -> list[tuple[str, str]]:
+    pairs = []
+    for _group, task_name, _node in _task_nodes():
+        spec = get_task_by_config_name(task_name)
+        if spec is not None:
+            pairs.append((task_name, spec.command))
+    return pairs
+
+
 def _legacy_priority_order() -> list[str]:
-    names = [command_to_config_name(command) for command in TASK_CATALOG]
+    names = [command_to_config_name(command) for command in TASK_SPECS]
     functions = []
     for name in names:
         function = Function({})
@@ -241,20 +331,20 @@ def _task_group(nodes: dict, *, page: str = "setting") -> dict:
     }
 
 
-def test_task_definition_catalog_lookup_is_immutable() -> None:
-    definition = TASK_CATALOG["main"]
+def test_task_spec_lookup_is_immutable() -> None:
+    spec = TASK_SPECS["main"]
 
-    assert isinstance(definition, TaskDefinition)
-    assert get_task_definition("main") is definition
-    assert get_task_definition("missing") is None
+    assert isinstance(spec, TaskSpec)
+    assert get_task_spec("main") is spec
+    assert get_task_spec("missing") is None
     priority_field = "priority"
     with pytest.raises(FrozenInstanceError):
-        setattr(definition, priority_field, 999)
+        setattr(spec, priority_field, 999)
 
 
 def test_sos_is_removed_without_changing_other_commands() -> None:
-    assert set(TASK_CATALOG) == EXPECTED_CATALOG_COMMANDS
-    assert get_task_definition("sos") is None
+    assert set(TASK_SPECS) == EXPECTED_CATALOG_COMMANDS
+    assert get_task_spec("sos") is None
     assert all(task_name != "Sos" for _group, task_name, _node in _task_nodes())
     assert "Sos" not in ConfigGenerator().argument
     assert not hasattr(GeneratedConfig, "Sos_Chapter")
@@ -266,13 +356,15 @@ def test_sos_is_removed_without_changing_other_commands() -> None:
     "command",
     ["bad space", "bad-name", "bad.name", "123", "_main", "main_", "main__two", "Main"],
 )
-def test_task_definition_rejects_non_ascii_snake_case_commands(command: str) -> None:
+def test_task_spec_rejects_non_ascii_snake_case_commands(command: str) -> None:
     with pytest.raises(ValueError, match="invalid task command"):
-        TaskDefinition(
+        TaskSpec(
             command=command,
             config_scopes=(),
             priority=0,
             execution_mode=ExecutionMode.SCHEDULED_JOB,
+            domain=TaskDomain.CAMPAIGN,
+            content_revision_policy=ContentRevisionPolicy.CAMPAIGN,
         )
 
 
@@ -280,13 +372,15 @@ def test_task_definition_rejects_non_ascii_snake_case_commands(command: str) -> 
     "config_scopes",
     [["General"], ("",), ("General", "General"), ("General", 1)],
 )
-def test_task_definition_rejects_invalid_config_scopes(config_scopes: object) -> None:
+def test_task_spec_rejects_invalid_config_scopes(config_scopes: object) -> None:
     with pytest.raises((TypeError, ValueError), match="config scopes"):
-        TaskDefinition(
+        TaskSpec(
             command="main",
             config_scopes=cast("tuple[str, ...]", config_scopes),
             priority=0,
             execution_mode=ExecutionMode.SCHEDULED_JOB,
+            domain=TaskDomain.CAMPAIGN,
+            content_revision_policy=ContentRevisionPolicy.CAMPAIGN,
         )
 
 
@@ -294,23 +388,27 @@ def test_task_definition_rejects_invalid_config_scopes(config_scopes: object) ->
     ("priority", "error"),
     [(True, TypeError), (1.0, TypeError), ("1", TypeError), (-1, ValueError)],
 )
-def test_task_definition_rejects_invalid_priority(priority: object, error: type[Exception]) -> None:
+def test_task_spec_rejects_invalid_priority(priority: object, error: type[Exception]) -> None:
     with pytest.raises(error, match="task priority"):
-        TaskDefinition(
+        TaskSpec(
             command="main",
             config_scopes=(),
             priority=cast("int | None", priority),
             execution_mode=ExecutionMode.SCHEDULED_JOB,
+            domain=TaskDomain.CAMPAIGN,
+            content_revision_policy=ContentRevisionPolicy.CAMPAIGN,
         )
 
 
-def test_task_definition_rejects_untyped_execution_mode() -> None:
+def test_task_spec_rejects_untyped_execution_mode() -> None:
     with pytest.raises(TypeError, match="execution mode"):
-        TaskDefinition(
+        TaskSpec(
             command="main",
             config_scopes=(),
             priority=0,
             execution_mode=cast("ExecutionMode", "scheduled_job"),
+            domain=TaskDomain.CAMPAIGN,
+            content_revision_policy=ContentRevisionPolicy.CAMPAIGN,
         )
 
 
@@ -322,39 +420,41 @@ def test_task_definition_rejects_untyped_execution_mode() -> None:
         (ExecutionMode.DIRECT_COMMAND, 0, ValueError, "non-scheduled task priority"),
     ],
 )
-def test_task_definition_rejects_priority_that_conflicts_with_execution_mode(
+def test_task_spec_rejects_priority_that_conflicts_with_execution_mode(
     mode: ExecutionMode,
     priority: int | None,
     error: type[Exception],
     message: str,
 ) -> None:
     with pytest.raises(error, match=message):
-        TaskDefinition(
+        TaskSpec(
             command="main",
             config_scopes=(),
             priority=priority,
             execution_mode=mode,
+            domain=TaskDomain.CAMPAIGN,
+            content_revision_policy=ContentRevisionPolicy.CAMPAIGN,
         )
 
 
-def test_task_yaml_commands_are_unique_catalog_entries_with_matching_modes() -> None:
+def test_task_yaml_nodes_resolve_unique_specs_with_matching_modes() -> None:
     command_nodes: dict[str, tuple[str, str, tuple[str, ...]]] = {}
     scope_nodes = set()
 
     for task_group, task_name, node in _task_nodes():
-        assert set(node) <= {"command", "groups"}
+        assert set(node) <= {"groups"}
         groups = tuple(_deep_string_list(node.get("groups", [])))
-        command_value = node.get("command")
-        if command_value is None:
+        spec = get_task_by_config_name(task_name)
+        if spec is None:
             scope_nodes.add(task_name)
             continue
-        command = _deep_string(command_value)
+        command = spec.command
 
         assert command not in command_nodes
-        assert command in TASK_CATALOG
+        assert command in TASK_SPECS
         assert command_to_config_name(command) == task_name
         command_nodes[command] = (task_group, task_name, groups)
-        execution_mode = TASK_CATALOG[command].execution_mode
+        execution_mode = spec.execution_mode
         if "Scheduler" in groups:
             assert execution_mode is ExecutionMode.SCHEDULED_JOB
         else:
@@ -362,50 +462,60 @@ def test_task_yaml_commands_are_unique_catalog_entries_with_matching_modes() -> 
             assert execution_mode is not ExecutionMode.SCHEDULED_JOB
 
     assert scope_nodes == SCOPE_ONLY_NODES
-    assert set(TASK_CATALOG) - set(command_nodes) == INTERNAL_SCHEDULED_COMMANDS
-    assert set(command_nodes) - set(TASK_CATALOG) == set()
+    assert set(TASK_SPECS) - set(command_nodes) == INTERNAL_SCHEDULED_COMMANDS
+    assert set(command_nodes) - set(TASK_SPECS) == set()
 
 
-def test_task_catalog_scopes_are_complete() -> None:
+def test_task_spec_scopes_are_complete() -> None:
     assert {
-        command: definition.config_scopes for command, definition in TASK_CATALOG.items() if definition.config_scopes
+        command: spec.config_scopes for command, spec in TASK_SPECS.items() if spec.config_scopes
     } == EXPECTED_SCOPES
 
 
-def test_task_catalog_execution_modes_are_exact_and_complete() -> None:
+def test_task_spec_execution_modes_are_exact_and_complete() -> None:
     classified_commands = [command for commands in EXPECTED_EXECUTION_COMMANDS.values() for command in commands]
 
     assert set(EXPECTED_EXECUTION_COMMANDS) == set(ExecutionMode)
     assert set(classified_commands) == EXPECTED_CATALOG_COMMANDS
     assert len(classified_commands) == len(set(classified_commands))
-    assert {command: definition.execution_mode for command, definition in TASK_CATALOG.items()} == {
+    assert {command: spec.execution_mode for command, spec in TASK_SPECS.items()} == {
         command: mode for mode, commands in EXPECTED_EXECUTION_COMMANDS.items() for command in commands
     }
 
 
-def test_execution_mode_is_the_only_launch_rule_and_determines_priority_shape() -> None:
-    assert TASK_CATALOG["daemon"].execution_mode is ExecutionMode.ASSIST_SESSION
-    assert TASK_CATALOG["benchmark"].execution_mode is ExecutionMode.DIRECT_COMMAND
-    assert TASK_CATALOG["restart"].execution_mode is ExecutionMode.SCHEDULED_JOB
+def test_task_specs_are_the_only_domain_and_content_revision_classification() -> None:
     assert {
-        command
-        for command, definition in TASK_CATALOG.items()
-        if definition.execution_mode is not ExecutionMode.SCHEDULED_JOB
+        domain: {command for command, spec in TASK_SPECS.items() if spec.domain is domain} for domain in TaskDomain
+    } == EXPECTED_DOMAINS
+    for policy, expected in EXPECTED_CONTENT_POLICIES.items():
+        assert {command for command, spec in TASK_SPECS.items() if spec.content_revision_policy is policy} == expected
+    classified = set().union(*EXPECTED_CONTENT_POLICIES.values())
+    assert {
+        command for command, spec in TASK_SPECS.items() if spec.content_revision_policy is ContentRevisionPolicy.BUILTIN
+    } == EXPECTED_CATALOG_COMMANDS - classified
+
+
+def test_execution_mode_is_the_only_launch_rule_and_determines_priority_shape() -> None:
+    assert TASK_SPECS["daemon"].execution_mode is ExecutionMode.ASSIST_SESSION
+    assert TASK_SPECS["benchmark"].execution_mode is ExecutionMode.DIRECT_COMMAND
+    assert TASK_SPECS["restart"].execution_mode is ExecutionMode.SCHEDULED_JOB
+    assert {
+        command for command, spec in TASK_SPECS.items() if spec.execution_mode is not ExecutionMode.SCHEDULED_JOB
     } == NON_SCHEDULED_COMMANDS
     assert all(
-        (definition.priority is not None) is (definition.execution_mode is ExecutionMode.SCHEDULED_JOB)
-        for definition in TASK_CATALOG.values()
+        (spec.priority is not None) is (spec.execution_mode is ExecutionMode.SCHEDULED_JOB)
+        for spec in TASK_SPECS.values()
     )
 
 
 @pytest.mark.parametrize(
     ("task_name", "command"),
-    [(task_name, _deep_string(node["command"])) for _group, task_name, node in _task_nodes() if "command" in node],
+    _task_command_pairs(),
 )
 def test_all_config_commands_keep_legacy_bind_chain(task_name: str, command: str) -> None:
     extra_scope = "CallerScope"
 
-    assert AzurLaneConfig.task_bind_chain(task_name, [extra_scope]) == [
+    assert task_bind_chain(task_name, [extra_scope]) == [
         "General",
         "Alas",
         *EXPECTED_SCOPES.get(command, ()),
@@ -418,28 +528,20 @@ def test_task_yaml_scheduler_command_remains_pascal_case_node_name() -> None:
     args = ConfigGenerator().args
 
     for _task_group, task_name, node in _task_nodes():
-        if "command" in node and "Scheduler" in _deep_string_list(node["groups"]):
+        if get_task_by_config_name(task_name) is not None and "Scheduler" in _deep_string_list(node["groups"]):
             task_args = _deep_dict(args[task_name])
             scheduler = _deep_dict(task_args["Scheduler"])
             command = _deep_dict(scheduler["Command"])
             assert command["value"] == task_name
 
 
-def test_config_generator_rejects_unknown_and_duplicate_commands() -> None:
+def test_config_generator_rejects_unknown_task_name() -> None:
     unknown = object.__new__(ConfigGenerator)
     unknown.task = {
-        "Tool": {"tasks": {"Missing": {"command": "missing", "groups": []}}},
+        "Tool": {"tasks": {"Missing": {"groups": []}}},
     }
-    with pytest.raises(ValueError, match="unknown task command"):
+    with pytest.raises(ValueError, match="unknown scope-only task"):
         _ = unknown.menu
-
-    duplicate = object.__new__(ConfigGenerator)
-    duplicate.task = {
-        "One": {"tasks": {"Main": {"command": "main", "groups": ["Scheduler"]}}},
-        "Two": {"tasks": {"Main": {"command": "main", "groups": ["Scheduler"]}}},
-    }
-    with pytest.raises(ValueError, match="duplicate task command"):
-        _ = duplicate.menu
 
 
 @pytest.mark.parametrize(
@@ -449,13 +551,13 @@ def test_config_generator_rejects_unknown_and_duplicate_commands() -> None:
         ({"General": {"groups": ["Scheduler"]}}, "setting", "scope-only task.*Scheduler"),
         ({"General": {"groups": ["Emulator"]}}, "tool", "scope-only task.*tool"),
         (
-            {"Benchmark": {"command": "benchmark", "groups": ["Scheduler"]}},
+            {"Benchmark": {"groups": ["Scheduler"]}},
             "setting",
             "execution mode",
         ),
-        ({"Main": {"command": "main", "groups": []}}, "tool", "execution mode"),
+        ({"Main": {"groups": []}}, "tool", "execution mode"),
         (
-            {"Main": {"command": "main", "groups": ["Campaign"]}},
+            {"Main": {"groups": ["Campaign"]}},
             "setting",
             "must be scheduled or tool",
         ),
@@ -497,7 +599,7 @@ def test_config_generator_rejects_duplicate_task_name_across_groups() -> None:
 )
 def test_config_generator_rejects_invalid_argument_groups(groups: list[str], message: str) -> None:
     generator = _schema_generator(
-        _task_group({"Main": {"command": "main", "groups": groups}}),
+        _task_group({"Main": {"groups": groups}}),
         "Scheduler",
     )
 
@@ -508,12 +610,12 @@ def test_config_generator_rejects_invalid_argument_groups(groups: list[str], mes
 def test_priority_matches_legacy_filter_first_match_order() -> None:
     legacy_order = _legacy_priority_order()
     prioritized = sorted(
-        (definition for definition in TASK_CATALOG.values() if definition.priority is not None),
-        key=lambda definition: definition.priority,
+        (spec for spec in TASK_SPECS.values() if spec.priority is not None),
+        key=lambda spec: cast("int", spec.priority),
     )
 
-    assert [definition.priority for definition in prioritized] == list(range(51))
-    assert [command_to_config_name(definition.command) for definition in prioritized] == legacy_order
+    assert [spec.priority for spec in prioritized] == list(range(51))
+    assert [command_to_config_name(spec.command) for spec in prioritized] == legacy_order
     assert legacy_order.count("OpsiAshBeacon") == 1
 
     derived_filter = Filter(regex=r"(.*)", attr=["command"])

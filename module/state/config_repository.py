@@ -32,7 +32,7 @@ from module.config.json_codec import (
     decode_json,
 )
 from module.runtime.task_state import TaskStateDocument, TaskStateEntry
-from module.task_registry import TASK_CATALOG, TaskDefinition
+from module.task_registry import TASK_SPECS, TaskSpec
 
 if TYPE_CHECKING:
     from module.config.deep import MutableDeepData, MutableDeepValue
@@ -42,7 +42,6 @@ if TYPE_CHECKING:
 type JsonValue = bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
 
 
-DEFAULT_CONFIG_PATH = Path("config/alas.json")
 _CHECKPOINT_FIELDS = frozenset({"schema_version", "payload", "updated_at"})
 
 
@@ -143,42 +142,42 @@ def _object_field(parent: Mapping[str, object], key: str, *, path: str) -> dict[
     return cast("dict[str, object]", value)
 
 
-def _definition(task_id: TaskId) -> TaskDefinition:
+def _spec(task_id: TaskId) -> TaskSpec:
     if not isinstance(task_id, TaskId):
         message = "task_id must be a TaskId"
         raise TypeError(message)
     try:
-        return TASK_CATALOG[task_id.value]
+        return TASK_SPECS[task_id.value]
     except KeyError as error:
         message = f"unknown task: {task_id.value}"
         raise ConfigStateError(message) from error
 
 
-def _scheduled_definition(task_id: TaskId) -> TaskDefinition:
-    definition = _definition(task_id)
-    if definition.priority is None:
+def _scheduled_spec(task_id: TaskId) -> TaskSpec:
+    spec = _spec(task_id)
+    if spec.priority is None:
         message = f"task is not schedulable: {task_id.value}"
         raise ConfigStateError(message)
-    return definition
+    return spec
 
 
-def _task_section(document: Mapping[str, object], definition: TaskDefinition) -> dict[str, object]:
-    return _object_field(document, definition.config_name, path="$")
+def _task_section(document: Mapping[str, object], spec: TaskSpec) -> dict[str, object]:
+    return _object_field(document, spec.config_name, path="$")
 
 
-def _scheduler(document: Mapping[str, object], task_id: TaskId) -> tuple[dict[str, object], TaskDefinition]:
-    definition = _scheduled_definition(task_id)
-    section = _task_section(document, definition)
-    scheduler = _object_field(section, "Scheduler", path=f"$.{definition.config_name}")
+def _scheduler(document: Mapping[str, object], task_id: TaskId) -> tuple[dict[str, object], TaskSpec]:
+    spec = _scheduled_spec(task_id)
+    section = _task_section(document, spec)
+    scheduler = _object_field(section, "Scheduler", path=f"$.{spec.config_name}")
     enabled = scheduler.get("Enable")
     if type(enabled) is not bool:
-        message = f"$.{definition.config_name}.Scheduler.Enable must be a bool"
+        message = f"$.{spec.config_name}.Scheduler.Enable must be a bool"
         raise ConfigStateError(message)
     next_run = scheduler.get("NextRun")
     if not isinstance(next_run, str) or not next_run.strip():
-        message = f"$.{definition.config_name}.Scheduler.NextRun must be a non-empty string"
+        message = f"$.{spec.config_name}.Scheduler.NextRun must be a non-empty string"
         raise ConfigStateError(message)
-    return scheduler, definition
+    return scheduler, spec
 
 
 def _parse_due_at(value: str, *, task_id: TaskId, timezone: ZoneInfo) -> datetime:
@@ -194,12 +193,12 @@ def _parse_due_at(value: str, *, task_id: TaskId, timezone: ZoneInfo) -> datetim
 
 def _schedule_items(document: Mapping[str, object], *, timezone: ZoneInfo) -> tuple[ScheduleItem, ...]:
     scheduled = sorted(
-        (definition for definition in TASK_CATALOG.values() if definition.priority is not None),
-        key=lambda definition: cast("int", definition.priority),
+        (spec for spec in TASK_SPECS.values() if spec.priority is not None),
+        key=lambda spec: cast("int", spec.priority),
     )
     items: list[ScheduleItem] = []
-    for definition in scheduled:
-        task_id = TaskId(definition.command)
+    for spec in scheduled:
+        task_id = TaskId(spec.command)
         scheduler, _ = _scheduler(document, task_id)
         items.append(
             ScheduleItem(
@@ -210,7 +209,7 @@ def _schedule_items(document: Mapping[str, object], *, timezone: ZoneInfo) -> tu
                     task_id=task_id,
                     timezone=timezone,
                 ),
-                priority=cast("int", definition.priority),
+                priority=cast("int", spec.priority),
             )
         )
     return tuple(items)
@@ -223,7 +222,7 @@ def _read_schedule_items(config_path: Path, *, timezone: ZoneInfo) -> tuple[Sche
 
 
 def read_schedule_items(
-    config_path: Path = DEFAULT_CONFIG_PATH,
+    config_path: Path,
     *,
     timezone_name: str = "Asia/Shanghai",
 ) -> tuple[ScheduleItem, ...]:
@@ -235,10 +234,10 @@ def read_schedule_items(
 
 
 def _storage(document: Mapping[str, object], task_id: TaskId) -> dict[str, object]:
-    definition = _definition(task_id)
-    section = _task_section(document, definition)
-    storage_group = _object_field(section, "Storage", path=f"$.{definition.config_name}")
-    return _object_field(storage_group, "Storage", path=f"$.{definition.config_name}.Storage")
+    spec = _spec(task_id)
+    section = _task_section(document, spec)
+    storage_group = _object_field(section, "Storage", path=f"$.{spec.config_name}")
+    return _object_field(storage_group, "Storage", path=f"$.{spec.config_name}.Storage")
 
 
 def _thaw_json(value: object, *, path: str = "$") -> JsonValue:
@@ -295,7 +294,7 @@ class ConfigStateRepository(RunRepository, ScheduleSource):
         self,
         clock: ConfigRepositoryClock,
         *,
-        config_path: Path = DEFAULT_CONFIG_PATH,
+        config_path: Path,
         timezone_name: str = "Asia/Shanghai",
         initial_document: Mapping[str, object] | None = None,
         initial_runtime_document: MutableDeepData | None = None,
@@ -334,7 +333,7 @@ class ConfigStateRepository(RunRepository, ScheduleSource):
 
     @override
     def begin_run(self, task_id: TaskId, mode: ExecutionMode, metadata: RunMetadata) -> datetime:
-        _definition(task_id)
+        _spec(task_id)
         if not isinstance(mode, ExecutionMode):
             message = "mode must be an ExecutionMode"
             raise TypeError(message)

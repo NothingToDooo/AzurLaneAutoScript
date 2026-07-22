@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
     from module.base.type_alias import ImageArray
     from module.device.contracts import CaptureRuntime
-    from module.device.platform.emulator_base import EmulatorInstanceBase
 
 type PixelBuffer = ctypes.Array[ctypes.c_ubyte]
 type Recovery = Callable[[], None]
@@ -424,19 +423,11 @@ class NemuIpcCapture:
 
     @cached_property
     def nemu_ipc(self) -> NemuIpcImpl:
-        # 可执行文件位于 <安装目录>/shell 时，nemu_folder 取其上级安装目录。
         instance = self.mumu_runtime.emulator_instance
-        if instance is None:
-            logger.error("Unable to use NemuIpc because emulator instance not found")
-            raise HumanTakeoverRequiredError
-        if "MuMuPlayerGlobal" in instance.path:
-            logger.info(f"当前个人版不支持 MuMuPlayerGlobal：{instance.path}")
-            raise HumanTakeoverRequiredError
         try:
-            instance_id = _require_mumu_instance_id(instance)
             impl = NemuIpcImpl(
-                nemu_folder=instance.emulator.abspath("../"),
-                instance_id=instance_id,
+                nemu_folder=instance.executable.parent.parent.as_posix(),
+                instance_id=instance.instance_id,
                 display_id=0,
             )
             impl.connect_with_retry()
@@ -464,11 +455,3 @@ class NemuIpcCapture:
 
     def screenshot(self) -> ImageArray:
         return self.screenshot_nemu_ipc()
-
-
-def _require_mumu_instance_id(instance: EmulatorInstanceBase) -> int:
-    instance_id = instance.mumu_player_12_id
-    if instance_id is None:
-        message = f"Unable to determine MuMu instance id from {instance.name}"
-        raise NemuIpcError(message)
-    return instance_id

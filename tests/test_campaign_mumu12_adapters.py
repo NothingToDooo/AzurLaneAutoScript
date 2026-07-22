@@ -11,13 +11,14 @@ import module.adapters.campaign_mumu12 as campaign_adapters
 import module.adapters.encounter_mumu12 as encounter_adapters
 from module.adapters.campaign_map_data_mumu12 import apply_normal_enemy_candidate_mask
 from module.adapters.campaign_map_initialization import CampaignMapInitializationService
-from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionOwner
 from module.adapters.campaign_mumu12 import (
     CampaignRuntimeEvidenceError,
     DeclarativeCampaignMapRuntime,
     DeclarativeCampaignRuntimeFactory,
+    Mumu12CampaignAttempt,
     Mumu12CampaignRuntimeProvider,
     Mumu12HardCampaignPort,
+    Mumu12HardCampaignSession,
     campaign_execution_overlay,
     campaign_stage_overlay,
     compile_campaign_map,
@@ -142,10 +143,9 @@ from module.map.map_spawn_gap import MapSpawnProgress
 from module.ui.page import page_campaign_menu, page_event
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
-    from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionRuntime
-    from module.adapters.campaign_mumu12 import Mumu12CampaignHardAssembly, Mumu12CampaignMapAssembly
+    from module.adapters.campaign_profile_services import CampaignProfileServices
     from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
     from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
@@ -200,11 +200,34 @@ def test_combat_stuck_detection_pause_is_scoped(monkeypatch: pytest.MonkeyPatch)
 def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    compile_services = campaign_adapters.compile_campaign_profile_services
+    compiled_services: list[CampaignProfileServices] = []
+
+    def record_services(manager: CampaignRuntimeProfileManager) -> CampaignProfileServices:
+        services = compile_services(manager)
+        compiled_services.append(services)
+        return services
+
+    monkeypatch.setattr(campaign_adapters, "compile_campaign_profile_services", record_services)
     config = in_memory_config("campaign-event-ui-wiring", {})
     definition = load_default_stage(StageRef("event_20250424_cn", "t1"))
     runtime = DeclarativeCampaignMapRuntime(config, object.__new__(Device), definition)
 
+    assert len(compiled_services) == 1
+    profile_services = compiled_services[0]
+    assert runtime._profile_services is profile_services  # ruff:ignore[private-member-access] - runtime 必须消费唯一 bundle。
+    assert runtime._hard_behavior is profile_services.hard_behavior  # ruff:ignore[private-member-access] - hard service 来自唯一 bundle。
+    assert runtime._clear_mode_config_service is profile_services.clear_mode_config  # ruff:ignore[private-member-access] - 全局顺序 service 来自唯一 bundle。
+    assert runtime._map_initialization_service is profile_services.map_initialization  # ruff:ignore[private-member-access] - 全局顺序 service 来自唯一 bundle。
+    assert runtime._profile_fleet_preparation_service is profile_services.fleet_preparation  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._submarine_services is profile_services.submarine  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._strategy_set_service is profile_services.strategy_set  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._program_capabilities is profile_services.program_capabilities  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._map_observer is profile_services.map_observer  # ruff:ignore[private-member-access] - observer 来自唯一 bundle。
+    assert runtime._map_swipe_service is profile_services.map_swipe  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._mystery_item_service is profile_services.mystery_item  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
     services = runtime._event_ui_services  # ruff:ignore[private-member-access] - 验证 runtime 构造期的能力 wiring。
+    assert services is profile_services.event_ui
     combat_result = runtime._combat_result_ui  # ruff:ignore[private-member-access] - 删除生产 wiring 时本测试必须失败。
     map_transition = runtime._map_transition_ui  # ruff:ignore[private-member-access] - transition 必须注入所有 consumer。
     assert combat_result is services.combat_result
@@ -227,6 +250,45 @@ def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
     assert combat_result.handle_experience_result(runtime) is False
 
 
+def test_declarative_runtime_resets_bound_profile_when_construction_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    construction_error = RuntimeError("runtime lease construction failed")
+    events: list[str] = []
+    original_bind = campaign_adapters.CampaignRuntimeProfileManager.bind
+    original_reset = campaign_adapters.CampaignRuntimeProfileManager.reset
+
+    def bind(
+        manager: CampaignRuntimeProfileManager,
+        runtime: object,
+        compiled_map: CampaignMap,
+    ) -> None:
+        original_bind(manager, runtime, compiled_map)
+        events.append("bind")
+
+    def reset(manager: CampaignRuntimeProfileManager) -> None:
+        events.append("reset")
+        original_reset(manager)
+
+    def fail_lease(_manager: CampaignRuntimeProfileManager) -> RuntimeProfileLease:
+        assert events == ["bind"]
+        raise construction_error
+
+    monkeypatch.setattr(campaign_adapters.CampaignRuntimeProfileManager, "bind", bind)
+    monkeypatch.setattr(campaign_adapters.CampaignRuntimeProfileManager, "reset", reset)
+    monkeypatch.setattr(campaign_adapters, "RuntimeProfileLease", fail_lease)
+
+    with pytest.raises(RuntimeError) as raised:
+        DeclarativeCampaignMapRuntime(
+            in_memory_config("campaign-partial-runtime-cleanup", {}),
+            object.__new__(Device),
+            load_default_stage(StageRef("campaign_main", "8-1")),
+        )
+
+    assert raised.value is construction_error
+    assert events == ["bind", "reset"]
+
+
 def test_provider_runs_real_runtime_profile_map_initialization_service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -244,10 +306,10 @@ def test_provider_runs_real_runtime_profile_map_initialization_service(
     assert session is not None
 
     provider = Mumu12CampaignRuntimeProvider(config, device)
-    handle = provider._new_handle(job, session, AbortToken())  # ruff:ignore[private-member-access]
-    runtime = handle.runtime
+    attempt = provider._new_attempt(job, session, AbortToken())  # ruff:ignore[private-member-access]
+    runtime = attempt.runtime
     initialization = runtime._map_initialization_service  # ruff:ignore[private-member-access]
-    assert handle.owner._initialization is initialization  # ruff:ignore[private-member-access]
+    assert attempt._initialization is initialization  # ruff:ignore[private-member-access]
     observed_weights: list[str] = []
 
     def map_data_init(_runtime: DeclarativeCampaignMapRuntime, map_: CampaignMap | None) -> None:
@@ -261,11 +323,10 @@ def test_provider_runs_real_runtime_profile_map_initialization_service(
 
     assert config.EnemyPriority_EnemyScaleBalanceWeight == "S3_enemy_first"
     try:
-        handle.owner.initialize(CampaignRunVariant.NORMAL)
+        attempt.initialize(CampaignRunVariant.NORMAL)
         assert observed_weights == ["default_mode"]
     finally:
-        if handle.owner.active:
-            handle.owner.close(RuntimeSessionOutcome.COMPLETED)
+        attempt.release(RuntimeSessionOutcome.COMPLETED)
 
 
 def test_declarative_runtime_owns_boss_fleet_across_sequential_profiles_and_hard_composition() -> None:
@@ -857,43 +918,78 @@ class _FakeRuntimeProfileSessionManager:
             raise error
 
 
-def test_runtime_factory_builds_map_assembly_with_one_owner() -> None:
+def test_runtime_factory_builds_complete_attempt_before_publication() -> None:
     _FakeDeclarativeRuntime.created.clear()
     factory = DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+    job = _job()
+    session = job.sessions[0]
 
-    assembly = factory.build_map(
-        in_memory_config("campaign-map-assembly", {}),
+    attempt = factory.build_attempt(
+        in_memory_config("campaign-attempt", {}),
         object.__new__(Device),
-        _definition(),
+        job,
+        session,
+        AbortToken(),
     )
 
-    runtime = cast("_FakeDeclarativeRuntime", assembly.runtime)
-    assert assembly.owner.active is False
-    assembly.owner.discard()
-    assembly.owner.discard()
+    runtime = cast("_FakeDeclarativeRuntime", attempt.runtime)
+    assert attempt.profile_state is RuntimeProfileLeaseState.READY
+    assert attempt.prepared
+    attempt.release(RuntimeSessionOutcome.INTERRUPTED)
+    attempt.release(RuntimeSessionOutcome.INTERRUPTED)
     assert runtime.calls.count("reset_runtime") == 1
     assert runtime.calls.count("discard_runtime") == 1
 
 
-def test_runtime_factory_builds_hard_assembly_before_interaction() -> None:
+def test_runtime_factory_transfers_profile_lease_to_attempt_once() -> None:
+    factory = DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+    job = _job()
+    session = job.sessions[0]
+
+    attempt = factory.build_attempt(
+        in_memory_config("campaign-attempt-lease-transfer", {}),
+        object.__new__(Device),
+        job,
+        session,
+        AbortToken(),
+    )
+
+    with pytest.raises(CampaignRuntimeEvidenceError, match="already claimed"):
+        attempt.runtime.take_profile_lease()
+
+    attempt.release(RuntimeSessionOutcome.INTERRUPTED)
+
+
+def test_runtime_factory_opens_complete_hard_session_before_publication() -> None:
     _FakeDeclarativeRuntime.created.clear()
     factory = DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     definition = compose_campaign_attempt_definition(_definition(), CampaignDifficulty.HARD)
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
+    stage = StageRef("campaign_main", "11-4")
 
-    assembly = factory.build_hard(
-        in_memory_config("campaign-hard-assembly", {}),
-        object.__new__(Device),
+    session = factory.open_hard_session(
+        in_memory_config("campaign-hard-session", {}),
+        device,
         definition,
+        stage=stage,
+        cancellation=AbortToken(),
+        remaining_reader=lambda _device: 1,
     )
 
-    runtime = cast("_FakeDeclarativeRuntime", assembly.runtime)
-    assembly.owner.release()
-    assembly.owner.release()
+    runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
+    assert session.stage == stage
+    assert session.remaining == 1
+    with pytest.raises(CampaignRuntimeEvidenceError, match="already claimed"):
+        runtime.take_profile_lease()
+    session.close()
+    session.close()
     assert runtime.calls.count("reset_runtime") == 1
     assert runtime.calls.count("discard_runtime") == 1
 
 
-def test_runtime_factory_discards_map_lease_when_product_assembly_fails() -> None:
+def test_runtime_factory_discards_map_lease_when_attempt_construction_fails() -> None:
     class _IncompleteProgramRuntime(_FakeDeclarativeRuntime):
         created: ClassVar[list[object]] = []
 
@@ -907,31 +1003,38 @@ def test_runtime_factory_discards_map_lease_when_product_assembly_fails() -> Non
             del self._program_capabilities
 
     factory = DeclarativeCampaignRuntimeFactory(_IncompleteProgramRuntime)
+    job = _job()
+    session = job.sessions[0]
 
     with pytest.raises(AttributeError, match="_program_capabilities"):
-        factory.build_map(
-            in_memory_config("campaign-incomplete-map-assembly", {}),
+        factory.build_attempt(
+            in_memory_config("campaign-incomplete-attempt", {}),
             object.__new__(Device),
-            _definition(),
+            job,
+            session,
+            AbortToken(),
         )
 
     runtime = cast("_IncompleteProgramRuntime", _IncompleteProgramRuntime.created[-1])
     assert runtime.calls == ["reset_runtime", "discard_runtime"]
 
 
-class _OpaqueFakeAssemblyFactory:
-    """发布 product 后隐藏 assembly 私有字段，验证调用方只依赖 product。"""
+class _OpaqueFakeRuntimeFactory(DeclarativeCampaignRuntimeFactory):
+    """发布 product 后隐藏 runtime 私有字段，验证调用方只依赖完整 product。"""
 
     def __init__(self) -> None:
-        self._factory = DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        super().__init__(_FakeDeclarativeRuntime)
 
-    def build_map(
+    @override
+    def build_attempt(
         self,
         config: AzurLaneConfig,
         device: Device,
-        definition: CampaignStageDefinition,
-    ) -> Mumu12CampaignMapAssembly:
-        assembly = self._factory.build_map(config, device, definition)
+        job: CampaignJobSpec,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> Mumu12CampaignAttempt:
+        attempt = super().build_attempt(config, device, job, session, cancellation)
         for field in (
             "_runtime_profile_lease",
             "_submarine_services",
@@ -939,27 +1042,40 @@ class _OpaqueFakeAssemblyFactory:
             "_runtime_profile",
             "_program_capabilities",
         ):
-            vars(assembly.runtime).pop(field)
-        return assembly
+            vars(attempt.runtime).pop(field)
+        return attempt
 
-    def build_hard(
+    @override
+    def open_hard_session(
         self,
         config: AzurLaneConfig,
         device: Device,
         definition: CampaignStageDefinition,
-    ) -> Mumu12CampaignHardAssembly:
-        assembly = self._factory.build_hard(config, device, definition)
-        vars(assembly.runtime).pop("_runtime_profile_lease")
-        vars(assembly.runtime).pop("_hard_behavior")
-        return assembly
+        *,
+        stage: StageRef,
+        cancellation: CancellationSource,
+        remaining_reader: Callable[[Device], int],
+    ) -> Mumu12HardCampaignSession:
+        session = super().open_hard_session(
+            config,
+            device,
+            definition,
+            stage=stage,
+            cancellation=cancellation,
+            remaining_reader=remaining_reader,
+        )
+        runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
+        vars(runtime).pop("_runtime_profile_lease")
+        vars(runtime).pop("_hard_behavior")
+        return session
 
 
-def test_map_provider_consumes_assembly_without_runtime_private_fields() -> None:
+def test_map_provider_consumes_attempt_without_runtime_private_fields() -> None:
     _FakeDeclarativeRuntime.created.clear()
     provider = Mumu12CampaignRuntimeProvider(
-        in_memory_config("campaign-opaque-map-assembly", {}),
+        in_memory_config("campaign-opaque-attempt", {}),
         object.__new__(Device),
-        assembly_factory=_OpaqueFakeAssemblyFactory(),
+        runtime_factory=_OpaqueFakeRuntimeFactory(),
     )
 
     activated = provider.activate(_job(), AbortToken())
@@ -971,16 +1087,16 @@ def test_map_provider_consumes_assembly_without_runtime_private_fields() -> None
     assert "reset_runtime" in runtime.calls
 
 
-def test_hard_port_consumes_assembly_without_runtime_private_fields() -> None:
+def test_hard_port_consumes_session_without_runtime_private_fields() -> None:
     _FakeDeclarativeRuntime.created.clear()
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
     port = Mumu12HardCampaignPort(
-        in_memory_config("campaign-opaque-hard-assembly", {}),
+        in_memory_config("campaign-opaque-hard-session", {}),
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=_OpaqueFakeAssemblyFactory(),
+        runtime_factory=_OpaqueFakeRuntimeFactory(),
         remaining_reader=lambda _device: 1,
     )
 
@@ -1202,7 +1318,7 @@ def test_campaign_runtime_does_not_reapply_stale_emotion_values_after_recording(
     config = in_memory_config("campaign-emotion-ledger", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -1341,7 +1457,7 @@ def test_normal_enemy_candidate_mask_validates_every_cell_before_writing() -> No
     assert tuple(grid.may_enemy for grid in map_) == before
 
 
-def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None:
+def test_campaign_attempt_is_poisoned_before_session_cleanup_can_fail() -> None:
     cleanup_error = RuntimeError("session cleanup failed")
     calls: list[object] = []
 
@@ -1360,21 +1476,24 @@ def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None
             calls.append("reset")
 
     lease = RuntimeProfileLease(_EndFailingProfile())
-    lease.start()
-    runtime = object.__new__(DeclarativeCampaignMapRuntime)
-    owner = Mumu12CampaignMapSessionOwner(
-        runtime,
-        lease,
-        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
-        CampaignMapInitializationService(),
+    job = _job()
+    session = job.sessions[0]
+    device = object.__new__(Device)
+    runtime = _FakeDeclarativeRuntime(
+        in_memory_config("campaign-attempt-close-failure", {}),
+        device,
+        session.definition,
     )
+    runtime._runtime_profile_lease = lease  # ruff:ignore[private-member-access] - 注入关闭失败的真实 lease。
+    attempt = Mumu12CampaignAttempt(runtime, runtime.take_profile_lease(), job, session, device, AbortToken())
+    lease.start()
 
     with pytest.raises(RuntimeError) as raised:
-        owner.close(RuntimeSessionOutcome.FAILED)
+        attempt.release(RuntimeSessionOutcome.FAILED)
 
     assert raised.value is cleanup_error
-    assert lease.state is RuntimeProfileLeaseState.CLOSED
-    assert owner.active is False
+    assert attempt.profile_state is RuntimeProfileLeaseState.CLOSED
+    assert attempt.active is False
     assert calls == [
         "begin_session",
         ("end_session", RuntimeSessionOutcome.FAILED),
@@ -1384,7 +1503,7 @@ def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None
         lease.start()
 
 
-def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> None:
+def test_campaign_attempt_preserves_initialization_and_cleanup_failures() -> None:
     initialization_error = RuntimeError("map initialization failed")
     cleanup_error = OSError("profile cleanup failed")
     calls: list[object] = []
@@ -1403,31 +1522,29 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
         def reset() -> None:
             calls.append("reset")
 
-    def fail_map_data_init(map_: CampaignMap | None) -> None:
-        del map_
-        raise initialization_error
+    class _InitializationFailingRuntime(_FakeDeclarativeRuntime):
+        @override
+        def map_data_init(self, map_: CampaignMap | None) -> None:
+            del map_
+            raise initialization_error
 
-    runtime = cast(
-        "Mumu12CampaignMapSessionRuntime",
-        SimpleNamespace(
-            MAP=compile_campaign_map(_definition()),
-            session_variant=CampaignRunVariant.NORMAL,
-            map_is_clear_mode=False,
-            map_data_init=fail_map_data_init,
-            map_control_init=lambda: None,
-        ),
+    job = _job()
+    session = job.sessions[0]
+    device = object.__new__(Device)
+    runtime = _InitializationFailingRuntime(
+        in_memory_config("campaign-attempt-initialization-failure", {}),
+        device,
+        session.definition,
     )
-    owner = Mumu12CampaignMapSessionOwner(
-        runtime,
-        RuntimeProfileLease(_CleanupFailingProfile()),
-        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
-        CampaignMapInitializationService(),
-    )
+    lease = RuntimeProfileLease(_CleanupFailingProfile())
+    runtime._runtime_profile_lease = lease  # ruff:ignore[private-member-access] - 注入双失败 lease。
+    attempt = Mumu12CampaignAttempt(runtime, runtime.take_profile_lease(), job, session, device, AbortToken())
     with pytest.raises(BaseExceptionGroup) as raised:
-        owner.initialize(CampaignRunVariant.NORMAL)
+        attempt.initialize(CampaignRunVariant.NORMAL)
 
     assert raised.value.exceptions == (initialization_error, cleanup_error)
-    assert owner.active is False
+    assert attempt.profile_state is RuntimeProfileLeaseState.CLOSED
+    assert attempt.active is False
     assert calls == [
         "begin_session",
         ("end_session", RuntimeSessionOutcome.FAILED),
@@ -1435,7 +1552,7 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
     ]
 
 
-def test_map_session_owner_maps_map_initialization_abort_to_interrupted() -> None:
+def test_campaign_attempt_maps_map_initialization_abort_to_interrupted() -> None:
     abort = AbortRequested("map initialization cancelled")
 
     class _AbortingMapDataInitRuntime(_FakeDeclarativeRuntime):
@@ -1448,23 +1565,20 @@ def test_map_session_owner_maps_map_initialization_abort_to_interrupted() -> Non
 
     runtime = _AbortingMapDataInitRuntime(
         in_memory_config("campaign-map-init-abort", {}),
-        object.__new__(Device),
+        device := object.__new__(Device),
         _definition(),
     )
-    owner = Mumu12CampaignMapSessionOwner(
-        runtime,
-        runtime._runtime_profile_lease,  # ruff:ignore[private-member-access] - 测试显式接管 runtime lease。
-        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
-        CampaignMapInitializationService(),
-    )
+    job = _job()
     session = CampaignSession(runtime.definition, CampaignRunVariant.NORMAL)
+    attempt = Mumu12CampaignAttempt(runtime, runtime.take_profile_lease(), job, session, device, AbortToken())
 
     with pytest.raises(AbortRequested) as raised:
-        owner.initialize(session.variant)
+        attempt.initialize(session.variant)
 
     assert raised.value is abort
     assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in runtime.calls
-    assert owner.active is False
+    assert attempt.profile_state is RuntimeProfileLeaseState.CLOSED
+    assert attempt.active is False
 
 
 def test_new_runtime_refresh_failure_cleans_the_factory_result(
@@ -1479,19 +1593,17 @@ def test_new_runtime_refresh_failure_cleans_the_factory_result(
     _RefreshCleanupFailingRuntime.cleanup_error = cleanup_error
 
     def fail_refresh(
-        provider: Mumu12CampaignRuntimeProvider,
-        job: CampaignJobSpec,
-        runtime: DeclarativeCampaignMapRuntime,
+        attempt: Mumu12CampaignAttempt,
         cancellation: CancellationSource,
-    ) -> SafeUnitCancellation:
-        del provider, job, runtime, cancellation
+    ) -> None:
+        del attempt, cancellation
         raise refresh_error
 
-    monkeypatch.setattr(Mumu12CampaignRuntimeProvider, "_refresh_runtime_cancellation", fail_refresh)
+    monkeypatch.setattr(Mumu12CampaignAttempt, "refresh_cancellation", fail_refresh)
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-refresh-cleanup-failure", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_RefreshCleanupFailingRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_RefreshCleanupFailingRuntime),
     )
 
     with pytest.raises(ExceptionGroup) as raised:
@@ -1525,7 +1637,7 @@ def test_fresh_activation_guard_cleans_runtime_when_entry_setup_fails() -> None:
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-entry-setup-cleanup-failure", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_SetupCleanupFailingRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_SetupCleanupFailingRuntime),
     )
 
     with pytest.raises(ExceptionGroup) as raised:
@@ -1550,7 +1662,7 @@ def test_activation_guard_releases_initialized_runtime_when_final_overlay_fails(
     provider = Mumu12CampaignRuntimeProvider(
         config,
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
     )
 
     with pytest.raises(RuntimeError) as raised:
@@ -1559,7 +1671,7 @@ def test_activation_guard_releases_initialized_runtime_when_final_overlay_fails(
     assert raised.value is overlay_error
     runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
     assert ("finish_runtime_session", RuntimeSessionOutcome.FAILED) in runtime.calls
-    assert provider._handle is None  # ruff:ignore[private-member-access] - cleanup 前先撤销唯一 handle。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - cleanup 前先撤销唯一 attempt。
 
 
 def test_provider_enters_once_and_exposes_only_the_exact_activated_variant() -> None:
@@ -1568,7 +1680,7 @@ def test_provider_enters_once_and_exposes_only_the_exact_activated_variant() -> 
     config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
 
     activated = provider.activate(_job(), AbortToken())
@@ -1650,7 +1762,7 @@ def test_fresh_activation_orders_entry_session_phases_overlay_and_publication(
     provider = Mumu12CampaignRuntimeProvider(
         config,
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_OrderedRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_OrderedRuntime),
     )
 
     activated = provider.activate(_job(), AbortToken())
@@ -1669,12 +1781,12 @@ def test_fresh_activation_orders_entry_session_phases_overlay_and_publication(
     assert provider.active_runtime(activated, AbortToken()) is _OrderedRuntime.created[-1]
 
 
-def test_prepared_handle_mismatch_does_not_construct_a_second_runtime() -> None:
+def test_prepared_attempt_mismatch_does_not_construct_a_second_runtime() -> None:
     _FakeDeclarativeRuntime.created.clear()
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-prepared-mismatch", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
     )
     prepared_job = _job()
     session = prepared_job.sessions[0]
@@ -1684,10 +1796,10 @@ def test_prepared_handle_mismatch_does_not_construct_a_second_runtime() -> None:
         provider.activate(_job(), AbortToken())
 
     assert len(_FakeDeclarativeRuntime.created) == 1
-    assert provider._handle is None  # ruff:ignore[private-member-access] - mismatch cleanup 后不得残留 owner。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - mismatch cleanup 后不得残留 attempt。
 
 
-def test_gems_hard_preparation_failure_retains_a_prepared_ready_handle() -> None:
+def test_gems_hard_preparation_failure_retains_a_prepared_ready_attempt() -> None:
     class _GemsPreparationRuntime(_FakeDeclarativeRuntime):
         created: ClassVar[list[object]] = []
 
@@ -1706,7 +1818,7 @@ def test_gems_hard_preparation_failure_retains_a_prepared_ready_handle() -> None
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-gems-preparation", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_GemsPreparationRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_GemsPreparationRuntime),
     )
     job = _job()
     session = job.sessions[0]
@@ -1714,14 +1826,14 @@ def test_gems_hard_preparation_failure_retains_a_prepared_ready_handle() -> None
     result = provider.activate(job, AbortToken())
 
     assert isinstance(result, CampaignGemsReplacementFailed)
-    handle = provider._handle  # ruff:ignore[private-member-access] - 验证失败边界仍由唯一 Prepared handle 持有。
-    assert handle is not None
-    assert handle.owner.active is False
-    assert handle.runtime._runtime_profile_lease.state is RuntimeProfileLeaseState.READY  # ruff:ignore[private-member-access]
+    attempt = provider._attempt  # ruff:ignore[private-member-access] - 失败边界仍保留唯一 READY attempt。
+    assert attempt is not None
+    assert attempt.prepared
+    assert attempt.profile_state is RuntimeProfileLeaseState.READY
     replacement = provider.commit_replacement_unit(session, AbortToken())
-    assert replacement.runtime is handle.runtime
+    assert replacement.runtime is attempt.runtime
     provider.finish(session, session.initial_state(), CampaignStopReason.GEMS_HARD_PREPARATION_FAILED)
-    assert provider._handle is None  # ruff:ignore[private-member-access] - report 边界释放 Prepared handle。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - report 边界释放 Prepared attempt。
 
 
 def test_hard_attempt_overlay_is_immutable_and_idempotent() -> None:
@@ -1744,7 +1856,7 @@ def test_provider_composes_hard_runtime_profile_for_a_main_stage() -> None:
     device = object.__new__(Device)
     job = replace(_job(), difficulty=CampaignDifficulty.HARD)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
 
     activated = provider.activate(job, AbortToken())
@@ -1766,7 +1878,7 @@ def test_provider_keeps_one_runtime_across_resumable_turns_then_releases_it() ->
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -1803,7 +1915,7 @@ def test_retained_runtime_rejects_a_different_durable_checkpoint_token() -> None
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-checkpoint-token", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -1823,7 +1935,7 @@ def test_retained_runtime_rejects_a_different_durable_checkpoint_token() -> None
 
     runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[0])
     assert ("finish_runtime_session", RuntimeSessionOutcome.FAILED) in runtime.calls
-    assert provider._handle is None  # ruff:ignore[private-member-access] - token mismatch 必须毒化并释放 retained owner。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - token mismatch 必须毒化并释放 retained attempt。
 
 
 def test_checkpoint_probe_failure_releases_the_retained_runtime() -> None:
@@ -1844,7 +1956,7 @@ def test_checkpoint_probe_failure_releases_the_retained_runtime() -> None:
     provider = Mumu12CampaignRuntimeProvider(
         config,
         device,
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_CheckpointCleanupFailingRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_CheckpointCleanupFailingRuntime),
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -1863,16 +1975,16 @@ def test_checkpoint_probe_failure_releases_the_retained_runtime() -> None:
         provider.activate(_job(progress=progress), AbortToken())
 
     assert raised.value.exceptions == (screenshot_error, cleanup_error)
-    assert provider._handle is None  # ruff:ignore[private-member-access] - probe 失败后唯一 owner 必须清空。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - probe 失败后唯一 attempt 必须清空。
 
 
-def test_checkpoint_activation_abort_closes_the_active_handle_as_interrupted() -> None:
+def test_checkpoint_activation_abort_closes_the_active_attempt_as_interrupted() -> None:
     _FakeDeclarativeRuntime.created.clear()
     abort = AbortRequested("checkpoint activation cancelled")
     config = in_memory_config("campaign-checkpoint-abort", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -1898,7 +2010,7 @@ def test_checkpoint_activation_abort_closes_the_active_handle_as_interrupted() -
     assert raised.value is abort
     runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[0])
     assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in runtime.calls
-    assert provider._handle is None  # ruff:ignore[private-member-access] - 取消清理后不得保留 active handle。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - 取消清理后不得保留 active attempt。
 
 
 def test_provider_discards_retained_checkpoint_runtime_as_interrupted() -> None:
@@ -1906,7 +2018,7 @@ def test_provider_discards_retained_checkpoint_runtime_as_interrupted() -> None:
     config = in_memory_config("campaign-provider-stale", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -1936,7 +2048,7 @@ def test_provider_discards_prepared_checkpoint_runtime() -> None:
     config = in_memory_config("campaign-provider-stale-prepared", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     job = _job()
     session = job.sessions[0]
@@ -1949,7 +2061,7 @@ def test_provider_discards_prepared_checkpoint_runtime() -> None:
     assert "discard_runtime" in prepared_runtime.calls
 
 
-def test_provider_clears_single_handle_before_cleanup_failure() -> None:
+def test_provider_clears_single_attempt_before_cleanup_failure() -> None:
     cleanup_error = RuntimeError("prepared cleanup failed")
 
     class _CleanupFailingPreparedRuntime(_FakeDeclarativeRuntime):
@@ -1960,7 +2072,7 @@ def test_provider_clears_single_handle_before_cleanup_failure() -> None:
     provider = Mumu12CampaignRuntimeProvider(
         config,
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingPreparedRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingPreparedRuntime),
     )
     job = _job()
     session = job.sessions[0]
@@ -1970,7 +2082,7 @@ def test_provider_clears_single_handle_before_cleanup_failure() -> None:
         provider.discard_checkpoint()
 
     assert raised.value is cleanup_error
-    assert provider._handle is None  # ruff:ignore[private-member-access] - cleanup 失败也不能恢复 owner。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - cleanup 失败也不能恢复 attempt。
 
 
 def test_in_progress_completed_state_closes_the_finished_map_runtime() -> None:
@@ -1978,7 +2090,7 @@ def test_in_progress_completed_state_closes_the_finished_map_runtime() -> None:
     config = in_memory_config("campaign-provider-completed-map", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -2001,7 +2113,7 @@ def test_completed_map_remains_completed_when_post_map_fleet_replacement_fails()
     config = in_memory_config("campaign-provider-post-map-gems-failure", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -2024,7 +2136,7 @@ def test_active_map_fleet_replacement_failure_marks_runtime_failed() -> None:
     config = in_memory_config("campaign-provider-pre-map-gems-failure", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -2045,7 +2157,7 @@ def test_provider_reports_failed_domain_state_to_runtime_lifecycle() -> None:
     config = in_memory_config("campaign-provider-failed", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -2062,24 +2174,65 @@ def test_provider_reports_failed_domain_state_to_runtime_lifecycle() -> None:
     assert ("finish_runtime_session", RuntimeSessionOutcome.FAILED) in runtime.calls
 
 
-def test_provider_commits_program_io_as_one_non_interruptible_safe_unit() -> None:
+def test_provider_reuses_one_committed_cancellation_until_campaign_checkpoint() -> None:
     _FakeDeclarativeRuntime.created.clear()
     config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     cancellation = AbortToken()
     activated = provider.activate(_job(), cancellation)
     assert isinstance(activated, CampaignSession)
 
-    unit = provider.commit_active_unit(activated, cancellation)
+    standard_unit = provider.commit_active_unit(activated, cancellation)
+    auto_search_unit = provider.commit_active_unit(activated, cancellation)
     cancellation.request("defer until campaign checkpoint")
 
-    unit.cancellation.raise_if_requested()
-    assert unit.runtime is _FakeDeclarativeRuntime.created[-1]
+    assert auto_search_unit.cancellation is standard_unit.cancellation
+    standard_unit.cancellation.raise_if_requested()
+    auto_search_unit.cancellation.raise_if_requested()
+    assert standard_unit.runtime is _FakeDeclarativeRuntime.created[-1]
+    assert auto_search_unit.runtime is standard_unit.runtime
     with pytest.raises(AbortRequested, match="defer until campaign checkpoint"):
         cancellation.raise_if_requested()
+
+
+def test_provider_rejects_cancellation_before_committing_active_unit() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = in_memory_config("campaign-provider-pre-commit-cancellation", {})
+    device = object.__new__(Device)
+    provider = Mumu12CampaignRuntimeProvider(
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+    )
+    cancellation = AbortToken()
+    activated = provider.activate(_job(), cancellation)
+    assert isinstance(activated, CampaignSession)
+    cancellation.request("stop before campaign action")
+
+    with pytest.raises(AbortRequested, match="stop before campaign action"):
+        provider.commit_active_unit(activated, cancellation)
+
+
+def test_provider_rejects_non_active_session_before_committing_unit() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = in_memory_config("campaign-provider-session-mismatch", {})
+    device = object.__new__(Device)
+    provider = Mumu12CampaignRuntimeProvider(
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+    )
+    cancellation = AbortToken()
+    activated = provider.activate(_job(), cancellation)
+    assert isinstance(activated, CampaignSession)
+    other_variant = (
+        CampaignRunVariant.LOOP if activated.variant is CampaignRunVariant.NORMAL else CampaignRunVariant.NORMAL
+    )
+    mismatched = CampaignSession(activated.definition, other_variant)
+
+    with pytest.raises(CampaignRuntimeEvidenceError, match="no active safe unit"):
+        provider.commit_active_unit(mismatched, cancellation)
+
+    assert provider.commit_active_unit(activated, cancellation).runtime is _FakeDeclarativeRuntime.created[-1]
 
 
 def test_provider_returns_typed_map_achievement_evidence_from_entry_stop() -> None:
@@ -2091,7 +2244,7 @@ def test_provider_returns_typed_map_achievement_evidence_from_entry_stop() -> No
     config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
 
     try:
@@ -2131,7 +2284,7 @@ def test_provider_preserves_campaign_selection_and_discard_failures() -> None:
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-selection-failure", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_SelectionFailingRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_SelectionFailingRuntime),
     )
 
     with pytest.raises(ExceptionGroup) as raised:
@@ -2156,7 +2309,7 @@ def test_provider_does_not_reinspect_map_achievement() -> None:
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-map-stop-inspection-failure", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_InspectionFailingStopRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_InspectionFailingStopRuntime),
     )
 
     result = provider.activate(_job(), AbortToken())
@@ -2172,7 +2325,7 @@ def test_resource_free_selection_projects_exact_completion_runtime_policy() -> N
     config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     base = _job()
     ref = base.stage_refs[0]
@@ -2209,7 +2362,7 @@ def test_gems_policy_projects_runtime_configuration_without_overwriting_live_equ
     )
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     base = _job()
     fallback_definition = replace(
@@ -2248,7 +2401,7 @@ def test_provider_reuses_pre_entry_evidence_runtime_for_activation() -> None:
     config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
     job = _job()
     session = job.sessions[0]
@@ -2285,7 +2438,7 @@ def test_provider_restarts_an_initial_checkpoint_after_evidence_proves_a_map_bou
     selected = job.session_for(progress.stage_ref, progress.variant)
     assert selected is not None
     provider = Mumu12CampaignRuntimeProvider(
-        config, device, assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     )
 
     evidence = provider.before_entry(job, selected, progress.session_state, AbortToken())
@@ -2327,7 +2480,7 @@ def test_provider_resets_a_cold_noninitial_checkpoint_without_constructing_runti
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-cold-checkpoint", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(fail_runtime_factory),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(fail_runtime_factory),
     )
 
     result = provider.activate(_job(progress=progress), AbortToken())
@@ -2336,7 +2489,7 @@ def test_provider_resets_a_cold_noninitial_checkpoint_without_constructing_runti
     assert _FakeUI.calls == [(page_campaign_menu, False)]
     assert isinstance(_FakeUI.devices[0], CancellationAwareMumu12Device)
     assert _FakeDeclarativeRuntime.created == []
-    assert provider._handle is None  # ruff:ignore[private-member-access] - cold reset 不得伪造 runtime owner。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - cold reset 不得伪造 runtime attempt。
 
 
 def test_provider_normalizes_an_initial_direct_activation_and_builds_one_runtime() -> None:
@@ -2355,7 +2508,7 @@ def test_provider_normalizes_an_initial_direct_activation_and_builds_one_runtime
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-initial-direct", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
     )
 
     result = provider.activate(_job(progress=progress), AbortToken())
@@ -2375,7 +2528,7 @@ def test_provider_resets_a_retained_checkpoint_when_the_client_left_its_map(
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-missing-retained-map", {}),
         device,
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
     )
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
@@ -2399,7 +2552,7 @@ def test_provider_resets_a_retained_checkpoint_when_the_client_left_its_map(
     assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in runtime.calls
     assert _FakeUI.calls == [(page_campaign_menu, False)]
     assert len(_FakeDeclarativeRuntime.created) == 1
-    assert provider._handle is None  # ruff:ignore[private-member-access] - physical mismatch 经统一 reset 释放 owner。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - physical mismatch 经统一 reset 释放 attempt。
 
 
 @pytest.mark.parametrize(
@@ -2430,7 +2583,7 @@ def test_cold_checkpoint_reset_error_has_no_runtime_effect(
     provider = Mumu12CampaignRuntimeProvider(
         in_memory_config("campaign-cold-reset-error", {}),
         object.__new__(Device),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
     )
     _FakeDeclarativeRuntime.created.clear()
 
@@ -2439,7 +2592,7 @@ def test_cold_checkpoint_reset_error_has_no_runtime_effect(
 
     assert raised.value is error
     assert _FakeDeclarativeRuntime.created == []
-    assert provider._handle is None  # ruff:ignore[private-member-access] - UI 失败不产生可持久化 runtime 状态。
+    assert provider._attempt is None  # ruff:ignore[private-member-access] - UI 失败不产生可持久化 runtime 状态。
 
 
 @pytest.mark.parametrize(
@@ -2464,7 +2617,7 @@ def test_hard_port_uses_explicit_override_or_main_map_and_settles_one_attempt(
         config,
         device,
         source,
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=lambda _device: 2,
     )
     settings = _hard_settings(stage)
@@ -2504,7 +2657,7 @@ def test_hard_workflow_closes_each_real_runtime_across_three_attempts(
         config,
         device,
         source,
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=lambda _device: next(remaining),
     )
     _disable_hard_activation(monkeypatch, device)
@@ -2554,7 +2707,7 @@ def test_hard_workflow_releases_real_runtime_before_retry(
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FailingHardRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FailingHardRuntime),
         remaining_reader=lambda _device: next(remaining),
     )
     _disable_hard_activation(monkeypatch, device)
@@ -2598,7 +2751,7 @@ def test_hard_workflow_releases_real_runtime_after_cancellation(
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=read_remaining,
     )
     _disable_hard_activation(monkeypatch, device)
@@ -2634,7 +2787,7 @@ def test_hard_workflow_releases_real_runtime_after_unexpected_error(
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FailingHardRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FailingHardRuntime),
         remaining_reader=lambda _device: next(remaining),
     )
     _disable_hard_activation(monkeypatch, device)
@@ -2677,7 +2830,7 @@ def test_hard_port_preserves_attempt_discovery_and_cleanup_failures() -> None:
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingRuntime),
         remaining_reader=fail_remaining,
     )
 
@@ -2685,14 +2838,15 @@ def test_hard_port_preserves_attempt_discovery_and_cleanup_failures() -> None:
         port.remaining_attempts(_hard_settings(), AbortToken())
 
     assert raised.value.exceptions == (discovery_error, cleanup_error)
-    assert port._handle is None  # ruff:ignore[private-member-access] - discovery 失败不得发布半初始化 handle。
+    assert port._session is None  # ruff:ignore[private-member-access] - discovery 失败不得发布半初始化 session。
     runtime = cast("_CleanupFailingRuntime", _CleanupFailingRuntime.created[0])
-    assert runtime._runtime_profile_lease.state is RuntimeProfileLeaseState.CLOSED  # ruff:ignore[private-member-access] - owner 即使 cleanup 失败也必须关闭唯一 lease。
+    with pytest.raises(CampaignRuntimeEvidenceError, match="already claimed"):
+        runtime.take_profile_lease()
     assert runtime.calls.count("discard_runtime") == 1
     assert runtime.calls[-1] == "discard_runtime"
 
 
-def test_hard_port_records_interrupted_owner_outcome_for_mid_attempt_cancellation() -> None:
+def test_hard_port_records_interrupted_session_outcome_for_mid_attempt_cancellation() -> None:
     _FakeDeclarativeRuntime.created.clear()
 
     class _CancelAfterLeaseStart:
@@ -2704,7 +2858,7 @@ def test_hard_port_records_interrupted_owner_outcome_for_mid_attempt_cancellatio
                     reason = "cancel hard attempt"
                     raise AbortRequested(reason)
 
-    config = in_memory_config("hard-owner-cancel", {})
+    config = in_memory_config("hard-session-cancel", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
@@ -2712,7 +2866,7 @@ def test_hard_port_records_interrupted_owner_outcome_for_mid_attempt_cancellatio
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=lambda _device: 1,
     )
     cancellation = _CancelAfterLeaseStart()
@@ -2731,7 +2885,7 @@ def test_hard_port_records_interrupted_owner_outcome_for_mid_attempt_cancellatio
     assert runtime.calls.count("reset_runtime") == 1
 
 
-def test_hard_port_release_clears_handle_before_owner_cleanup_failure() -> None:
+def test_hard_port_release_clears_session_before_cleanup_failure() -> None:
     cleanup_error = OSError("runtime cleanup failed")
 
     class _CleanupFailingRuntime(_FakeDeclarativeRuntime):
@@ -2746,7 +2900,7 @@ def test_hard_port_release_clears_handle_before_owner_cleanup_failure() -> None:
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingRuntime),
         remaining_reader=lambda _device: 1,
     )
 
@@ -2755,47 +2909,10 @@ def test_hard_port_release_clears_handle_before_owner_cleanup_failure() -> None:
         port.release()
 
     assert raised.value is cleanup_error
-    assert port._handle is None  # ruff:ignore[private-member-access] - cleanup 失败也不能复用已移交的 handle。
+    assert port._session is None  # ruff:ignore[private-member-access] - cleanup 失败也不能复用已移交的 session。
     port.release()
     runtime = cast("_CleanupFailingRuntime", _CleanupFailingRuntime.created[-1])
     assert runtime.calls.count("discard_runtime") == 1
-
-
-def test_hard_port_owner_contract_failure_discards_lease_before_interaction() -> None:
-    interactions: list[str] = []
-
-    class _InvalidHardRuntime(_FakeDeclarativeRuntime):
-        created: ClassVar[list[object]] = []
-
-        def __init__(self, config: AzurLaneConfig, device: Device, definition: CampaignStageDefinition) -> None:
-            super().__init__(config, device, definition)
-            vars(self)["auto_search_execute_a_battle"] = None
-
-    config = in_memory_config("hard-owner-contract-failure", {})
-    device = object.__new__(Device)
-    vars(device)["screenshot"] = lambda: interactions.append("screenshot")
-    vars(device)["image"] = object()
-
-    def read_remaining(_device: Device) -> int:
-        interactions.append("ocr")
-        return 1
-
-    port = Mumu12HardCampaignPort(
-        config,
-        device,
-        _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_InvalidHardRuntime),
-        remaining_reader=read_remaining,
-    )
-
-    with pytest.raises(TypeError, match="hard attempt runtime"):
-        port.remaining_attempts(_hard_settings(), AbortToken())
-
-    runtime = cast("_InvalidHardRuntime", _InvalidHardRuntime.created[-1])
-    assert interactions == []
-    assert not any(isinstance(call, tuple) and call[0] == "select_stage" for call in runtime.calls)
-    assert runtime.calls == ["reset_runtime", "discard_runtime"]
-    assert port._handle is None  # ruff:ignore[private-member-access] - owner 构造失败不得发布 handle。
 
 
 @pytest.mark.parametrize("hard_behavior", [None, object()], ids=("missing", "wrong-type"))
@@ -2824,7 +2941,7 @@ def test_hard_port_rejects_invalid_typed_behavior_before_stage_or_ocr_interactio
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_InvalidHardBehaviorRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_InvalidHardBehaviorRuntime),
         remaining_reader=read_remaining,
     )
 
@@ -2835,35 +2952,32 @@ def test_hard_port_rejects_invalid_typed_behavior_before_stage_or_ocr_interactio
     assert interactions == []
     assert not any(isinstance(call, tuple) and call[0] == "select_stage" for call in runtime.calls)
     assert runtime.calls == ["reset_runtime", "discard_runtime"]
-    assert port._handle is None  # ruff:ignore[private-member-access] - 无 typed behavior 不得发布 handle。
+    assert port._session is None  # ruff:ignore[private-member-access] - 无 typed behavior 不得发布 session。
 
 
-def test_hard_port_releases_real_runtime_before_the_next_attempt(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    entrance = Button(area=(), color=(), button=(1, 2, 3, 4), name="HARD_ENTRANCE")
-
-    def discover_without_ui(
-        _port: Mumu12HardCampaignPort,
-        _runtime: DeclarativeCampaignMapRuntime,
-        _settings: HardSettings,
-        _cancellation: CancellationSource,
-    ) -> tuple[int, Button]:
-        return 1, entrance
-
-    monkeypatch.setattr(Mumu12HardCampaignPort, "_read_remaining_attempts", discover_without_ui)
-    config = in_memory_config("hard-real-owner-wiring", {})
+def test_hard_port_releases_session_before_the_next_attempt() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = in_memory_config("hard-session-wiring", {})
     device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
     port = Mumu12HardCampaignPort(
         config,
         device,
-        _FakeSessionSource(load_default_stage(StageRef("campaign_main", "8-1"))),
+        _FakeSessionSource(_definition()),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        remaining_reader=lambda _device: 1,
     )
 
-    assert port.remaining_attempts(_hard_settings("8-1"), AbortToken()) == 1
+    assert port.remaining_attempts(_hard_settings(), AbortToken()) == 1
     port.release()
-    assert port.remaining_attempts(_hard_settings("8-1"), AbortToken()) == 1
+    assert port.remaining_attempts(_hard_settings(), AbortToken()) == 1
     port.release()
+
+    assert len(_FakeDeclarativeRuntime.created) == 2
+    for created in _FakeDeclarativeRuntime.created:
+        runtime = cast("_FakeDeclarativeRuntime", created)
+        assert runtime.calls.count("discard_runtime") == 1
 
 
 def test_hard_port_stage_mismatch_can_be_released_without_cancellation() -> None:
@@ -2876,7 +2990,7 @@ def test_hard_port_stage_mismatch_can_be_released_without_cancellation() -> None
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=lambda _device: 1,
     )
     first = _hard_settings("11-4")

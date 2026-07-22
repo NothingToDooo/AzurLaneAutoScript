@@ -26,7 +26,7 @@ def test_nier_pause_uses_new_exercise_hp_layout(monkeypatch: pytest.MonkeyPatch)
         areas.append(area)
         return 1.0
 
-    monkeypatch.setattr(HpDaemon, "_calculate_hp", staticmethod(calculate_hp))
+    monkeypatch.setattr(HpDaemon, "_calculate_exercise_hp", staticmethod(calculate_hp))
     image = cast("ImageArray", np.zeros((1, 1, 3), dtype=np.uint8))
 
     assert (

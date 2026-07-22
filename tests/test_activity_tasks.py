@@ -61,7 +61,7 @@ from module.gameplay.activity import (
     RaidMode,
     RaidOptions,
 )
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -198,7 +198,7 @@ def _context(
     abort: AbortToken | None = None,
 ) -> TaskContext:
     if mode is None:
-        mode = TASK_CATALOG[command].execution_mode
+        mode = TASK_SPECS[command].execution_mode
     return TaskContext(
         task_id=TaskId(command),
         started_at=_RUN_STARTED_AT,
@@ -299,7 +299,7 @@ def test_gameplay_command_enums_are_registered_in_the_task_catalog() -> None:
         for command in command_type
     }
 
-    assert commands <= TASK_CATALOG.keys()
+    assert commands <= TASK_SPECS.keys()
 
 
 @pytest.mark.parametrize(

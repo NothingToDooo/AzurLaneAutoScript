@@ -5,7 +5,8 @@ import threading
 from typing import TYPE_CHECKING, cast
 
 from module.bootstrap.production import run_default_command
-from module.logger import logger
+from module.logger import configure_file_logging, logger
+from module.project_paths import PROJECT_ROOT
 from module.runtime.runner import CommandStatus
 
 if TYPE_CHECKING:
@@ -38,6 +39,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    configure_file_logging(PROJECT_ROOT, name="alas")
     stop = _ProcessStopSignal()
     previous: dict[signal.Signals, object] = {}
     supported = tuple(
@@ -49,6 +51,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         outcome = run_default_command(
             args.command,
+            project_root=PROJECT_ROOT,
             stop_signal=stop,
         )
     finally:

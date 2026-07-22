@@ -11,6 +11,7 @@ from tqdm.contrib.concurrent import process_map
 from module.base.utils import get_bbox, get_color, image_size, load_image
 from module.config.config_manual import ManualConfig as AzurLaneConfig
 from module.logger import logger
+from module.project_paths import PROJECT_ROOT
 
 if TYPE_CHECKING:
     from module.base.type_alias import FilePath, ImageArray
@@ -19,7 +20,7 @@ type Bounds = tuple[int, int, int, int]
 type MeanColor = tuple[int, int, int]
 type Extraction = tuple[Bounds, MeanColor]
 
-MODULE_FOLDER = "./module"
+MODULE_FOLDER = (PROJECT_ROOT / "module").as_posix()
 BUTTON_FILE = "assets.py"
 EXPECTED_BUTTON_RESOLUTION = (1280, 720)
 IMAGE_EXTENSIONS = frozenset({".gif", ".png"})
@@ -159,6 +160,15 @@ def _generated_path(path: Path) -> str:
     return value if path.is_absolute() else f"./{value}"
 
 
+def _repository_root() -> Path:
+    return Path(MODULE_FOLDER).resolve().parent
+
+
+def _source_path(file: FilePath) -> Path:
+    path = Path(file)
+    return path if path.is_absolute() else _repository_root() / path
+
+
 class ImageExtractor:
     def __init__(self, module: str, file: FilePath) -> None:
         path = Path(file)
@@ -170,7 +180,7 @@ class ImageExtractor:
         for ext in [".png", ".gif"]:
             file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
             file = _generated_path(Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file)
-            if Path(file).exists():
+            if _source_path(file).exists():
                 return file
 
         ext = ".png"
@@ -209,18 +219,22 @@ class ImageExtractor:
 
     def load(self) -> tuple[Bounds, MeanColor, Bounds, str]:
         file = self.get_file()
-        if Path(file).exists():
-            area, color = self.extract(file)
+        source = _source_path(file)
+        if source.exists():
+            area, color = self.extract(source)
             button = area
             override = self.get_file("AREA")
-            if Path(override).exists():
-                area, _ = self.extract(override)
+            override_source = _source_path(override)
+            if override_source.exists():
+                area, _ = self.extract(override_source)
             override = self.get_file("COLOR")
-            if Path(override).exists():
-                _, color = self.extract(override)
+            override_source = _source_path(override)
+            if override_source.exists():
+                _, color = self.extract(override_source)
             override = self.get_file("BUTTON")
-            if Path(override).exists():
-                button, _ = self.extract(override)
+            override_source = _source_path(override)
+            if override_source.exists():
+                button, _ = self.extract(override_source)
 
             return area, color, button, file
         raise FileNotFoundError(file)
@@ -250,7 +264,7 @@ class TemplateExtractor(ImageExtractor):
 class ModuleExtractor:
     def __init__(self, name: str) -> None:
         self.name = name
-        self.folder = (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / name).as_posix()
+        self.folder = _source_path(Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / name).as_posix()
 
     @staticmethod
     def split(file: FilePath) -> tuple[str, str, str]:
@@ -308,13 +322,13 @@ class AssetExtractor:
     def __init__(self) -> None:
         logger.info("Assets extract")
 
-        assets_folder = Path(AzurLaneConfig.ASSETS_FOLDER) / "cn"
+        assets_folder = _source_path(Path(AzurLaneConfig.ASSETS_FOLDER) / "cn")
         modules = sorted(path.name for path in assets_folder.iterdir() if path.is_dir())
 
         issues = collect_asset_issues(assets_folder)
         if not issues:
             process_map(worker, modules)
-        generated_issues = collect_generated_asset_issues(Path(MODULE_FOLDER), repository_root=Path())
+        generated_issues = collect_generated_asset_issues(Path(MODULE_FOLDER), repository_root=_repository_root())
         issues = tuple(sorted((*issues, *generated_issues)))
         if issues:
             raise AssetExtractionError(issues)

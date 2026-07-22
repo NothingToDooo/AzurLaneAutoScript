@@ -9,8 +9,7 @@ from module.base.timer import Timer
 from module.config.utils import get_server_next_update
 from module.device.connection import Connection
 from module.device.control import Control
-from module.device.platform.emulator_base import EmulatorBase
-from module.device.runtime import DeviceRuntime
+from module.device.runtime import DeviceRuntime, MumuRuntime
 from module.device.screenshot import Screenshot
 from module.exception import (
     EmulatorNotRunningError,
@@ -27,9 +26,9 @@ if TYPE_CHECKING:
 
     from module.base.type_alias import ImageArray
     from module.config.config import AzurLaneConfig
-    from module.device.contracts import AppControllerService, CaptureService, ControllerService, MumuRuntimeService
+    from module.device.contracts import AppControllerService, CaptureService, ControllerService
     from module.device.control import ButtonTarget
-    from module.device.platform.emulator_base import EmulatorInstanceBase
+    from module.device.mumu_instance import MuMuInstance
 
 
 def show_function_call() -> None:
@@ -73,15 +72,8 @@ class Device(Screenshot, Control, Connection):
                 if trial >= 3:
                     logger.critical("Failed to start emulator after 3 trial")
                     raise HumanTakeoverRequiredError from e
-                if self.emulator_instance is not None:
-                    self.emulator_start()
-                else:
-                    logger.critical(
-                        f'No emulator with serial "{self.config.Emulator_Serial}" found, please set a correct serial'
-                    )
-                    raise HumanTakeoverRequiredError from e
+                self.emulator_start()
 
-        self.method_check()
         self.screenshot_interval_set()
 
     @property
@@ -89,7 +81,7 @@ class Device(Screenshot, Control, Connection):
         return self._runtime
 
     @property
-    def mumu_runtime(self) -> MumuRuntimeService:
+    def mumu_runtime(self) -> MumuRuntime:
         return self.runtime.mumu_runtime
 
     @property
@@ -105,12 +97,8 @@ class Device(Screenshot, Control, Connection):
         return self.runtime.app_controller
 
     @property
-    def emulator_instance(self) -> EmulatorInstanceBase | None:
+    def emulator_instance(self) -> MuMuInstance:
         return self.mumu_runtime.emulator_instance
-
-    @emulator_instance.setter
-    def emulator_instance(self, value: EmulatorInstanceBase | None) -> None:
-        self.mumu_runtime.__dict__["emulator_instance"] = value
 
     def emulator_start(self) -> bool:
         return self.mumu_runtime.emulator_start()
@@ -132,12 +120,6 @@ class Device(Screenshot, Control, Connection):
 
     def _app_stop_service(self) -> None:
         return self.app_controller.stop()
-
-    def method_check(self) -> None:
-        instance = self.emulator_instance
-        if instance is None or instance.type != EmulatorBase.MuMuPlayer12:
-            logger.critical("当前个人版只保留 MuMu + nemu_ipc 截图 + minitouch 控制，当前需要 MuMu12 实例")
-            raise HumanTakeoverRequiredError
 
     def handle_night_commission(self, daily_trigger: str = "21:00", threshold: int = 30) -> bool:
         """仅在 daily_trigger 前后 threshold 秒内处理夜间委托。"""

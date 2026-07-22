@@ -1,9 +1,10 @@
 import copy
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from module.config.utils import path_to_arg
+from module.task_registry import get_task_by_config_name
 
 if TYPE_CHECKING:
     from module.config.deep import DeepValue, MutableDeepValue
@@ -45,6 +46,25 @@ class ResolvedTaskConfig:
 
     def __getattr__(self, name: str) -> MutableDeepValue:
         return copy.deepcopy(self._get_field(name).value)
+
+
+def _prepend_missing(items: list[str], item: str) -> None:
+    if item not in items:
+        items.insert(0, item)
+
+
+def task_bind_chain(task_name: str, extra_scopes: Iterable[str] = ()) -> list[str]:
+    """生成 General、Alas、任务通用作用域、当前任务和额外作用域链。"""
+
+    chain = list(extra_scopes)
+    _prepend_missing(chain, task_name)
+    definition = get_task_by_config_name(task_name)
+    if definition is not None:
+        for scope in reversed(definition.config_scopes):
+            _prepend_missing(chain, scope)
+    _prepend_missing(chain, "Alas")
+    _prepend_missing(chain, "General")
+    return chain
 
 
 def _require_mapping(value: DeepValue, *, path: str) -> Mapping[str, DeepValue]:

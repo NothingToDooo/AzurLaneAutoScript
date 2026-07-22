@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, cast, override
 
+import numpy as np
 import pytest
 
 from module.exception import GameStuckError
@@ -8,6 +9,10 @@ from module.handler.strategy import STRATEGY_TRANSITION_BUDGET, StrategyHandler
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from module.base.button import MatchOffset
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 
 class _Device:
@@ -23,20 +28,26 @@ class _Strategy:
         self.events: list[tuple[object, ...]] = []
         self.device = _Device(self.events)
         self.exit_checks = 0
-        self.loop_timeout: float | None = None
+        self.loop_timeout: float | Timer | None = None
 
-    def loop(self, *, skip_first: bool = True, timeout: float | None = None) -> Iterator[object]:
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
         self.loop_timeout = timeout
         for index in range(3):
             if index or not skip_first:
                 self.device.screenshot()
-            yield object()
+            yield np.zeros((1, 1, 3), dtype=np.uint8)
 
     def appear_then_click(self, button: object, **kwargs: object) -> bool:
         self.events.append(("appear_then_click", button, kwargs))
         return self.exit_checks == 0
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del offset, interval
         self.events.append(("handle_popup_confirm", name))
         return self.exit_checks == 0
 

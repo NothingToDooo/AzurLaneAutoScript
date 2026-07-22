@@ -1,7 +1,6 @@
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol, override
 
 from module.adapters import (
@@ -37,6 +36,8 @@ from module.bootstrap.configuration_compiler import (
     ConfigurationDocument,
     WebConfigurationCompiler,
 )
+from module.bootstrap.configured_activity_content import validate_configured_activity_content
+from module.bootstrap.configured_campaign_content import validate_configured_campaign_content
 from module.bootstrap.revisions import RevisionTree, SourceTreeRevisionSource
 from module.config.config import AzurLaneConfig, Function
 from module.config.deep import deep_set
@@ -55,23 +56,28 @@ from module.content.stage_loader import StageSpecLoader
 from module.device.device import Device
 from module.diagnostics import ErrorBundleContext, ScreenshotHistory, write_error_bundle
 from module.gameplay.activity_factories import ActivityFactoryDependencies, build_activity_factories
-from module.gameplay.campaign import CAMPAIGN_JOB_KINDS
 from module.gameplay.campaign_factories import HardCampaignSessionSource, build_campaign_factories
 from module.gameplay.composite_factories import build_composite_factories
 from module.gameplay.encounter_factories import build_encounter_factories
 from module.gameplay.facility_factories import build_facility_factories
 from module.gameplay.market_factories import build_market_factories
-from module.gameplay.opsi import WORLD_TASK_DEFINITIONS
 from module.gameplay.opsi_factories import build_opsi_factories
 from module.logger import get_log_file, logger
 from module.maintenance import build_maintenance_factories
 from module.notify.configuration import DisabledNotificationConfig, NotificationConfig, SmtpNotificationConfig
 from module.notify.direct import send_notification
+from module.project_paths import PROJECT_ROOT
 from module.runtime.errors import RuntimeCompositionError
-from module.runtime.factories import TaskFactory, TaskFactoryRegistry
+from module.runtime.factories import TaskBinding, TaskFactory, bind_tasks
 from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner
 from module.state.config_repository import ConfigRepositoryClock, ConfigStateRepository
-from module.task_registry import TASK_CATALOG, get_task_definition
+from module.task_registry import (
+    TASK_SPECS,
+    ContentRevisionPolicy,
+    TaskDomain,
+    TaskSpec,
+    get_task_spec,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping
@@ -83,67 +89,6 @@ if TYPE_CHECKING:
 _CONTENT_SUFFIXES = frozenset({".json", ".yaml", ".yml"})
 _PYTHON_SUFFIXES = frozenset({".py"})
 _CONTENTLESS_REVISION = "builtin-content-v1"
-
-_DOMAIN_TASKS: tuple[tuple[str, frozenset[str]], ...] = (
-    ("maintenance", frozenset({"restart", "azur_lane_uncensored", "game_manager", "benchmark"})),
-    ("facility", frozenset({"research", "commission", "tactical"})),
-    ("composite", frozenset({"dorm", "meowfficer", "guild", "reward", "freebies", "private_quarters"})),
-    ("market", frozenset({"awaken", "shipyard", "gacha", "shop_frequent", "shop_once"})),
-    ("encounter", frozenset({"daily", "hard", "exercise"})),
-    ("campaign", frozenset(task_id.value for task_id in CAMPAIGN_JOB_KINDS)),
-    ("opsi", frozenset(task_id.value for task_id in WORLD_TASK_DEFINITIONS)),
-    (
-        "activity",
-        frozenset(
-            {
-                "minigame",
-                "event_story",
-                "raid_daily",
-                "maritime_escort",
-                "raid",
-                "hospital",
-                "coalition",
-                "coalition_sp",
-                "daemon",
-                "opsi_daemon",
-            }
-        ),
-    ),
-)
-_EVENT_CONTENT_TASKS = frozenset(
-    {
-        "event_story",
-        "raid_daily",
-        "maritime_escort",
-        "raid",
-        "hospital",
-        "coalition",
-        "coalition_sp",
-    }
-)
-_CAMPAIGN_CONTENT_TASKS = frozenset({"hard", *(task_id.value for task_id in CAMPAIGN_JOB_KINDS)})
-
-
-def _index_task_domains() -> Mapping[str, str]:
-    domains: dict[str, str] = {}
-    duplicates: set[str] = set()
-    for domain, task_ids in _DOMAIN_TASKS:
-        for task_id in task_ids:
-            if task_id in domains:
-                duplicates.add(task_id)
-            domains[task_id] = domain
-    if duplicates:
-        message = f"task domains overlap: {sorted(duplicates)}"
-        raise RuntimeError(message)
-    if set(domains) != set(TASK_CATALOG):
-        missing = sorted(set(TASK_CATALOG) - set(domains))
-        unknown = sorted(set(domains) - set(TASK_CATALOG))
-        message = f"task domain coverage mismatch: missing={missing}, unknown={unknown}"
-        raise RuntimeError(message)
-    return MappingProxyType(domains)
-
-
-_TASK_DOMAINS = _index_task_domains()
 
 
 class RevisionSource(Protocol):
@@ -204,23 +149,17 @@ class PersonalRuntimeConfig(AzurLaneConfig):
         return True
 
 
-class _ConfigurationValidationConfig(PersonalRuntimeConfig):
-    """只读候选配置；若 composition 尝试写盘则立即失败。"""
-
-    @override
-    def save(self) -> bool:
-        if self.modified:
-            message = "configuration validation must not persist runtime changes"
-            raise RuntimeError(message)
-        return False
-
-
-class _ConfigurationValidationDevice(Device):
-    """只暴露 factory composition 需要的配置，不建立 ADB 或截图连接。"""
-
-    @override
-    def __init__(self, config: AzurLaneConfig) -> None:
-        self.config = config
+def _require_validation_content(
+    activities: ActivityCatalog | None,
+    sessions: HardCampaignSessionSource | None,
+) -> tuple[ActivityCatalog, CompiledCampaignSessionSource]:
+    if not isinstance(activities, ActivityCatalog):
+        message = "activity content loader did not return an ActivityCatalog"
+        raise RuntimeCompositionError(message)
+    if not isinstance(sessions, CompiledCampaignSessionSource):
+        message = "campaign content loader did not return a CompiledCampaignSessionSource"
+        raise RuntimeCompositionError(message)
+    return activities, sessions
 
 
 def validate_personal_configuration(
@@ -228,19 +167,22 @@ def validate_personal_configuration(
     *,
     project_root: Path | None = None,
 ) -> CompiledConfiguration:
-    """用真实内容和全部玩法 factory 校验候选配置，但不连接设备或写盘。"""
+    """纯编译候选配置，并确定性验证它实际引用的声明式内容。"""
 
     root = _require_project_root(
-        Path(__file__).resolve().parents[2] if project_root is None else project_root,
+        PROJECT_ROOT if project_root is None else project_root,
     )
     try:
-        compiled, registry, _repository, _screenshots = PersonalRuntimeBuilder(
+        compiled = WebConfigurationCompiler().compile(document)
+        loaded_activities, loaded_sessions = _load_personal_content(
             root,
-            "alas",
-            config_factory=_ConfigurationValidationConfig,
-            device_factory=_ConfigurationValidationDevice,
-        ).build(document, clock=SystemLoopClock())
-        registry.validate_settings(compiled.tasks, compiled.task_revisions)
+            needs_activity=True,
+            needs_campaign=True,
+            sessions_factory=_default_sessions,
+        )
+        activities, sessions = _require_validation_content(loaded_activities, loaded_sessions)
+        validate_configured_activity_content(compiled.tasks, activities)
+        validate_configured_campaign_content(compiled.tasks, sessions)
     except ConfigurationCompileError:
         raise
     except (
@@ -260,7 +202,7 @@ def _validate_command(command: str) -> None:
     if not isinstance(command, str) or not command or command != command.strip():
         message = "command must be trimmed and non-empty"
         raise ValueError(message)
-    if command != "alas" and get_task_definition(command) is None:
+    if command != "alas" and get_task_spec(command) is None:
         message = f"unknown task command: {command}"
         raise ValueError(message)
 
@@ -375,6 +317,43 @@ def _default_sessions(
     )
 
 
+def _load_personal_content(
+    project_root: Path,
+    *,
+    needs_activity: bool,
+    needs_campaign: bool,
+    sessions_factory: Callable[
+        [Path, ContentCatalog, CampaignRuntimeProfileRegistry],
+        HardCampaignSessionSource,
+    ],
+) -> tuple[ActivityCatalog | None, HardCampaignSessionSource | None]:
+    """只加载所需声明式内容；此边界不接触配置状态、设备或任务对象。"""
+
+    if not needs_activity and not needs_campaign:
+        return None, None
+
+    packs = load_event_manifests(project_root / "content" / "events")
+    content_catalog = ContentCatalog(packs)
+    if needs_campaign:
+        validate_mumu12_war_archives_profiles(content_catalog)
+    activities = None
+    if needs_activity:
+        activities = ActivityCatalog(content_catalog.packs)
+        validate_mumu12_activity_profiles(activities)
+    if not needs_campaign:
+        return activities, None
+
+    runtime_profiles = compile_campaign_runtime_profile_registry(
+        project_root / "content" / "campaign-runtime-profiles.json"
+    )
+    validate_mumu12_campaign_runtime_profiles(content_catalog.stages, runtime_profiles)
+    sessions = sessions_factory(project_root, content_catalog, runtime_profiles)
+    if not isinstance(sessions, HardCampaignSessionSource):
+        message = "sessions_factory must return a HardCampaignSessionSource"
+        raise TypeError(message)
+    return activities, sessions
+
+
 class SystemLoopClock:
     """为个人调度循环提供 UTC 时钟和可取消等待。"""
 
@@ -485,7 +464,7 @@ class PersonalRuntimeBuilder:
         document: ConfigurationDocument,
         *,
         clock: ConfigRepositoryClock,
-    ) -> tuple[CompiledConfiguration, TaskFactoryRegistry, ConfigStateRepository, ScreenshotHistory]:
+    ) -> tuple[CompiledConfiguration, Mapping[TaskId, TaskBinding], ConfigStateRepository, ScreenshotHistory]:
         """编译候选配置，并只组装当前命令需要的领域。"""
 
         configuration = WebConfigurationCompiler().compile(document)
@@ -504,7 +483,12 @@ class PersonalRuntimeBuilder:
             raise ValueError(message)
 
         domains = self._selected_domains()
-        activities, sessions = self._prepare_content(domains)
+        activities, sessions = _load_personal_content(
+            self._project_root,
+            needs_activity=TaskDomain.ACTIVITY in domains,
+            needs_campaign=TaskDomain.CAMPAIGN in domains or TaskDomain.ENCOUNTER in domains,
+            sessions_factory=self._sessions_factory,
+        )
         device = self._device_factory(config)
         if not isinstance(device, Device):
             message = "device_factory must return a Device"
@@ -526,70 +510,47 @@ class PersonalRuntimeBuilder:
                 raise RuntimeCompositionError(message)
             factories.update(group)
 
-        catalog = TASK_CATALOG if self._command == "alas" else {self._command: TASK_CATALOG[self._command]}
-        selected_factories = {task_id: factories[task_id] for task_id in catalog if task_id in factories}
-        registry = TaskFactoryRegistry(
-            catalog=catalog,
+        specs = TASK_SPECS if self._command == "alas" else {self._command: TASK_SPECS[self._command]}
+        selected_factories = {task_id: factories[task_id] for task_id in specs if task_id in factories}
+        bindings = bind_tasks(
+            specs=specs,
             factories=selected_factories,
-            content_revisions=self._content_revisions(tuple(catalog)),
+            settings=configuration.tasks,
+            content_revisions=self._content_revisions(specs),
         )
-        return configuration, registry, repository, device.error_screenshots
+        return configuration, bindings, repository, device.error_screenshots
 
-    def _selected_domains(self) -> tuple[str, ...]:
+    def _selected_domains(self) -> tuple[TaskDomain, ...]:
         if self._command == "alas":
-            return tuple(domain for domain, _task_ids in _DOMAIN_TASKS)
-        return (_TASK_DOMAINS[self._command],)
+            return tuple(TaskDomain)
+        return (TASK_SPECS[self._command].domain,)
 
-    def _prepare_content(
-        self,
-        domains: tuple[str, ...],
-    ) -> tuple[ActivityCatalog | None, HardCampaignSessionSource | None]:
-        needs_activity = "activity" in domains
-        needs_campaign = "campaign" in domains or "encounter" in domains
-        if not needs_activity and not needs_campaign:
-            return None, None
-
-        packs = load_event_manifests(self._project_root / "content" / "events")
-        content_catalog = ContentCatalog(packs)
-        if needs_campaign:
-            validate_mumu12_war_archives_profiles(content_catalog)
-        activities = None
-        if needs_activity:
-            activities = ActivityCatalog(content_catalog.packs)
-            validate_mumu12_activity_profiles(activities)
-        if not needs_campaign:
-            return activities, None
-
-        runtime_profiles = compile_campaign_runtime_profile_registry(
-            self._project_root / "content" / "campaign-runtime-profiles.json"
-        )
-        validate_mumu12_campaign_runtime_profiles(content_catalog.stages, runtime_profiles)
-        sessions = self._sessions_factory(self._project_root, content_catalog, runtime_profiles)
-        if not isinstance(sessions, HardCampaignSessionSource):
-            message = "sessions_factory must return a HardCampaignSessionSource"
-            raise TypeError(message)
-        return activities, sessions
-
-    @staticmethod
     def _build_domain_factories(  # ruff:ignore[complex-structure, too-many-return-statements] - 直接分支比第二套领域注册表更清楚。
-        domain: str,
+        self,
+        domain: TaskDomain,
         *,
         config: AzurLaneConfig,
         device: Device,
         activities: ActivityCatalog | None,
         sessions: HardCampaignSessionSource | None,
     ) -> Mapping[str, TaskFactory]:
-        if domain == "maintenance":
-            return build_maintenance_factories(build_mumu12_maintenance_services(config, device))
-        if domain == "facility":
+        if domain is TaskDomain.MAINTENANCE:
+            return build_maintenance_factories(
+                build_mumu12_maintenance_services(
+                    config,
+                    device,
+                    uncensored_toolkit_root=self._project_root / "toolkit" / "AzurLaneUncensored",
+                )
+            )
+        if domain is TaskDomain.FACILITY:
             return build_facility_factories(build_mumu12_facility_workflows(config, device))
-        if domain == "composite":
+        if domain is TaskDomain.COMPOSITE:
             return build_composite_factories(build_mumu12_composite_workflows(config, device))
-        if domain == "market":
+        if domain is TaskDomain.MARKET:
             return build_market_factories(build_mumu12_market_workflows(config, device))
-        if domain == "opsi":
+        if domain is TaskDomain.OPSI:
             return build_opsi_factories(build_mumu12_opsi_workflows(config, device))
-        if domain == "activity":
+        if domain is TaskDomain.ACTIVITY:
             if activities is None:
                 message = "activity composition requires an activity catalog"
                 raise RuntimeError(message)
@@ -602,9 +563,9 @@ class PersonalRuntimeBuilder:
         if sessions is None:
             message = f"{domain} composition requires campaign content"
             raise RuntimeError(message)
-        if domain == "campaign":
+        if domain is TaskDomain.CAMPAIGN:
             return build_campaign_factories(build_mumu12_campaign_dependencies(config, device, sessions))
-        if domain == "encounter":
+        if domain is TaskDomain.ENCOUNTER:
             hard_campaign = Mumu12HardCampaignPort(config, device, sessions)
             return build_encounter_factories(
                 build_mumu12_encounter_workflows(
@@ -616,16 +577,21 @@ class PersonalRuntimeBuilder:
         message = f"unknown task domain: {domain}"
         raise RuntimeError(message)
 
-    def _content_revisions(self, task_ids: tuple[str, ...]) -> Mapping[str, str]:
-        revisions = dict.fromkeys(task_ids, _CONTENTLESS_REVISION)
-        event_tasks = _EVENT_CONTENT_TASKS.intersection(task_ids)
-        if event_tasks:
-            event_revision = self._event_revision.current()
-            revisions.update(dict.fromkeys(event_tasks, event_revision))
-        campaign_tasks = _CAMPAIGN_CONTENT_TASKS.intersection(task_ids)
-        if campaign_tasks:
-            campaign_revision = self._campaign_revision.current()
-            revisions.update(dict.fromkeys(campaign_tasks, campaign_revision))
+    def _content_revisions(self, specs: Mapping[str, TaskSpec]) -> Mapping[str, str]:
+        event_revision: str | None = None
+        campaign_revision: str | None = None
+        revisions: dict[str, str] = {}
+        for task_id, spec in specs.items():
+            if spec.content_revision_policy is ContentRevisionPolicy.BUILTIN:
+                revisions[task_id] = _CONTENTLESS_REVISION
+            elif spec.content_revision_policy is ContentRevisionPolicy.EVENT:
+                if event_revision is None:
+                    event_revision = self._event_revision.current()
+                revisions[task_id] = event_revision
+            else:
+                if campaign_revision is None:
+                    campaign_revision = self._campaign_revision.current()
+                revisions[task_id] = campaign_revision
         return revisions
 
 
@@ -637,7 +603,7 @@ def run_default_command(
 ) -> CommandOutcome:
     """构造一次个人运行时并执行 scheduler 或单个调试命令。"""
     root = _require_project_root(
-        Path(__file__).resolve().parents[2] if project_root is None else project_root,
+        PROJECT_ROOT if project_root is None else project_root,
     )
     screenshots: ScreenshotHistory | None = None
     notification: NotificationConfig = DisabledNotificationConfig()
@@ -646,12 +612,10 @@ def run_default_command(
         config_path = ensure_personal_configuration(root)
         document = JsonConfigurationDocumentSource(config_path).load()
         clock = SystemLoopClock()
-        compiled, registry, repository, screenshots = builder.build(document, clock=clock)
+        compiled, bindings, repository, screenshots = builder.build(document, clock=clock)
         notification = compiled.notification
         runner = RuntimeRunner(
-            factories=registry,
-            settings=compiled.tasks,
-            settings_revisions=compiled.task_revisions,
+            bindings=bindings,
             repository=repository,
             clock=clock,
             observer=lambda task_id, result: _observe_result(

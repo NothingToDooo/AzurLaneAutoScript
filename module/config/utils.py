@@ -16,6 +16,7 @@ from module.config.json_codec import (
     decode_json,
 )
 from module.logger import logger
+from module.project_paths import PROJECT_ROOT
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -51,24 +52,24 @@ yaml.add_representer(str, str_presenter)
 SafeRepresenter.add_representer(str, str_presenter)
 
 
-def filepath_args(filename: str = "args") -> str:
-    return f"./module/config/argument/{filename}.json"
+def filepath_args(filename: str = "args") -> Path:
+    return PROJECT_ROOT / "module" / "config" / "argument" / f"{filename}.json"
 
 
-def filepath_argument(filename: str) -> str:
-    return f"./module/config/argument/{filename}.yaml"
+def filepath_argument(filename: str) -> Path:
+    return PROJECT_ROOT / "module" / "config" / "argument" / f"{filename}.yaml"
 
 
-def filepath_i18n(lang: str) -> str:
-    return (Path("./module/config/i18n") / f"{lang}.json").as_posix()
+def filepath_i18n(lang: str) -> Path:
+    return PROJECT_ROOT / "module" / "config" / "i18n" / f"{lang}.json"
 
 
-def filepath_config(filename: str) -> str:
-    return (Path("./config") / f"{filename}.json").as_posix()
+def filepath_config(filename: str) -> Path:
+    return PROJECT_ROOT / "config" / f"{filename}.json"
 
 
-def filepath_code() -> str:
-    return "./module/config/config_generated.py"
+def filepath_code() -> Path:
+    return PROJECT_ROOT / "module" / "config" / "config_generated.py"
 
 
 def read_file(file: FilePath) -> MutableDeepData:

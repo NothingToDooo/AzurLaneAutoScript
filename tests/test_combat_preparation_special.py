@@ -1,9 +1,10 @@
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Literal, override
 
 import numpy as np
 
 from module.combat.assets import BATTLE_PREPARATION
+from module.combat_ui import assets as combat_ui_assets
 from module.event_hospital.combat import HospitalCombat
 
 if TYPE_CHECKING:
@@ -66,13 +67,13 @@ class _SpecialCombatBase:
 
     def appear_then_click(
         self,
-        _button: Button,
+        button: Button,
         offset: MatchOffset | None = 0,
         interval: float = 0,
         similarity: float = 0.85,
         threshold: int = 30,
     ) -> bool:
-        del offset, interval, similarity, threshold
+        del button, offset, interval, similarity, threshold
         return self._next(self.appear_then_click_results)
 
     def handle_combat_automation_confirm(self) -> bool:
@@ -81,8 +82,8 @@ class _SpecialCombatBase:
     def handle_story_skip(self) -> bool:
         return self._next(self.story_results)
 
-    def is_combat_executing(self) -> bool:
-        return self._next(self.combat_results)
+    def is_combat_executing(self) -> Button | Literal[False]:
+        return combat_ui_assets.PAUSE if self._next(self.combat_results) else False
 
 
 class _HospitalCombat(_SpecialCombatBase, HospitalCombat):

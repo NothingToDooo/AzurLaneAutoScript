@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, ClassVar, Self, cast
 
 from rich.console import ConsoleRenderable
 
-from module.logger import logger, set_file_logger, set_func_logger
+from module.logger import configure_file_logging, logger, set_func_logger
+from module.project_paths import PROJECT_ROOT
 from module.runtime.runner import CommandOutcome, CommandStatus
 from module.task_registry import get_tool_task_command
 
@@ -88,7 +89,7 @@ def _execute_process(
     # production 依赖只在实际 worker 执行有效命令时加载。
     from module.bootstrap.production import run_default_command  # ruff:ignore[import-outside-top-level]
 
-    return run_default_command(resolved_command, stop_signal=stop_event)
+    return run_default_command(resolved_command, project_root=PROJECT_ROOT, stop_signal=stop_event)
 
 
 def _system_exit_outcome(
@@ -351,7 +352,7 @@ class ProcessManager:
     ) -> None:
         outcome: CommandOutcome | None = None
         try:
-            set_file_logger(name="alas")
+            configure_file_logging(PROJECT_ROOT, name="alas")
             set_func_logger(func=renderable_queue.put)
             outcome = _execute_process(request, stop_event)
         except SystemExit as error:

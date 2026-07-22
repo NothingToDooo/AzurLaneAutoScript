@@ -1,5 +1,5 @@
-from datetime import UTC, datetime, time
-from types import MappingProxyType
+from dataclasses import replace
+from datetime import UTC, datetime, time, timedelta
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -9,6 +9,7 @@ from module.application import (
     Blocked,
     DailySchedule,
     Deferred,
+    DelayRange,
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
@@ -36,27 +37,54 @@ from module.content.stage_definition import (
 )
 from module.content.stage_rules import MapFeatures, RepeatableCompletion, StageRules, StarRequirements
 from module.gameplay.campaign import (
+    CampaignAutomationSettings,
+    CampaignDifficulty,
+    CampaignEnemyPrioritySettings,
     CampaignExecutionSettings,
+    CampaignFleetSettings,
+    CampaignHpControlSettings,
+    CampaignJobSettings,
     CampaignJobSpec,
+    CampaignLimits,
+    CampaignMapAchievement,
     CampaignProgress,
     CampaignRunReport,
     CampaignStopReason,
+    CampaignSubmarineSettings,
     CampaignWorkflow,
+    EnemyPriorityMode,
+    FleetMode,
+    FleetOrder,
+    GemsCommonCarrier,
+    GemsCommonDestroyer,
+    GemsFarmingSettings,
+    GemsFlagshipChange,
+    GemsVanguardChange,
+    SubmarineAutoSearchMode,
+    SubmarineDistanceToBoss,
+    SubmarineMode,
+    TaskBalancerPolicy,
 )
 from module.gameplay.campaign_factories import (
     CampaignFactoryDependencies,
     CampaignSessionSource,
     build_campaign_factories,
 )
+from module.gameplay.emotion import (
+    EmotionControl,
+    EmotionMode,
+    EmotionRecoverLocation,
+    EmotionSettings,
+    FleetEmotionSettings,
+)
 from module.runtime import (
     FrozenJsonValue,
-    SettingsDocumentError,
     TaskBuildContext,
     TaskStateDocument,
     TaskStateDocumentError,
     TaskStateEntry,
 )
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from module.application import CancellationSource
@@ -173,117 +201,116 @@ def _dependencies(
     )
 
 
-def _stage_settings(command: str) -> tuple[str, tuple[str, ...]]:
+def _stage_refs(command: str) -> tuple[StageRef, ...]:
     if command in {"event_a", "event_b", "event_c", "event_d"}:
-        return "event_20260625_cn", ("a1", "a2")
+        return tuple(StageRef("event_20260625_cn", stage_id) for stage_id in ("a1", "a2"))
     if command == "event_sp":
-        return "event_20260625_cn", ("sp",)
+        return (StageRef("event_20260625_cn", "sp"),)
     if command in {"event", "event2", "gems_farming"}:
-        return "event_20260625_cn", ("d3",)
+        return (StageRef("event_20260625_cn", "d3"),)
     if command == "war_archives":
-        return "campaign_war_archives", ("d3",)
-    return "campaign_main", ("12-4",)
+        return (StageRef("campaign_war_archives", "d3"),)
+    return (StageRef("campaign_main", "12-4"),)
 
 
-def _valid_settings(command: str) -> dict[str, FrozenJsonValue]:
-    pack_id, stage_ids = _stage_settings(command)
-    settings: dict[str, FrozenJsonValue] = {
-        "pack_id": pack_id,
-        "stage_ids": stage_ids,
-        "difficulty": "normal",
-        "execution": {
-            "automation": {
-                "ambush_evade": True,
-                "use_2x_book": False,
-                "use_auto_search": True,
-                "use_clear_mode": True,
-                "use_fleet_lock": True,
-            },
-            "fleets": {
-                "fleet1": 1,
-                "fleet1_mode": "combat_auto",
-                "fleet1_step": 3,
-                "fleet2": 2,
-                "fleet2_mode": "combat_manual",
-                "fleet2_step": 2,
-                "order": "fleet1_mob_fleet2_boss",
-            },
-            "submarine": {
-                "fleet": 1,
-                "mode": "boss_only",
-                "auto_search_mode": "sub_auto_call",
-                "distance_to_boss": "2_grid_to_boss",
-            },
-            "emotion": {
-                "mode": "calculate",
-                "fleet1": {
-                    "control": "prevent_green_face",
-                    "recover": "not_in_dormitory",
-                    "oath": False,
-                },
-                "fleet2": {
-                    "control": "keep_exp_bonus",
-                    "recover": "dormitory_floor_1",
-                    "oath": True,
-                },
-            },
-            "hp_control": {
-                "use_hp_balance": True,
-                "use_emergency_repair": False,
-                "use_low_hp_retreat": True,
-                "hp_balance_threshold": 0.2,
-                "hp_balance_weight": (1_000, 900, 800),
-                "repair_use_single_threshold": 0.3,
-                "repair_use_multi_threshold": 0.6,
-                "low_hp_retreat_threshold": 0.3,
-            },
-            "enemy_priority": {"scale_balance_weight": "S3_enemy_first"},
-        },
-        "limits": {
-            "run_count": 0,
-            "reach_level": 0,
-            "oil": 1_000,
-            "stop_on_new_ship": False,
-            "event_points": 0,
-            "event_deadline": None,
-            "map_achievement": "non_stop",
-            "stage_increase": False,
-        },
-        "schedule": {
-            "timezone": "Asia/Hong_Kong",
-            "triggers": ("04:00",),
-        },
-        "failure_retry_seconds": {"lower_seconds": 1_800, "upper_seconds": 1_800},
-        "resource_retry_seconds": 10_800,
-        "task_balancer": None,
-    }
+_EXECUTION = CampaignExecutionSettings(
+    automation=CampaignAutomationSettings(
+        ambush_evade=True,
+        use_2x_book=False,
+        use_auto_search=True,
+        use_clear_mode=True,
+        use_fleet_lock=True,
+    ),
+    fleets=CampaignFleetSettings(
+        fleet1=1,
+        fleet1_mode=FleetMode.COMBAT_AUTO,
+        fleet1_step=3,
+        fleet2=2,
+        fleet2_mode=FleetMode.COMBAT_MANUAL,
+        fleet2_step=2,
+        order=FleetOrder.FLEET1_MOB_FLEET2_BOSS,
+    ),
+    submarine=CampaignSubmarineSettings(
+        fleet=1,
+        mode=SubmarineMode.BOSS_ONLY,
+        auto_search_mode=SubmarineAutoSearchMode.AUTO_CALL,
+        distance_to_boss=SubmarineDistanceToBoss.TWO_GRIDS_TO_BOSS,
+    ),
+    emotion=EmotionSettings(
+        mode=EmotionMode.CALCULATE,
+        fleet1=FleetEmotionSettings(
+            control=EmotionControl.PREVENT_GREEN_FACE,
+            recover=EmotionRecoverLocation.NOT_IN_DORMITORY,
+            oath=False,
+        ),
+        fleet2=FleetEmotionSettings(
+            control=EmotionControl.KEEP_EXP_BONUS,
+            recover=EmotionRecoverLocation.DORMITORY_FLOOR_1,
+            oath=True,
+        ),
+    ),
+    hp_control=CampaignHpControlSettings(
+        use_hp_balance=True,
+        use_emergency_repair=False,
+        use_low_hp_retreat=True,
+        hp_balance_threshold=0.2,
+        hp_balance_weight=(1_000, 900, 800),
+        repair_use_single_threshold=0.3,
+        repair_use_multi_threshold=0.6,
+        low_hp_retreat_threshold=0.3,
+    ),
+    enemy_priority=CampaignEnemyPrioritySettings(
+        scale_balance_weight=EnemyPriorityMode.LARGE_ENEMY_FIRST,
+    ),
+)
+
+
+def _valid_settings(command: str) -> CampaignJobSettings:
+    gems_farming = None
     if command == "gems_farming":
-        settings["gems_farming"] = {
-            "fallback": {
-                "pack_id": "campaign_main",
-                "stage_id": "2-4",
-            },
-            "flagship_change": "ship_equip",
-            "common_carrier": "langley",
-            "vanguard_change": "ship_equip",
-            "common_destroyer": "z20_or_z21",
-            "replacement_retry_seconds": 1_800,
-        }
-    return settings
+        gems_farming = GemsFarmingSettings(
+            fallback_ref=StageRef("campaign_main", "2-4"),
+            flagship_change=GemsFlagshipChange.SHIP_AND_EQUIPMENT,
+            common_carrier=GemsCommonCarrier.LANGLEY,
+            vanguard_change=GemsVanguardChange.SHIP_AND_EQUIPMENT,
+            common_destroyer=GemsCommonDestroyer.Z20_OR_Z21,
+            replacement_retry_delay=timedelta(minutes=30),
+        )
+    return CampaignJobSettings(
+        task_id=TaskId(command),
+        stage_refs=_stage_refs(command),
+        difficulty=CampaignDifficulty.NORMAL,
+        execution=_EXECUTION,
+        schedule=DailySchedule("Asia/Hong_Kong", (time(4),)),
+        failure_retry_delay=DelayRange(1_800, 1_800),
+        resource_retry_delay=timedelta(hours=3),
+        limits=CampaignLimits(
+            run_count=0,
+            reach_level=0,
+            oil=1_000,
+            stop_on_new_ship=False,
+            event_points=0,
+            event_deadline_at=None,
+            map_achievement=CampaignMapAchievement.NON_STOP,
+            stage_increase=False,
+        ),
+        task_balancer=None,
+        gems_farming=gems_farming,
+    )
 
 
 def _context(
     command: str,
-    settings: dict[str, FrozenJsonValue],
+    settings: object,
     *,
     content_revision: str = "content-1",
     task_state: TaskStateDocument | None = None,
 ) -> TaskBuildContext:
     return TaskBuildContext(
-        definition=TASK_CATALOG[command],
+        spec=TASK_SPECS[command],
         settings_revision=3,
         content_revision=content_revision,
-        settings=MappingProxyType(settings),
+        settings=settings,
         task_state=TaskStateDocument.empty(command) if task_state is None else task_state,
     )
 
@@ -511,8 +538,7 @@ def test_gems_factory_resolves_explicit_primary_and_fallback_sessions() -> None:
 def test_missing_daily_content_is_explicit_and_does_not_query_a_legacy_fallback(command: str) -> None:
     source = _SessionSource()
     workflow = _Workflow()
-    settings = _valid_settings(command)
-    settings["stage_ids"] = ()
+    settings = replace(_valid_settings(command), stage_refs=())
     task = build_campaign_factories(_dependencies(workflow=workflow, sessions=source))[command].build(
         _context(command, settings)
     )
@@ -528,145 +554,32 @@ def test_missing_daily_content_is_explicit_and_does_not_query_a_legacy_fallback(
     )
 
 
-@pytest.mark.parametrize(
-    ("command", "stage_ids", "message"),
-    [
-        ("main", (), "exactly one"),
-        ("main", ("1-1", "1-2"), "exactly one"),
-        ("event_sp", ("sp", "vsp"), "at most one"),
-        ("event_a", ("a1", "a1"), "must not contain duplicates"),
-    ],
-)
-def test_stage_cardinality_is_validated_before_content_resolution(
-    command: str,
-    stage_ids: tuple[str, ...],
-    message: str,
-) -> None:
-    source = _SessionSource()
-    settings = _valid_settings(command)
-    settings["stage_ids"] = stage_ids
-
-    with pytest.raises(SettingsDocumentError, match=message):
-        build_campaign_factories(_dependencies(sessions=source))[command].build(_context(command, settings))
-
-    assert source.calls == []
-
-
-def test_gems_fallback_is_required_and_has_no_implicit_default() -> None:
-    settings = _valid_settings("gems_farming")
-    gems = cast("dict[str, FrozenJsonValue]", settings["gems_farming"])
-    gems.pop("fallback")
-
-    with pytest.raises(SettingsDocumentError, match=r"missing required setting.*fallback"):
-        build_campaign_factories(_dependencies())["gems_farming"].build(_context("gems_farming", settings))
+def test_factory_rejects_untyped_or_mismatched_campaign_settings() -> None:
+    factory = build_campaign_factories(_dependencies())["main"]
+    with pytest.raises(TypeError, match="main settings must be CampaignJobSettings"):
+        factory.build(_context("main", object()))
+    with pytest.raises(ValueError, match="settings task_id must match 'main'"):
+        factory.build(_context("main", _valid_settings("main2")))
 
 
 def test_gems_fallback_must_differ_from_the_primary_stage() -> None:
     settings = _valid_settings("gems_farming")
-    gems = cast("dict[str, FrozenJsonValue]", settings["gems_farming"])
-    fallback = cast("dict[str, FrozenJsonValue]", gems["fallback"])
-    fallback["pack_id"] = "event_20260625_cn"
-    fallback["stage_id"] = "d3"
+    assert settings.gems_farming is not None
+    settings = replace(
+        settings,
+        gems_farming=replace(settings.gems_farming, fallback_ref=settings.stage_refs[0]),
+    )
 
     with pytest.raises(ValueError, match="fallback stage must differ"):
         build_campaign_factories(_dependencies())["gems_farming"].build(_context("gems_farming", settings))
 
 
-def test_decoder_rejects_missing_unknown_and_nested_unknown_settings() -> None:
-    factories = build_campaign_factories(_dependencies())
-    missing = _valid_settings("main")
-    missing.pop("limits")
-    with pytest.raises(SettingsDocumentError, match=r"missing required setting.*limits"):
-        factories["main"].build(_context("main", missing))
-
-    unknown = _valid_settings("main")
-    unknown["legacy_campaign_name"] = "12-4"
-    with pytest.raises(SettingsDocumentError, match=r"unknown settings.*legacy_campaign_name"):
-        factories["main"].build(_context("main", unknown))
-
-    nested_unknown = _valid_settings("main")
-    limits = cast("dict[str, FrozenJsonValue]", nested_unknown["limits"])
-    limits["obsolete"] = True
-    with pytest.raises(SettingsDocumentError, match=r"unknown settings.*obsolete"):
-        factories["main"].build(_context("main", nested_unknown))
-
-    execution_unknown = _valid_settings("main")
-    execution = cast("dict[str, FrozenJsonValue]", execution_unknown["execution"])
-    emotion = cast("dict[str, FrozenJsonValue]", execution["emotion"])
-    fleet1 = cast("dict[str, FrozenJsonValue]", emotion["fleet1"])
-    fleet1["legacy_record"] = "2020-01-01T00:00:00+00:00"
-    with pytest.raises(SettingsDocumentError, match=r"unknown settings.*legacy_record"):
-        factories["main"].build(_context("main", execution_unknown))
-
-
-@pytest.mark.parametrize(
-    ("group", "field", "value", "message"),
-    [
-        ("fleets", "fleet1_mode", "combat_magic", "must be one of"),
-        ("submarine", "fleet", 3, "at most 2"),
-        ("hp_control", "hp_balance_weight", (1_000, 900), "exactly 3"),
-        ("enemy_priority", "scale_balance_weight", "unknown", "must be one of"),
-    ],
-)
-def test_execution_decoder_rejects_values_outside_the_typed_contract(
-    group: str,
-    field: str,
-    value: FrozenJsonValue,
-    message: str,
-) -> None:
-    settings = _valid_settings("main")
-    execution = cast("dict[str, FrozenJsonValue]", settings["execution"])
-    nested = cast("dict[str, FrozenJsonValue]", execution[group])
-    nested[field] = value
-
-    with pytest.raises(SettingsDocumentError, match=message):
-        build_campaign_factories(_dependencies())["main"].build(_context("main", settings))
-
-
-def test_gems_nested_settings_reject_unknown_fields() -> None:
-    settings = _valid_settings("gems_farming")
-    gems = cast("dict[str, FrozenJsonValue]", settings["gems_farming"])
-    fallback = cast("dict[str, FrozenJsonValue]", gems["fallback"])
-    fallback["legacy_fallback"] = True
-
-    with pytest.raises(SettingsDocumentError, match=r"unknown settings.*legacy_fallback"):
-        build_campaign_factories(_dependencies())["gems_farming"].build(_context("gems_farming", settings))
-
-
-@pytest.mark.parametrize(
-    "field",
-    ["flagship_change", "common_carrier", "vanguard_change", "common_destroyer"],
-)
-def test_gems_replacement_choices_are_closed_enums(field: str) -> None:
-    settings = _valid_settings("gems_farming")
-    gems = cast("dict[str, FrozenJsonValue]", settings["gems_farming"])
-    gems[field] = "legacy_guess"
-
-    with pytest.raises(SettingsDocumentError, match=field):
-        build_campaign_factories(_dependencies())["gems_farming"].build(_context("gems_farming", settings))
-
-
-def test_non_event_jobs_reject_event_limit_settings() -> None:
-    settings = _valid_settings("main")
-    limits = cast("dict[str, FrozenJsonValue]", settings["limits"])
-    limits["event_points"] = 100_000
-
-    with pytest.raises(SettingsDocumentError, match="event limits are only valid"):
-        build_campaign_factories(_dependencies())["main"].build(_context("main", settings))
-
-
-def test_task_balancer_only_accepts_the_three_legacy_target_slots() -> None:
-    settings = _valid_settings("main")
-    settings["task_balancer"] = {"target_task_id": "commission", "coin_limit": 10_000}
-
-    with pytest.raises(SettingsDocumentError, match=r"must be one of.*main"):
-        build_campaign_factories(_dependencies())["main"].build(_context("main", settings))
-
-
-def test_task_balancer_decodes_an_explicit_main_target() -> None:
+def test_task_balancer_passes_an_explicit_main_target() -> None:
     workflow = _Workflow()
-    settings = _valid_settings("main")
-    settings["task_balancer"] = {"target_task_id": "main2", "coin_limit": 10_000}
+    settings = replace(
+        _valid_settings("main"),
+        task_balancer=TaskBalancerPolicy(TaskId("main2"), 10_000),
+    )
     task = build_campaign_factories(_dependencies(workflow=workflow))["main"].build(_context("main", settings))
 
     task.run(_task_context("main"))
@@ -679,8 +592,7 @@ def test_task_balancer_decodes_an_explicit_main_target() -> None:
 
 def test_difficulty_is_independent_from_both_compiled_map_variants() -> None:
     source = _SessionSource()
-    settings = _valid_settings("main")
-    settings["difficulty"] = "hard"
+    settings = replace(_valid_settings("main"), difficulty=CampaignDifficulty.HARD)
 
     workflow = _Workflow()
     task = build_campaign_factories(_dependencies(workflow=workflow, sessions=source))["main"].build(
@@ -698,11 +610,12 @@ def test_difficulty_is_independent_from_both_compiled_map_variants() -> None:
 def test_factory_selects_a_loop_alias_once_and_resolves_both_variants_from_the_canonical_stage() -> None:
     source = _SelectingSource()
     workflow = _Workflow()
-    settings = _valid_settings("main")
-    settings["pack_id"] = "event_20221124_cn"
-    settings["stage_ids"] = ("th",)
-    limits = cast("dict[str, FrozenJsonValue]", settings["limits"])
-    limits["run_count"] = 2
+    baseline = _valid_settings("main")
+    settings = replace(
+        baseline,
+        stage_refs=(StageRef("event_20221124_cn", "th"),),
+        limits=replace(baseline.limits, run_count=2),
+    )
 
     task = build_campaign_factories(_dependencies(workflow=workflow, sessions=source))["main"].build(
         _context("main", settings)
@@ -724,9 +637,10 @@ def test_factory_selects_a_loop_alias_once_and_resolves_both_variants_from_the_c
 def test_factory_keeps_the_selected_loop_stage_while_resuming_the_same_settings_revision() -> None:
     source = _SelectingSource()
     workflow = _Workflow()
-    settings = _valid_settings("main")
-    settings["pack_id"] = "event_20221124_cn"
-    settings["stage_ids"] = ("th",)
+    settings = replace(
+        _valid_settings("main"),
+        stage_refs=(StageRef("event_20221124_cn", "th"),),
+    )
     resumed_ref = StageRef("event_20221124_cn", "th2")
     payload = _progress_payload()
     payload["stage_ref"] = {"pack_id": resumed_ref.pack_id, "stage_id": resumed_ref.stage_id}
@@ -744,9 +658,10 @@ def test_factory_keeps_the_selected_loop_stage_while_resuming_the_same_settings_
 def test_factory_does_not_resolve_a_stale_stage_from_an_old_content_revision() -> None:
     source = _SelectingSource()
     workflow = _Workflow()
-    settings = _valid_settings("main")
-    settings["pack_id"] = "event_20221124_cn"
-    settings["stage_ids"] = ("th",)
+    settings = replace(
+        _valid_settings("main"),
+        stage_refs=(StageRef("event_20221124_cn", "th"),),
+    )
     payload = _progress_payload()
     payload["content_revision"] = "content-old"
     payload["stage_ref"] = {"pack_id": "event_20221124_cn", "stage_id": "removed"}
@@ -763,15 +678,6 @@ def test_factory_does_not_resolve_a_stale_stage_from_an_old_content_revision() -
         effects=(RescheduleSelf(_OBSERVED_AT),),
         state_effects=(DeleteTaskState("main", "progress"),),
     )
-
-
-@pytest.mark.parametrize("seconds", [7_199, 14_401])
-def test_resource_retry_remains_within_the_legacy_two_to_four_hour_window(seconds: int) -> None:
-    settings = _valid_settings("main")
-    settings["resource_retry_seconds"] = seconds
-
-    with pytest.raises(SettingsDocumentError, match="resource_retry_seconds must be"):
-        build_campaign_factories(_dependencies())["main"].build(_context("main", settings))
 
 
 class _WrongSessionSource:

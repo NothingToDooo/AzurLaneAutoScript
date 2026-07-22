@@ -38,8 +38,8 @@ class _Coalition(Coalition):
         self.calls: list[str] = []
 
     @override
-    def enter_map(self) -> None:
-        self.calls.append("enter_map")
+    def enter_coalition_map(self) -> None:
+        self.calls.append("enter_coalition_map")
 
     @override
     def coalition_combat(self) -> None:
@@ -53,7 +53,7 @@ def test_execute_once_uses_typed_session_and_returns_content_result() -> None:
     result = coalition.coalition_execute_once()
 
     assert result == CoalitionExecutionResult(session.activity.content_id, CoalitionStageId("tc3"), 3)
-    assert coalition.calls == ["enter_map", "coalition_combat"]
+    assert coalition.calls == ["enter_coalition_map", "coalition_combat"]
     assert coalition.config.overlays == [
         {
             "Campaign_Name": "coalition_20230323_tc3",

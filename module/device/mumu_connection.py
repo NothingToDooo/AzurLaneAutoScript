@@ -1,23 +1,51 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Never
 
 from adbutils.errors import AdbError
 
-from module.device.method.pool import WORKER_POOL
-from module.device.method.utils import possible_reasons
-from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, mumu12_shifted_serials
-from module.device.mumu_discovery import MumuDeviceDiscovery
+from module.device.app_package import AppPackage
+from module.device.mumu import MUMU12_SERIAL_EXAMPLE, MuMuSerial, mumu12_endpoint_candidates
 from module.exception import EmulatorNotRunningError, HumanTakeoverRequiredError
 from module.logger import logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from module.device.adb_session import AdbDeviceWithStatus
     from module.map.map_grids import SelectedGrids
 
 
-class MumuTcpConnection(MumuDeviceDiscovery):
+class MumuEndpointAmbiguousError(HumanTakeoverRequiredError):
+    """同一 MuMu 实例暴露了多个可用邻居 endpoint。"""
+
+
+def select_mumu_endpoint(configured_serial: str, devices: Iterable[AdbDeviceWithStatus]) -> str | None:
+    """从配置实例允许的 exact、±1、±2 中选择唯一在线 endpoint。"""
+    configured = MuMuSerial.parse(configured_serial)
+    if configured is None:
+        message = f"invalid configured MuMu12 serial: {configured_serial!r}"
+        raise ValueError(message)
+    candidates = configured.endpoint_candidates()
+
+    available = {device.serial for device in devices if device.status == "device"}
+    exact, *neighbors = candidates
+    if exact in available:
+        return exact
+
+    matches = sorted(serial for serial in neighbors if serial in available)
+    if len(matches) > 1:
+        joined = ", ".join(matches)
+        message = f"multiple online MuMu endpoints for configured MuMu instance {configured.instance_id}: {joined}"
+        raise MumuEndpointAmbiguousError(message)
+    return matches[0] if matches else None
+
+
+class MumuTcpConnection(AppPackage):
     def _cleanup_adb_device_statuses(self, devices: SelectedGrids) -> None:
+        allowed = set(mumu12_endpoint_candidates(self.config.Emulator_Serial))
         for device in devices:
+            if device.serial not in allowed:
+                logger.info(f"Ignore ADB device outside configured MuMu instance: {device.serial} ({device.status})")
+                continue
             if device.status == "offline":
                 logger.warning(f"Device {device.serial} is offline, disconnect it before connecting")
                 msg = self.adb_client.disconnect(device.serial)
@@ -30,81 +58,58 @@ class MumuTcpConnection(MumuDeviceDiscovery):
             else:
                 logger.warning(f"Device {device.serial} is is having a unknown status: {device.status}")
 
-    @staticmethod
-    def _is_mumu_tcp_serial(serial: str) -> bool:
-        return is_mumu12_serial(serial)
-
-    def _ensure_mumu_tcp_serial(self) -> None:
-        """个人分支不兼容 emulator-* 或真机 serial。"""
-        if self._is_mumu_tcp_serial(self.serial):
-            return
-        logger.critical(f'当前个人分支只支持 MuMu12 TCP serial，例如 "{MUMU12_SERIAL_EXAMPLE}"，当前为 "{self.serial}"')
+    def _ensure_configured_mumu_serial(self) -> MuMuSerial:
+        configured_serial = self.config.Emulator_Serial
+        parsed = MuMuSerial.parse(configured_serial)
+        if parsed is not None:
+            return parsed
+        logger.critical(
+            f'当前个人分支只支持 MuMu12 TCP serial，例如 "{MUMU12_SERIAL_EXAMPLE}"，当前为 "{configured_serial}"'
+        )
         raise HumanTakeoverRequiredError
 
-    def _recover_mumu12_shifted_port(self) -> bool:
-        """MuMu12 端口被占用时会漂移；返回是否已在相邻端口找到新 serial。"""
-        if not self.is_mumu12_family:
-            return False
-
-        before = self.serial
-        serial_list = mumu12_shifted_serials(self.serial)
-        self.adb_brute_force_connect(serial_list)
-        self.detect_device()
-        return self.serial != before
-
-    def _handle_adb_connect_refused(self) -> bool:
-        """返回 True 表示 MuMu12 已通过相邻端口恢复连接。"""
-        if self._recover_mumu12_shifted_port():
-            return True
-        self._diagnose_adb_connect_refused()
-        logger.warning("No such device exists, please restart the emulator or set a correct serial")
-        raise EmulatorNotRunningError
-
-    def _diagnose_adb_connect_refused(self) -> None:
-        """
-        连接拒绝后由平台层补充诊断。
-        """
-
-    def _connect_adb_tcp_serial(self) -> bool:
-        """最多尝试 3 次；旧 ADB server 抢占时，首次可能只会杀掉旧进程。"""
-        for _ in range(3):
-            msg = self.adb_client.connect(self.serial)
-            logger.info(msg)
-            # Connected to 127.0.0.1:59865
-            # Already connected to 127.0.0.1:59865
-            if "connected" in msg:
-                return True
-            if "bad port" in msg:
-                possible_reasons("Serial incorrect, might be a typo")
-                raise HumanTakeoverRequiredError
-            # cannot connect to 127.0.0.1:55555:
-            # No connection could be made because the target machine actively refused it. (10061)
-            if "(10061)" in msg and self._handle_adb_connect_refused():
-                return True
-
-        return False
-
-    def adb_connect(self) -> bool:
+    def _list_adb_devices(self) -> SelectedGrids:
         devices = self.list_device()
         self._cleanup_adb_device_statuses(devices)
-        self._ensure_mumu_tcp_serial()
+        return devices
 
-        if self._connect_adb_tcp_serial():
+    def _bind_available_endpoint(self, devices: SelectedGrids) -> bool:
+        endpoint = select_mumu_endpoint(self.config.Emulator_Serial, devices)
+        if endpoint is None:
+            return False
+        if endpoint != self.serial:
+            logger.info(f"MuMu12 live endpoint switched {self.serial} -> {endpoint}")
+            self.bind_serial(endpoint)
+        return True
+
+    def _probe_configured_instance(self) -> None:
+        for serial in mumu12_endpoint_candidates(self.config.Emulator_Serial):
+            try:
+                msg = self.adb_client.connect(serial)
+            except (AdbError, OSError) as error:
+                logger.info(error)
+                continue
+            logger.info(msg)
+
+    def _diagnose_adb_connect_refused(self) -> None:
+        """连接拒绝后由 Device 的 MuMu runtime 补充诊断。"""
+
+    def _raise_emulator_not_running(self, instance_id: int, devices: SelectedGrids) -> Never:
+        self._diagnose_adb_connect_refused()
+        observed = ", ".join(f"{device.serial} ({device.status})" for device in devices) or "<none>"
+        message = f"no online endpoint for configured MuMu instance {instance_id}; observed: {observed}"
+        logger.warning(message)
+        raise EmulatorNotRunningError(message)
+
+    def adb_connect(self) -> bool:
+        configured = self._ensure_configured_mumu_serial()
+        devices = self._list_adb_devices()
+        if self._bind_available_endpoint(devices):
             return True
 
-        logger.warning(f"Failed to connect {self.serial} after 3 trial, assume connected")
-        self.detect_device()
-        return False
+        self._probe_configured_instance()
+        devices = self._list_adb_devices()
+        if self._bind_available_endpoint(devices):
+            return True
 
-    def adb_brute_force_connect(self, serial_list: Iterable[str]) -> None:
-        def connect(s: str) -> str:
-            try:
-                msg = self.adb_client.connect(s)
-            except AdbError, OSError:
-                return ""
-            logger.info(msg)
-            return msg
-
-        with WORKER_POOL.wait_jobs() as pool:
-            for serial in serial_list:
-                pool.start_thread_soon(connect, serial)
+        return self._raise_emulator_not_running(configured.instance_id, devices)

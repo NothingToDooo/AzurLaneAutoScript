@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 from module.base.decorator import del_cached_property
 from module.logger import logger
 from module.ocr.models import OCR_MODEL
+from module.project_paths import PROJECT_ROOT
 
 if TYPE_CHECKING:
     from module.base.type_alias import FilePath
@@ -25,9 +26,18 @@ def get_assets_from_file(file: FilePath, regex: re.Pattern[str]) -> set[str]:
 @cache
 def _preserved_ui_assets() -> frozenset[str]:
     assets = set()
-    assets |= get_assets_from_file(file="./module/ui/assets.py", regex=re.compile(r"^([A-Za-z][A-Za-z0-9_]+) = "))
-    assets |= get_assets_from_file(file="./module/ui/ui.py", regex=re.compile(r"\(([A-Z][A-Z0-9_]+),"))
-    assets |= get_assets_from_file(file="./module/handler/info_handler.py", regex=re.compile(r"\(([A-Z][A-Z0-9_]+),"))
+    assets |= get_assets_from_file(
+        file=PROJECT_ROOT / "module" / "ui" / "assets.py",
+        regex=re.compile(r"^([A-Za-z][A-Za-z0-9_]+) = "),
+    )
+    assets |= get_assets_from_file(
+        file=PROJECT_ROOT / "module" / "ui" / "ui.py",
+        regex=re.compile(r"\(([A-Z][A-Z0-9_]+),"),
+    )
+    assets |= get_assets_from_file(
+        file=PROJECT_ROOT / "module" / "handler" / "info_handler.py",
+        regex=re.compile(r"\(([A-Z][A-Z0-9_]+),"),
+    )
     # MAIN_CHECK 与 MAIN_GOTO_CAMPAIGN 共用资源，无需重复保留。
     return frozenset(assets)
 

@@ -8,12 +8,14 @@ from typing import TYPE_CHECKING
 from tqdm import tqdm
 
 from module.base.decorator import cached_property
+from module.project_paths import PROJECT_ROOT
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 REGEX_SETTING = re.compile(r"PlayerPrefs.Get(\w{1,10})\((.*)\)")
 REGEX_SETTING_KEY = re.compile(r'"(.*?)"')
+DEFAULT_SETTING_OUTPUT = PROJECT_ROOT / "module" / "game_setting" / "setting_generated.py"
 
 
 def _comment_lines(text: str) -> list[str]:
@@ -188,7 +190,7 @@ class SettingExtractor:
                 for line in setting.generated:
                     yield f"    {line}"
 
-    def generate(self, folder: str, output: str | Path = "./module/game_setting/setting_generated.py") -> None:
+    def generate(self, folder: str, output: str | Path = DEFAULT_SETTING_OUTPUT) -> None:
         lines = [line + "\n" for line in self.iter_generated_lines(folder)]
         with Path(output).open(mode="w", encoding="utf8") as f:
             f.writelines(lines)

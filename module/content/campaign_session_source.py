@@ -172,6 +172,22 @@ class CompiledCampaignSessionSource:
             return self._catalog.resolve_stage(hard_ref).ref
         return self._catalog.resolve_stage(StageRef(_MAIN_CAMPAIGN_PACK, normalized_stage_id)).ref
 
+    def validate_candidates(self, ref: StageRef) -> tuple[StageRef, ...]:
+        """确定性编译所有 primary candidate 及其 progression。"""
+
+        _loop_stages, primary_refs = self._selection_candidates(ref)
+        runtime_refs = tuple(
+            dict.fromkeys(
+                runtime_ref
+                for primary_ref in primary_refs
+                for runtime_ref in (primary_ref, *self._progression_from(primary_ref))
+            )
+        )
+        for runtime_ref in runtime_refs:
+            for variant in CampaignRunVariant:
+                self.resolve(runtime_ref, variant)
+        return primary_refs
+
     def select(
         self,
         ref: StageRef,
@@ -191,14 +207,8 @@ class CompiledCampaignSessionSource:
             message = "preferred_ref must be a StageRef or None"
             raise TypeError(message)
 
-        pack = self._catalog.get_pack(ref.pack_id)
-        aliased_stage = pack.policy.resolve_alias(ref.stage_id)
-        loop_stages = pack.policy.loop_stages(aliased_stage)
+        loop_stages, candidate_refs = self._selection_candidates(ref)
         loop_stage_switch = loop_stages is not None
-        candidate_stages = (aliased_stage,) if loop_stages is None else loop_stages
-        candidate_refs = tuple(
-            self._catalog.resolve_stage(StageRef(ref.pack_id, stage_id)).ref for stage_id in candidate_stages
-        )
         if preferred_ref is not None:
             preferred = self._catalog.resolve_stage(preferred_ref).ref
             progression_candidates = self._progression_from(candidate_refs[0]) if len(candidate_refs) == 1 else ()
@@ -230,6 +240,22 @@ class CompiledCampaignSessionSource:
             resource_free=selected_ref.stage_id in selected_pack.policy.resource_free_stages,
             map_achievement_fallbacks=selected_pack.policy.map_achievement_fallbacks,
         )
+
+    def _selection_candidates(
+        self,
+        ref: StageRef,
+    ) -> tuple[tuple[str, ...] | None, tuple[StageRef, ...]]:
+        if not isinstance(ref, StageRef):
+            message = "ref must be a StageRef"
+            raise TypeError(message)
+        pack = self._catalog.get_pack(ref.pack_id)
+        aliased_stage = pack.policy.resolve_alias(ref.stage_id)
+        loop_stages = pack.policy.loop_stages(aliased_stage)
+        candidate_stages = (aliased_stage,) if loop_stages is None else loop_stages
+        candidate_refs = tuple(
+            self._catalog.resolve_stage(StageRef(ref.pack_id, stage_id)).ref for stage_id in candidate_stages
+        )
+        return loop_stages, candidate_refs
 
     def _progression_from(self, ref: StageRef) -> tuple[StageRef, ...]:
         progression: list[StageRef] = []

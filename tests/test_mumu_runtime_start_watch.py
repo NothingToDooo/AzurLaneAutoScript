@@ -5,7 +5,6 @@ import pytest
 from adbutils import AdbClient
 
 from module.device import runtime as runtime_module
-from module.device.platform.emulator_base import EmulatorInstanceBase
 from module.device.runtime import MumuRuntime
 from module.map.map_grids import SelectedGrids
 
@@ -13,6 +12,7 @@ if TYPE_CHECKING:
     from adbutils import AdbConnection
 
     from module.device.contracts import AdbCommand
+    from module.device.control_options import Duration
 
 
 class _AdbClient(AdbClient):
@@ -68,6 +68,13 @@ class _Device:
     status: str
 
 
+@dataclass(slots=True)
+class _Config:
+    Emulator_Serial: str
+    Emulator_MuMuPath: str = "C:/MuMu/nx_main/MuMuNxMain.exe"
+    MINITOUCH_FILEPATH_REMOTE: str = "/data/local/tmp/minitouch"
+
+
 type _ShellResult = str | BaseException
 
 
@@ -82,9 +89,11 @@ class _Session:
         connect_messages: list[str] | None,
     ) -> None:
         self.serial = serial
+        self.config = _Config(Emulator_Serial=serial)
         self.is_mumu_family = True
         self.is_mumu12_family = True
         self.package = "com.bilibili.azurlane"
+        self.orientation = 0
         self.adb_client = _AdbClient(connect_messages)
         self.device_batches = list(device_batches)
         self.last_devices: list[_Device] = []
@@ -160,6 +169,22 @@ class _Session:
         self.prop_calls.append(name)
         return ""
 
+    @staticmethod
+    def adb_forward(remote: str) -> int:
+        del remote
+        return 0
+
+    @staticmethod
+    def adb_forward_remove(local: str) -> None:
+        del local
+
+    def get_orientation(self) -> int:
+        return self.orientation
+
+    @staticmethod
+    def sleep(second: Duration, /) -> None:
+        del second
+
     def list_device(self) -> SelectedGrids[_Device]:
         if self.device_batches:
             self.last_devices = self.device_batches.pop(0)
@@ -197,9 +222,7 @@ def _make_runtime(
         package_results=package_results or [["com.bilibili.azurlane"]],
         connect_messages=connect_messages,
     )
-    runtime = _Runtime(session)
-    runtime.__dict__["emulator_instance"] = EmulatorInstanceBase(serial=serial, name="test", path="test")
-    return runtime
+    return _Runtime(session)
 
 
 @pytest.fixture(autouse=True)
@@ -219,6 +242,21 @@ def test_emulator_start_watch_succeeds_when_device_shell_and_package_are_ready()
     assert runtime.session.adb_client.connect_calls == []
     assert runtime.session.shell_calls == 1
     assert runtime.session.package_calls == 1
+
+
+def test_emulator_start_watch_uses_live_serial_after_dynamic_shift() -> None:
+    configured_serial = "127.0.0.1:16384"
+    live_serial = "127.0.0.1:16385"
+    runtime = _make_runtime(
+        serial=live_serial,
+        device_batches=[[_device(live_serial, "device")]],
+    )
+    runtime.session.config.Emulator_Serial = configured_serial
+
+    assert runtime.emulator_start_watch()
+    assert runtime.session.serial == live_serial
+    assert runtime.session.config.Emulator_Serial == configured_serial
+    assert runtime.session.adb_client.connect_calls == []
 
 
 def test_emulator_start_watch_disconnects_offline_device_before_retrying() -> None:

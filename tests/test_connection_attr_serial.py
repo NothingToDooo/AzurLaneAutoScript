@@ -8,9 +8,11 @@ import adbutils
 import pytest
 from adbutils import adb_path
 
+import module.project_paths as project_paths_module
 from module.device import connection_attr as connection_attr_module
 from module.device.connection_attr import ConnectionAttr
 from module.device.device import Device
+from module.device.mumu_instance import MuMuInstance
 from module.device.runtime import DeviceRuntime
 from module.exception import HumanTakeoverRequiredError
 
@@ -53,18 +55,28 @@ def _make_connection(serial: str) -> Device:
 
 def test_connection_attr_publishes_selected_adb_binary_to_adbutils(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.delenv("ADBUTILS_ADB_PATH", raising=False)
+    project_root = tmp_path / "project"
+    executable = project_root / "tools" / "adb.exe"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    monkeypatch.setattr(project_paths_module, "PROJECT_ROOT", project_root)
 
     config = cast(
         "AzurLaneConfig",
         SimpleNamespace(
             Emulator_Serial="127.0.0.1:16384",
-            Emulator_AdbExecutable="./.venv/Lib/site-packages/adbutils/binaries/adb.exe",
+            Emulator_AdbExecutable="./tools/adb.exe",
         ),
     )
     connection = ConnectionAttr(config)
 
+    assert connection.adb_binary == str(executable.resolve())
     assert os.environ["ADBUTILS_ADB_PATH"] == connection.adb_binary
     assert adb_path() == connection.adb_binary
 
@@ -173,7 +185,9 @@ def test_bind_serial_same_serial_has_no_side_effects() -> None:
     assert state.forward_removals == []
 
 
-def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bind_serial_recomputes_serial_layers_without_replacing_configured_instance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     old_serial = "127.0.0.1:16384"
     new_serial = "127.0.0.1:16385"
     connection = _make_connection(old_serial)
@@ -190,7 +204,13 @@ def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch: pytest.M
     monkeypatch.setattr(connection_attr_module, "is_mumu12_serial", is_mumu12_serial)
     connection.__dict__["adb_client"] = object()
     connection.__dict__["adb_getprop"] = lambda name: properties[connection.serial][name]
-    connection.mumu_runtime.__dict__["find_emulator_instance"] = lambda serial: SimpleNamespace(serial=serial)
+    configured_instance = MuMuInstance(
+        executable=Path("C:/MuMu/nx_main/MuMuNxMain.exe"),
+        instance_id=0,
+        name="MuMuPlayer-15.0-0",
+        config_dir=Path("C:/MuMu/vms/MuMuPlayer-15.0-0/configs"),
+    )
+    connection.mumu_runtime.__dict__["emulator_instance"] = configured_instance
 
     old_adb = connection.adb
     assert connection.port == 16384
@@ -198,8 +218,7 @@ def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch: pytest.M
     assert connection.cpu_abi == "arm64-v8a"
     assert connection.sdk_ver == 28
     old_instance = connection.emulator_instance
-    assert old_instance is not None
-    assert old_instance.serial == old_serial
+    assert old_instance is configured_instance
 
     connection.bind_serial(new_serial)
 
@@ -210,8 +229,7 @@ def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch: pytest.M
     assert connection.cpu_abi == "x86_64"
     assert connection.sdk_ver == 35
     new_instance = connection.emulator_instance
-    assert new_instance is not None
-    assert new_instance.serial == new_serial
+    assert new_instance is configured_instance
     assert family_checks == [old_serial, new_serial]
 
 

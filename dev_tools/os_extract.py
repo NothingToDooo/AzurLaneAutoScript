@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, NotRequired, TypedDict
 
-import module.logger
 from dev_tools.utils import LuaLoader, require_lua_int, require_lua_str, require_lua_table
 from module.base.utils import location2node
 from module.os.map_data import DIC_OS_MAP
@@ -9,9 +8,6 @@ from module.os.map_data import DIC_OS_MAP
 if TYPE_CHECKING:
     from dev_tools.slpp import LuaTable
     from module.base.type_alias import FilePath
-
-# 导入 module.logger 会切换到项目根目录。
-_ = module.logger
 
 
 class OSChapterData(TypedDict):

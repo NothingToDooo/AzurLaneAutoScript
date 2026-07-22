@@ -41,7 +41,7 @@ class HpDaemon(ModuleBase):
     low_hp_confirm_timer: Timer
 
     @staticmethod
-    def _calculate_hp(
+    def _calculate_exercise_hp(
         image: ImageArray,
         area: Area,
         options: ColorBarOptions | None = None,
@@ -66,25 +66,25 @@ class HpDaemon(ModuleBase):
 
     def _at_low_hp(self, image: ImageArray, pause: Button | None = combat_ui_assets.PAUSE) -> bool:
         if pause == combat_ui_assets.PAUSE:
-            self.attacker_hp = self._calculate_hp(
+            self.attacker_hp = self._calculate_exercise_hp(
                 image, area=exercise_assets.ATTACKER_HP_AREA.area, options=self._hp_options(reverse=True)
             )
-            self.defender_hp = self._calculate_hp(
+            self.defender_hp = self._calculate_exercise_hp(
                 image, area=exercise_assets.DEFENDER_HP_AREA.area, options=self._hp_options(reverse=False)
             )
         elif pause in NEW_HP_BAR_PAUSES:
-            self.attacker_hp = self._calculate_hp(
+            self.attacker_hp = self._calculate_exercise_hp(
                 image, area=exercise_assets.ATTACKER_HP_AREA_New.area, options=self._hp_options(reverse=True)
             )
-            self.defender_hp = self._calculate_hp(
+            self.defender_hp = self._calculate_exercise_hp(
                 image, area=exercise_assets.DEFENDER_HP_AREA_New.area, options=self._hp_options(reverse=True)
             )
         else:
             logger.warning(f"_at_low_hp received unknown pause: {pause}")
-            self.attacker_hp = self._calculate_hp(
+            self.attacker_hp = self._calculate_exercise_hp(
                 image, area=exercise_assets.ATTACKER_HP_AREA.area, options=self._hp_options(reverse=True)
             )
-            self.defender_hp = self._calculate_hp(
+            self.defender_hp = self._calculate_exercise_hp(
                 image, area=exercise_assets.DEFENDER_HP_AREA.area, options=self._hp_options(reverse=False)
             )
 

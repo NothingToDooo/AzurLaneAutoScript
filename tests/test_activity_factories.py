@@ -1,7 +1,6 @@
 from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
-from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -25,6 +24,7 @@ from module.application import (
 from module.content.activity_catalog import ActivityCatalog
 from module.content.activity_profile import CoalitionStageId
 from module.content.manifest import load_event_manifests
+from module.content.models import ContentId
 from module.gameplay.activity import (
     ActivityDisposition,
     ActivityReport,
@@ -37,6 +37,8 @@ from module.gameplay.activity import (
     AssistSessionWorkflow,
     CoalitionFleetMode,
     CoalitionOptions,
+    CoalitionSettings,
+    CoalitionSpSettings,
     DaemonOptions,
     EncounterBalancerPolicy,
     EncounterCommand,
@@ -45,10 +47,17 @@ from module.gameplay.activity import (
     EncounterReport,
     EncounterSpec,
     EncounterStopReason,
+    EventStorySettings,
+    HospitalSettings,
+    MaritimeEscortSettings,
+    MinigameKind,
     MinigameProgress,
+    MinigameSettings,
     OpsiDaemonOptions,
+    RaidDailySettings,
     RaidMode,
     RaidOptions,
+    RaidSettings,
 )
 from module.gameplay.activity_factories import (
     ActivityFactoryDependencies,
@@ -71,7 +80,7 @@ from module.runtime import (
     TaskStateDocumentError,
     TaskStateEntry,
 )
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -82,77 +91,66 @@ if TYPE_CHECKING:
 _OBSERVED_AT = datetime(2026, 7, 13, 8, tzinfo=UTC)
 _SERVER_UPDATE_AT = datetime(2026, 7, 14, 0, tzinfo=UTC)
 _SERVER_UPDATE_SCHEDULE = DailySchedule("Asia/Hong_Kong", (time(8),))
-_SERVER_UPDATE_SETTINGS: dict[str, FrozenJsonValue] = {
-    "timezone": "Asia/Hong_Kong",
-    "triggers": ("08:00",),
-}
 _RESUME_AT = _OBSERVED_AT + timedelta(minutes=5)
-_POLICY_SETTINGS: dict[str, FrozenJsonValue] = {
-    "failure_retry_seconds": {"lower_seconds": 300, "upper_seconds": 300},
-    "resource_retry_seconds": 7_200,
-    "oil_limit": 1_000,
-    "event_point_limit": 0,
-    "event_deadline": None,
-    "use_2x_book": False,
-    "emotion": None,
-}
 _ENCOUNTER_POLICY = EncounterPolicy(
     failure_retry_delay=DelayRange(300, 300),
     resource_retry_delay=timedelta(hours=2),
     oil_limit=1_000,
 )
-_BALANCER_SETTINGS: dict[str, FrozenJsonValue] = {
-    "target_task_id": "main",
-    "coin_limit": 10_000,
-    "retry_seconds": 300,
-}
+_BALANCER_POLICY = EncounterBalancerPolicy(TaskId("main"), 10_000)
 _ACTIVITY_CATALOG = ActivityCatalog(load_event_manifests(Path("content/events")))
-_VALID_SETTINGS_BY_COMMAND: dict[str, dict[str, FrozenJsonValue]] = {
-    "minigame": {
-        "game": "new_year_challenge",
-        "operation_limit": 10,
-        "schedule": _SERVER_UPDATE_SETTINGS,
-    },
-    "event_story": {"event": "event_20260625_cn", "skip_battle": True},
-    "raid_daily": {
-        "event": "raid_20260212",
-        "stages": ("hard", "normal", "easy", "ex"),
-        "use_ticket": False,
-        "collect_daily_mission": True,
-        "policy": _POLICY_SETTINGS,
-        "schedule": _SERVER_UPDATE_SETTINGS,
-    },
-    "maritime_escort": {"policy": _POLICY_SETTINGS, "schedule": _SERVER_UPDATE_SETTINGS},
-    "raid": {
-        "event": "raid_20260212",
-        "mode": "hard",
-        "use_ticket": False,
-        "policy": _POLICY_SETTINGS,
-        "run_limit": None,
-        "balancer": _BALANCER_SETTINGS,
-    },
-    "hospital": {
-        "use_recommended_fleet": True,
-        "policy": _POLICY_SETTINGS,
-        "schedule": _SERVER_UPDATE_SETTINGS,
-    },
-    "coalition": {
-        "event": "coalition_20260122",
-        "stage": "hard",
-        "fleet": "single",
-        "policy": _POLICY_SETTINGS,
-        "run_limit": None,
-        "balancer": _BALANCER_SETTINGS,
-    },
-    "coalition_sp": {
-        "event": "coalition_20260122",
-        "stage": "sp",
-        "fleet": "multi",
-        "policy": _POLICY_SETTINGS,
-        "schedule": _SERVER_UPDATE_SETTINGS,
-    },
-    "daemon": {"enter_map": True},
-    "opsi_daemon": {"repair_ship": True, "select_enemy": False},
+_VALID_SETTINGS_BY_COMMAND: dict[str, object] = {
+    "minigame": MinigameSettings(
+        schedule=_SERVER_UPDATE_SCHEDULE,
+        operation_limit=10,
+        kind=MinigameKind.NEW_YEAR_CHALLENGE,
+    ),
+    "event_story": EventStorySettings(ContentId("event_20260625_cn"), skip_battle=True),
+    "raid_daily": RaidDailySettings(
+        content_id=ContentId("raid_20260212"),
+        stages=(RaidMode.HARD, RaidMode.NORMAL, RaidMode.EASY, RaidMode.EX),
+        use_ticket=False,
+        collect_daily_mission=True,
+        policy=_ENCOUNTER_POLICY,
+        schedule=_SERVER_UPDATE_SCHEDULE,
+    ),
+    "maritime_escort": MaritimeEscortSettings(
+        policy=_ENCOUNTER_POLICY,
+        schedule=_SERVER_UPDATE_SCHEDULE,
+    ),
+    "raid": RaidSettings(
+        content_id=ContentId("raid_20260212"),
+        mode=RaidMode.HARD,
+        use_ticket=False,
+        policy=_ENCOUNTER_POLICY,
+        run_limit=None,
+        balancer=_BALANCER_POLICY,
+    ),
+    "hospital": HospitalSettings(
+        use_recommended_fleet=True,
+        policy=_ENCOUNTER_POLICY,
+        schedule=_SERVER_UPDATE_SCHEDULE,
+    ),
+    "coalition": CoalitionSettings(
+        content_id=ContentId("coalition_20260122"),
+        stage=CoalitionStageId("hard"),
+        fleet=CoalitionFleetMode.SINGLE,
+        policy=_ENCOUNTER_POLICY,
+        run_limit=None,
+        balancer=_BALANCER_POLICY,
+    ),
+    "coalition_sp": CoalitionSpSettings(
+        content_id=ContentId("coalition_20260122"),
+        stage=CoalitionStageId("sp"),
+        fleet=CoalitionFleetMode.MULTI,
+        policy=_ENCOUNTER_POLICY,
+        schedule=_SERVER_UPDATE_SCHEDULE,
+    ),
+    "daemon": AssistSessionSpec(AssistSessionCommand.DAEMON, DaemonOptions(enter_map=True)),
+    "opsi_daemon": AssistSessionSpec(
+        AssistSessionCommand.OPSI_DAEMON,
+        OpsiDaemonOptions(repair_ship=True, select_enemy=False),
+    ),
 }
 
 
@@ -269,15 +267,15 @@ def _factories(workflows: ActivityWorkflows | None = None) -> dict[str, TaskFact
 
 def _build_context(
     command: str,
-    settings: dict[str, FrozenJsonValue],
+    settings: object,
     *,
     task_state: TaskStateDocument | None = None,
 ) -> TaskBuildContext:
     return TaskBuildContext(
-        definition=TASK_CATALOG[command],
+        spec=TASK_SPECS[command],
         settings_revision=3,
         content_revision="content-1",
-        settings=MappingProxyType(settings),
+        settings=settings,
         task_state=TaskStateDocument.empty(command) if task_state is None else task_state,
     )
 
@@ -290,17 +288,17 @@ def _task_context(
     return TaskContext(
         task_id=TaskId(command),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
-        mode=TASK_CATALOG[command].execution_mode,
+        mode=TASK_SPECS[command].execution_mode,
         metadata=RunMetadata(settings_revision=3, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
     )
 
 
-def _valid_settings(command: str) -> dict[str, FrozenJsonValue]:
-    return dict(_VALID_SETTINGS_BY_COMMAND.get(command, {}))
+def _valid_settings(command: str) -> object:
+    return _VALID_SETTINGS_BY_COMMAND[command]
 
 
-def test_minigame_factory_preserves_the_source_run_cap_and_decodes_the_schedule() -> None:
+def test_minigame_factory_preserves_the_source_run_cap_and_typed_schedule() -> None:
     workflow = _ActivityWorkflow()
     factory = _factories(replace(_workflows(), minigame=workflow))["minigame"]
     task = factory.build(_build_context("minigame", _valid_settings("minigame")))
@@ -396,11 +394,10 @@ def test_minigame_factory_rejects_incompatible_or_malformed_progress(
         )
 
 
-def test_continuous_encounter_factory_decodes_nullable_limit_and_typed_balancer_target() -> None:
+def test_continuous_encounter_factory_uses_typed_limit_and_balancer_target() -> None:
     workflow = _EncounterWorkflow()
     factory = _factories(replace(_workflows(), raid=workflow))["raid"]
-    settings = _valid_settings("raid")
-    settings["run_limit"] = 3
+    settings = replace(cast("RaidSettings", _valid_settings("raid")), run_limit=3)
     task = factory.build(
         _build_context(
             "raid",
@@ -432,28 +429,24 @@ def test_continuous_encounter_factory_decodes_nullable_limit_and_typed_balancer_
     )
 
 
-def test_encounter_factory_decodes_canonical_emotion_settings() -> None:
+def test_encounter_factory_preserves_typed_emotion_settings() -> None:
     workflow = _EncounterWorkflow()
     factory = _factories(replace(_workflows(), raid=workflow))["raid"]
-    settings = _valid_settings("raid")
-    policy_settings = dict(cast("dict[str, FrozenJsonValue]", settings["policy"]))
-    policy_settings["emotion"] = cast(
-        "FrozenJsonValue",
-        {
-            "mode": "calculate",
-            "fleet1": {
-                "control": "prevent_green_face",
-                "recover": "not_in_dormitory",
-                "oath": False,
-            },
-            "fleet2": {
-                "control": "keep_exp_bonus",
-                "recover": "dormitory_floor_1",
-                "oath": True,
-            },
-        },
+    source = cast("RaidSettings", _valid_settings("raid"))
+    emotion = EmotionSettings(
+        mode=EmotionMode.CALCULATE,
+        fleet1=FleetEmotionSettings(
+            control=EmotionControl.PREVENT_GREEN_FACE,
+            recover=EmotionRecoverLocation.NOT_IN_DORMITORY,
+            oath=False,
+        ),
+        fleet2=FleetEmotionSettings(
+            control=EmotionControl.KEEP_EXP_BONUS,
+            recover=EmotionRecoverLocation.DORMITORY_FLOOR_1,
+            oath=True,
+        ),
     )
-    settings["policy"] = policy_settings
+    settings = replace(source, policy=replace(source.policy, emotion=emotion))
     task = factory.build(_build_context("raid", settings))
 
     task.run(_task_context("raid"))
@@ -472,8 +465,7 @@ def test_encounter_factory_decodes_canonical_emotion_settings() -> None:
 def test_continuous_encounter_factory_restores_typed_progress_checkpoint() -> None:
     workflow = _EncounterWorkflow()
     factory = _factories(replace(_workflows(), raid=workflow))["raid"]
-    settings = _valid_settings("raid")
-    settings["run_limit"] = 3
+    settings = replace(cast("RaidSettings", _valid_settings("raid")), run_limit=3)
     progress = {
         "runs_completed": 2,
         "cycle_ends_at": None,
@@ -525,7 +517,7 @@ def _request_abort(abort: AbortToken) -> None:
     abort.request("operator stop")
 
 
-def test_assist_factories_decode_command_specific_options() -> None:
+def test_assist_factories_use_command_specific_typed_options() -> None:
     daemon_workflow = _AssistWorkflow(AssistSessionState.COMPLETED)
     abort = AbortToken()
     opsi_workflow = _AssistWorkflow(
@@ -534,87 +526,86 @@ def test_assist_factories_decode_command_specific_options() -> None:
     )
     factories = _factories(replace(_workflows(), daemon=daemon_workflow, opsi_daemon=opsi_workflow))
 
-    daemon = factories["daemon"].build(_build_context("daemon", {"enter_map": False}))
-    opsi_daemon = factories["opsi_daemon"].build(
-        _build_context("opsi_daemon", {"repair_ship": True, "select_enemy": False})
+    daemon_spec = AssistSessionSpec(AssistSessionCommand.DAEMON, DaemonOptions(enter_map=False))
+    opsi_spec = AssistSessionSpec(
+        AssistSessionCommand.OPSI_DAEMON,
+        OpsiDaemonOptions(repair_ship=True, select_enemy=False),
     )
+    daemon = factories["daemon"].build(_build_context("daemon", daemon_spec))
+    opsi_daemon = factories["opsi_daemon"].build(_build_context("opsi_daemon", opsi_spec))
 
     assert daemon.run(_task_context("daemon")) == TaskResult(outcome=Succeeded())
     assert opsi_daemon.run(_task_context("opsi_daemon", abort=abort)) == TaskResult(outcome=Cancelled("operator stop"))
-    assert daemon_workflow.specs == [AssistSessionSpec(AssistSessionCommand.DAEMON, DaemonOptions(enter_map=False))]
-    assert opsi_workflow.specs == [
-        AssistSessionSpec(
-            AssistSessionCommand.OPSI_DAEMON,
-            OpsiDaemonOptions(repair_ship=True, select_enemy=False),
-        )
-    ]
+    assert daemon_workflow.specs == [daemon_spec]
+    assert opsi_workflow.specs == [opsi_spec]
 
 
-def _settings_with(command: str, name: str, value: FrozenJsonValue) -> dict[str, FrozenJsonValue]:
-    settings = _valid_settings(command)
-    settings[name] = value
-    return settings
+@pytest.mark.parametrize(
+    ("command", "expected_type"),
+    [
+        ("minigame", "MinigameSettings"),
+        ("event_story", "EventStorySettings"),
+        ("raid_daily", "RaidDailySettings"),
+        ("maritime_escort", "MaritimeEscortSettings"),
+        ("raid", "RaidSettings"),
+        ("hospital", "HospitalSettings"),
+        ("coalition", "CoalitionSettings"),
+        ("coalition_sp", "CoalitionSpSettings"),
+        ("daemon", "AssistSessionSpec"),
+        ("opsi_daemon", "AssistSessionSpec"),
+    ],
+)
+def test_activity_factories_reject_wrong_settings_type(
+    command: str,
+    expected_type: str,
+) -> None:
+    factory = _factories()[command]
+
+    with pytest.raises(TypeError, match=rf"{command} settings must be {expected_type}"):
+        factory.build(_build_context(command, object()))
+
+
+def test_assist_factory_rejects_mismatched_typed_command() -> None:
+    wrong_spec = AssistSessionSpec(
+        AssistSessionCommand.OPSI_DAEMON,
+        OpsiDaemonOptions(repair_ship=True, select_enemy=False),
+    )
+
+    with pytest.raises(ValueError, match="daemon settings command must be daemon"):
+        _factories()["daemon"].build(_build_context("daemon", wrong_spec))
 
 
 @pytest.mark.parametrize(
     ("command", "settings", "message"),
     [
-        ("minigame", {}, "missing required setting"),
         (
             "event_story",
-            _settings_with("event_story", "removed", value=True),
-            "unknown settings",
+            EventStorySettings(ContentId("campaign_main"), skip_battle=True),
+            "expected event_story",
         ),
-        ("minigame", _settings_with("minigame", "removed", value=True), "unknown settings"),
-        ("raid", _settings_with("raid", "run_limit", 0), "must be at least 1"),
         (
             "raid",
-            _settings_with(
-                "raid",
-                "balancer",
-                {"target_task_id": "", "coin_limit": 10_000, "retry_seconds": 300},
+            replace(
+                _VALID_SETTINGS_BY_COMMAND["raid"],
+                content_id=ContentId("event_20260625_cn"),
             ),
-            "trimmed non-empty string",
+            "expected raid",
         ),
-        ("daemon", {"enter_map": 1}, "must be a boolean"),
         (
-            "hospital",
-            _settings_with(
-                "hospital",
-                "schedule",
-                {"timezone": "UTC", "triggers": ("00:00:00",)},
+            "coalition",
+            replace(
+                _VALID_SETTINGS_BY_COMMAND["coalition"],
+                content_id=ContentId("raid_20260212"),
             ),
-            "must be HH:MM",
+            "expected coalition",
         ),
-    ],
-)
-def test_activity_factories_reject_missing_unknown_and_invalid_settings(
-    command: str,
-    settings: dict[str, FrozenJsonValue],
-    message: str,
-) -> None:
-    factory = _factories()[command]
-
-    with pytest.raises(SettingsDocumentError, match=message):
-        factory.build(_build_context(command, settings))
-
-
-@pytest.mark.parametrize(
-    ("command", "event", "message"),
-    [
-        ("event_story", "campaign_main", "expected event_story"),
-        ("raid", "event_20260625_cn", "expected raid"),
-        ("coalition", "raid_20260212", "expected coalition"),
     ],
 )
 def test_activity_factories_reject_wrong_content_kind_before_workflow_entry(
     command: str,
-    event: str,
+    settings: object,
     message: str,
 ) -> None:
-    settings = _valid_settings(command)
-    settings["event"] = event
-
     with pytest.raises(SettingsDocumentError, match=message):
         _factories()[command].build(_build_context(command, settings))
 

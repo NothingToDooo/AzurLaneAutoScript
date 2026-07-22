@@ -570,7 +570,7 @@ def test_config_generator_writes_readme_through_atomic_boundary(
 
     assert writes == [
         (
-            config_updater_module.REPO_ROOT / "campaign" / "Readme.md",
+            config_updater_module.PROJECT_ROOT / "campaign" / "Readme.md",
             render_campaign_readme((pack,)),
         )
     ]

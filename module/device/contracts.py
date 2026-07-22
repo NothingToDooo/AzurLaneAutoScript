@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from module.base.type_alias import Area, ImageArray, Point
     from module.device.control_options import Duration
     from module.device.minitouch_service import CommandBuilder
-    from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase
+    from module.device.mumu_instance import MuMuInstance
     from module.map.map_grids import SelectedGrids
 
 type AdbCommand = str | Iterable[str | int]
@@ -71,6 +71,7 @@ class MinitouchConfig(Protocol):
 
 
 class DeviceConfig(MinitouchConfig, Protocol):
+    Emulator_Serial: str
     Emulator_MuMuPath: str
 
 
@@ -95,7 +96,10 @@ class MinitouchSession(AdbShellSession, Protocol):
     def sleep(second: Duration, /) -> None: ...
 
 
-class MumuSession(RetrySession, Protocol):
+class DeviceSession(MinitouchSession, RetrySession, Protocol):
+    @property
+    def config(self) -> DeviceConfig: ...
+
     @property
     def serial(self) -> str: ...
 
@@ -115,40 +119,9 @@ class MumuSession(RetrySession, Protocol):
     def list_known_packages(self, *, show_log: bool = True) -> list[str]: ...
 
 
-class DeviceSession(MinitouchSession, MumuSession, Protocol):
-    @property
-    def config(self) -> DeviceConfig: ...
-
-
 class CaptureRuntime(Protocol):
     @property
-    def emulator_instance(self) -> EmulatorInstanceBase | None: ...
-
-
-class MumuRuntimeService(CaptureRuntime, Protocol):
-    @property
-    def session(self) -> MumuSession: ...
-
-    @property
-    def emulator_manager(self) -> EmulatorManagerBase: ...
-
-    def find_emulator_instance(self, serial: str) -> EmulatorInstanceBase | None: ...
-
-    def emulator_start(self) -> bool: ...
-
-    def emulator_stop(self) -> bool: ...
-
-    def emulator_start_watch(self) -> bool: ...
-
-    def check_mumu_app_keep_alive(self) -> bool: ...
-
-    def check_mumu_bridge_network(self) -> bool: ...
-
-    def check_after_connected(self) -> None: ...
-
-    def diagnose_adb_connect_refused(self) -> None: ...
-
-    def invalidate_serial(self) -> None: ...
+    def emulator_instance(self) -> MuMuInstance: ...
 
 
 class CaptureService(Protocol):

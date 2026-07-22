@@ -5,7 +5,7 @@ import pytest
 
 from module.bootstrap import production
 from module.runtime.runner import CommandStatus
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 
 def _project_root(tmp_path: Path) -> Path:
@@ -18,7 +18,7 @@ def _project_root(tmp_path: Path) -> Path:
 
 def test_command_validation_accepts_scheduler_and_every_task() -> None:
     production._validate_command("alas")  # ruff:ignore[private-member-access] - composition boundary contract.
-    for command in TASK_CATALOG:
+    for command in TASK_SPECS:
         production._validate_command(command)  # ruff:ignore[private-member-access] - composition boundary contract.
 
 

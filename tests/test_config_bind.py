@@ -7,6 +7,7 @@ import pytest
 
 from module.config.config import AzurLaneConfig, name_to_function
 from module.config.deep import deep_get, deep_set
+from module.config.resolved import task_bind_chain
 from module.config.utils import filepath_config, read_file
 from module.os.config import OSConfig
 
@@ -73,7 +74,7 @@ def test_fleet_convenience_properties_are_read_only_and_stateless() -> None:
 
 
 def test_task_bind_chain_adds_event_defaults_in_existing_order() -> None:
-    assert AzurLaneConfig.task_bind_chain("Event") == [
+    assert task_bind_chain("Event") == [
         "General",
         "Alas",
         "TaskBalancer",
@@ -83,7 +84,7 @@ def test_task_bind_chain_adds_event_defaults_in_existing_order() -> None:
 
 
 def test_task_bind_chain_adds_opsi_defaults() -> None:
-    assert AzurLaneConfig.task_bind_chain("OpsiExplore") == [
+    assert task_bind_chain("OpsiExplore") == [
         "General",
         "Alas",
         "OpsiGeneral",
@@ -94,7 +95,7 @@ def test_task_bind_chain_adds_opsi_defaults() -> None:
 def test_task_bind_chain_does_not_modify_callers_list() -> None:
     extra_scopes = ["CallerScope"]
 
-    chain = AzurLaneConfig.task_bind_chain("Event", extra_scopes)
+    chain = task_bind_chain("Event", extra_scopes)
 
     assert extra_scopes == ["CallerScope"]
     assert chain[-1] == "CallerScope"

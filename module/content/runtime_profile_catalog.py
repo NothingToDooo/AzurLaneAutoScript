@@ -22,9 +22,10 @@ from module.content.runtime_profile import (
     RuntimeTuning,
     RuntimeTuningKey,
 )
+from module.project_paths import PROJECT_ROOT
 
 RUNTIME_PROFILE_SCHEMA_VERSION = 1
-DEFAULT_RUNTIME_PROFILE_PATH = Path(__file__).resolve().parents[2] / "content" / "campaign-runtime-profiles.json"
+DEFAULT_RUNTIME_PROFILE_PATH = PROJECT_ROOT / "content" / "campaign-runtime-profiles.json"
 _ROOT_FIELDS = {"schema_version", "extensions", "profiles"}
 _EXTENSION_FIELDS = {"id", "executors"}
 _EXECUTOR_FIELDS = {"kind", "implementation", "options"}

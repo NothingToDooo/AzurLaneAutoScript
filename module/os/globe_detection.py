@@ -9,6 +9,7 @@ from module.logger import logger
 from module.map_detection.homography import Homography
 from module.map_detection.perspective import Perspective
 from module.map_detection.utils import perspective_transform
+from module.project_paths import PROJECT_ROOT
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
     from module.config.config_manual import FindPeaksParameter
 
-GLOBE_MAP = "./assets/map_detection/os_globe_map.png"
+GLOBE_MAP = PROJECT_ROOT / "assets" / "map_detection" / "os_globe_map.png"
 GLOBE_MAP_SHAPE = (2570, 1696)
 
 

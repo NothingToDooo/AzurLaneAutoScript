@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from config_factory import in_memory_config
 
 from module.adapters.campaign_map_initialization import CampaignMapInitializationService
-from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionOwner
-from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
+from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime, Mumu12CampaignAttempt
+from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
@@ -15,7 +16,7 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileManager,
     RuntimeSessionOutcome,
 )
-from module.adapters.campaign_runtime_session import RuntimeProfileLease
+from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
 from module.adapters.campaign_submarine import (
     STANDARD_CAMPAIGN_SUBMARINE_SERVICES,
     CampaignSubmarineFreshCombatContributor,
@@ -24,7 +25,7 @@ from module.adapters.campaign_submarine import (
     SubmarineFreshCombatRuntime,
     build_campaign_submarine_services,
 )
-from module.application import AbortRequested
+from module.application import AbortRequested, AbortToken
 from module.content.campaign_session import CampaignRunVariant
 from module.content.models import StageRef
 from module.content.runtime_profile import (
@@ -38,6 +39,7 @@ from module.content.runtime_profile import (
 )
 from module.content.stage_loader import load_default_stage
 from module.device.device import Device
+from module.gameplay.campaign import CampaignJobKind
 from module.map.map_base import CampaignMap
 from module.map.support_fleet import SupportFleetAttemptState, SupportFleetStateSource, SupportFleetStatus
 
@@ -45,6 +47,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from module.combat.combat import CombatEnd
+    from module.content.campaign_session import CampaignSession
+    from module.gameplay.campaign import CampaignJobSpec
 _SUPPORT_ID = "map_mechanic/support_fleet"
 _POPUP_ID = "map_mechanic/submarine_support_popup"
 _FRESH_COMBAT_ID = "map_mechanic/submarine_fresh_combat"
@@ -253,8 +257,14 @@ class _SessionManager:
         self.events.append("reset")
 
 
-class _SessionRuntime:
+class _SessionRuntime(DeclarativeCampaignMapRuntime):
     FUNCTION_NAME_BASE = "SESSION_TEST_"
+    _map_initialization_service: CampaignMapInitializationService
+    _program_capabilities: CampaignProgramCapabilityReader
+    _runtime_profile: _SessionManager
+    _runtime_profile_lease: RuntimeProfileLease
+    _submarine_services: SimpleNamespace
+    device: Device
 
     def __init__(self, events: list[object]) -> None:
         self.MAP = CampaignMap("submarine-session")
@@ -272,44 +282,58 @@ class _SessionRuntime:
     def map_control_init(self) -> None:
         self.events.append("map_control_init")
 
-    @staticmethod
     def combat(
+        self,
         *,
-        balance_hp: bool,
-        emotion_reduce: bool,
-        expected_end: CombatEnd | None,
-    ) -> object:
-        del balance_hp, emotion_reduce, expected_end
-        message = "session owner test injects its fresh combat handler"
+        balance_hp: bool | None = None,
+        emotion_reduce: bool | None = None,
+        submarine_mode: str | None = None,
+        expected_end: CombatEnd | None = None,
+        fleet_index: int = 1,
+    ) -> None:
+        del self, balance_hp, emotion_reduce, submarine_mode, expected_end, fleet_index
+        message = "campaign attempt test injects its fresh combat handler"
         raise AssertionError(message)
 
 
-def _owner(
+def _attempt(
     events: list[object],
     handler: Callable[[SubmarineFreshCombatRuntime], None],
-) -> tuple[Mumu12CampaignMapSessionOwner, _SessionRuntime]:
+) -> tuple[Mumu12CampaignAttempt, _SessionRuntime]:
     runtime = _SessionRuntime(events)
     service = CampaignSubmarineFreshCombatService(handler)
-    owner = Mumu12CampaignMapSessionOwner(
-        runtime,
-        RuntimeProfileLease(_SessionManager(events)),
-        service,
-        CampaignMapInitializationService(),
+    manager = _SessionManager(events)
+    runtime._runtime_profile_lease = RuntimeProfileLease(manager)  # ruff:ignore[private-member-access] - fake runtime 注入真实 lease。
+    runtime._submarine_services = SimpleNamespace(fresh_combat=service)  # ruff:ignore[private-member-access] - 注入被测 fresh service。
+    runtime._map_initialization_service = CampaignMapInitializationService()  # ruff:ignore[private-member-access] - 使用标准初始化服务。
+    runtime._runtime_profile = manager  # ruff:ignore[private-member-access] - program state 不参与本测试。
+    runtime._program_capabilities = CampaignProgramCapabilityReader()  # ruff:ignore[private-member-access] - program 能力不参与本测试。
+    device = object.__new__(Device)
+    attempt = Mumu12CampaignAttempt(
+        cast("DeclarativeCampaignMapRuntime", runtime),
+        runtime.take_profile_lease(),
+        cast("CampaignJobSpec", SimpleNamespace(kind=CampaignJobKind.STANDARD)),
+        cast("CampaignSession", SimpleNamespace()),
+        device,
+        AbortToken(),
     )
-    return owner, runtime
+    return attempt, runtime
 
 
-def test_session_owner_runs_fresh_hook_before_fixed_map_initialization() -> None:
+def test_campaign_attempt_runs_fresh_hook_before_fixed_map_initialization() -> None:
     events: list[object] = []
-    owner, _runtime = _owner(events, lambda _runtime: events.append("fresh_combat"))
+    attempt, _runtime = _attempt(events, lambda _runtime: events.append("fresh_combat"))
 
-    owner.initialize(CampaignRunVariant.NORMAL)
+    attempt.initialize(CampaignRunVariant.NORMAL)
+    attempt.release(RuntimeSessionOutcome.COMPLETED)
 
     assert events == [
         "lease.start",
         "fresh_combat",
         "map_data_init",
         "map_control_init",
+        ("lease.close", RuntimeSessionOutcome.COMPLETED),
+        "reset",
     ]
 
 
@@ -330,10 +354,10 @@ def test_fresh_hook_failure_closes_the_started_session(
         del runtime
         raise error
 
-    owner, _runtime = _owner(events, fail)
+    attempt, _runtime = _attempt(events, fail)
 
     with pytest.raises(type(error)) as raised:
-        owner.initialize(CampaignRunVariant.NORMAL)
+        attempt.initialize(CampaignRunVariant.NORMAL)
 
     assert raised.value is error
     assert events == [
@@ -341,7 +365,8 @@ def test_fresh_hook_failure_closes_the_started_session(
         ("lease.close", outcome),
         "reset",
     ]
-    assert not owner.active
+    assert attempt.profile_state is RuntimeProfileLeaseState.CLOSED
+    assert not attempt.active
 
 
 @pytest.mark.parametrize(
@@ -385,11 +410,12 @@ def test_real_chapter_16_profiles_wire_only_the_early_submarine_services(
 
     assert runtime.handle_submarine_support_popup() is expected_submarine
     assert popup_calls == (["SUBMARINE_SUPPORT"] if expected_submarine else [])
-    runtime._runtime_profile_lease.start()  # ruff:ignore[private-member-access] - direct hard-style lease boundary must not execute owner hooks.
+    lease = runtime.take_profile_lease()
+    lease.start()
     assert combat_calls == []
-    runtime._submarine_services.fresh_combat.start(runtime)  # ruff:ignore[private-member-access] - 验证生产 profile 编译出的 typed hook。
+    runtime.fresh_combat_service.start(runtime)
     assert combat_calls == (["combat"] if expected_submarine else [])
-    runtime._runtime_profile_lease.close(RuntimeSessionOutcome.COMPLETED)  # ruff:ignore[private-member-access] - 完整关闭纯内存 session。
+    lease.close(RuntimeSessionOutcome.COMPLETED)
 
     assert (_POPUP_ID in implementation_ids) is expected_submarine
     assert (_FRESH_COMBAT_ID in implementation_ids) is expected_submarine

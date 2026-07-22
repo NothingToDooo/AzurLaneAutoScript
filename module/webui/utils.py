@@ -19,6 +19,7 @@ from rich.terminal_theme import TerminalTheme
 
 from module.config.deep import DeepValue, MutableDeepValue, deep_iter
 from module.logger import logger
+from module.project_paths import PROJECT_ROOT
 from module.webui.setting import State
 
 if TYPE_CHECKING:
@@ -321,12 +322,12 @@ def get_generator(func: Callable[[], None]) -> TaskGenerator:
     return _g()
 
 
-def filepath_css(filename: str) -> str:
-    return f"./assets/gui/css/{filename}.css"
+def filepath_css(filename: str) -> Path:
+    return PROJECT_ROOT / "assets" / "gui" / "css" / f"{filename}.css"
 
 
-def filepath_icon(filename: str) -> str:
-    return f"./assets/gui/icon/{filename}.svg"
+def filepath_icon(filename: str) -> Path:
+    return PROJECT_ROOT / "assets" / "gui" / "icon" / f"{filename}.svg"
 
 
 def add_css(filepath: str | Path) -> None:

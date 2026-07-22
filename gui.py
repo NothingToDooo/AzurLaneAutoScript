@@ -2,7 +2,8 @@ import argparse
 
 import uvicorn
 
-from module.logger import logger
+from module.logger import configure_file_logging, logger
+from module.project_paths import PROJECT_ROOT
 
 DEFAULT_WEBUI_HOST = "127.0.0.1"
 DEFAULT_WEBUI_PORT = 22267
@@ -23,6 +24,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    configure_file_logging(PROJECT_ROOT, name="gui")
     port = args.port or DEFAULT_WEBUI_PORT
 
     logger.hr("启动配置")

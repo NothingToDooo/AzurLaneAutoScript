@@ -132,7 +132,7 @@ def write_error_bundle(
     screenshots: tuple[CapturedScreenshot, ...],
     *,
     log_file: Path | None,
-    root: Path = Path("./log/error"),
+    root: Path,
 ) -> Path:
     """落盘最小故障现场；调用方决定旁路失败是否影响原异常。"""
 

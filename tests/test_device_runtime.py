@@ -1,5 +1,6 @@
+from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Literal, overload, override
+from typing import TYPE_CHECKING, Literal, cast, overload, override
 
 import numpy as np
 import pytest
@@ -12,8 +13,8 @@ from module.device import connection as connection_module
 from module.device.connection import Connection
 from module.device.device import Device
 from module.device.minitouch_service import CommandBuilder, MinitouchController
-from module.device.platform.emulator_base import EmulatorManagerBase
-from module.device.runtime import DeviceRuntime
+from module.device.mumu_instance import MuMuInstance
+from module.device.runtime import DeviceRuntime, MumuRuntime
 from module.exception import EmulatorNotRunningError
 from module.map.map_grids import SelectedGrids
 
@@ -24,11 +25,11 @@ if TYPE_CHECKING:
 
     from module.base.type_alias import Area, ImageArray, Point
     from module.device.control_options import Duration
-    from module.device.platform.emulator_base import EmulatorInstanceBase
 
 
 class _MinitouchConfigDouble:
     MINITOUCH_FILEPATH_REMOTE = "/data/local/tmp/minitouch"
+    Emulator_Serial = "127.0.0.1:16384"
     Emulator_MuMuPath = "C:/MuMu/MuMuNxMain.exe"
 
 
@@ -190,23 +191,18 @@ class _MumuRuntimeDouble:
         self.session = session
         self._calls = [] if calls is None else calls
         self._invalidate_error = invalidate_error
-        self._emulator_manager = EmulatorManagerBase()
-        self._emulator_instance: EmulatorInstanceBase | None = None
+        self._emulator_instance = MuMuInstance(
+            executable=Path("C:/MuMu/nx_main/MuMuNxMain.exe"),
+            instance_id=0,
+            name="MuMuPlayer-15.0-0",
+            config_dir=Path("C:/MuMu/vms/MuMuPlayer-15.0-0/configs"),
+        )
         self._lifecycle_result = True
-        self.find_requests: list[str] = []
         self.lifecycle_calls: list[str] = []
         self.health_check_calls: list[str] = []
 
     @property
-    def emulator_instance(self) -> EmulatorInstanceBase | None:
-        return self._emulator_instance
-
-    @property
-    def emulator_manager(self) -> EmulatorManagerBase:
-        return self._emulator_manager
-
-    def find_emulator_instance(self, serial: str) -> EmulatorInstanceBase | None:
-        self.find_requests.append(serial)
+    def emulator_instance(self) -> MuMuInstance:
         return self._emulator_instance
 
     def emulator_start(self) -> bool:
@@ -389,7 +385,6 @@ def test_device_builds_runtime_before_first_connection_and_reuses_it_for_recover
     config = _DeviceConfig()
     monkeypatch.setattr(DeviceRuntime, "create", staticmethod(create))
     monkeypatch.setattr(Connection, "__init__", connection_init)
-    monkeypatch.setattr(Device, "method_check", lambda _device: None)
     monkeypatch.setattr(Device, "screenshot_interval_set", lambda _device: None)
 
     device = Device(config)
@@ -406,7 +401,7 @@ def test_runtime_releases_serial_services_in_explicit_order() -> None:
     mumu_runtime = _MumuRuntimeDouble(session, calls)
     runtime = DeviceRuntime(
         adb_session=session,
-        mumu_runtime=mumu_runtime,
+        mumu_runtime=cast("MumuRuntime", mumu_runtime),
         capture=_CaptureServiceDouble(mumu_runtime, calls),
         controller=_ControllerServiceDouble(session, calls),
         app_controller=_AppControllerServiceDouble(session),
@@ -426,7 +421,7 @@ def test_runtime_finishes_capture_and_mumu_cleanup_after_controller_error() -> N
 
     runtime = DeviceRuntime(
         adb_session=session,
-        mumu_runtime=mumu_runtime,
+        mumu_runtime=cast("MumuRuntime", mumu_runtime),
         capture=_CaptureServiceDouble(mumu_runtime, calls),
         controller=_ControllerServiceDouble(session, calls, release_error=error),
         app_controller=_AppControllerServiceDouble(session),
@@ -450,7 +445,7 @@ def test_runtime_preserves_every_serial_cleanup_failure_in_order() -> None:
     mumu_runtime = _MumuRuntimeDouble(session, calls, invalidate_error=invalidation_error)
     runtime = DeviceRuntime(
         adb_session=session,
-        mumu_runtime=mumu_runtime,
+        mumu_runtime=cast("MumuRuntime", mumu_runtime),
         capture=_CaptureServiceDouble(mumu_runtime, calls, release_error=capture_error),
         controller=_ControllerServiceDouble(session, calls, release_error=controller_error),
         app_controller=_AppControllerServiceDouble(session),
@@ -529,7 +524,7 @@ def test_runtime_rejects_mismatched_service_sessions() -> None:
     with pytest.raises(ValueError, match="same ADB session"):
         DeviceRuntime(
             adb_session=session,
-            mumu_runtime=mumu_runtime,
+            mumu_runtime=cast("MumuRuntime", mumu_runtime),
             capture=_CaptureServiceDouble(mumu_runtime),
             controller=_ControllerServiceDouble(session),
             app_controller=_AppControllerServiceDouble(session),

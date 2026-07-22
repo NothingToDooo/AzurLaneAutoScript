@@ -490,6 +490,129 @@ class TaskBalancerPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class GemsFarmingSettings:
+    fallback_ref: StageRef
+    flagship_change: GemsFlagshipChange
+    common_carrier: GemsCommonCarrier
+    vanguard_change: GemsVanguardChange
+    common_destroyer: GemsCommonDestroyer
+    replacement_retry_delay: timedelta = timedelta(minutes=30)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.fallback_ref, StageRef):
+            message = "fallback_ref must be a StageRef"
+            raise TypeError(message)
+        if not isinstance(self.flagship_change, GemsFlagshipChange):
+            message = "flagship_change must be a GemsFlagshipChange"
+            raise TypeError(message)
+        if not isinstance(self.common_carrier, GemsCommonCarrier):
+            message = "common_carrier must be a GemsCommonCarrier"
+            raise TypeError(message)
+        if not isinstance(self.vanguard_change, GemsVanguardChange):
+            message = "vanguard_change must be a GemsVanguardChange"
+            raise TypeError(message)
+        if not isinstance(self.common_destroyer, GemsCommonDestroyer):
+            message = "common_destroyer must be a GemsCommonDestroyer"
+            raise TypeError(message)
+        validate_positive_duration(self.replacement_retry_delay, field_name="replacement_retry_delay")
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignJobSettings:
+    task_id: TaskId
+    stage_refs: tuple[StageRef, ...]
+    difficulty: CampaignDifficulty
+    execution: CampaignExecutionSettings
+    schedule: DailySchedule
+    failure_retry_delay: DelayRange
+    resource_retry_delay: timedelta
+    limits: CampaignLimits
+    task_balancer: TaskBalancerPolicy | None = None
+    gems_farming: GemsFarmingSettings | None = None
+
+    def __post_init__(self) -> None:
+        self._validate_task_id()
+        self._validate_stage_refs()
+        self._validate_execution_settings()
+        self._validate_limit_scope()
+        self._validate_gems_settings()
+
+    def _validate_task_id(self) -> None:
+        if not isinstance(self.task_id, TaskId):
+            message = "task_id must be a TaskId"
+            raise TypeError(message)
+        if self.task_id not in CAMPAIGN_JOB_KINDS:
+            message = f"unsupported campaign task: {self.task_id.value}"
+            raise ValueError(message)
+
+    def _validate_execution_settings(self) -> None:
+        if not isinstance(self.difficulty, CampaignDifficulty):
+            message = "difficulty must be a CampaignDifficulty"
+            raise TypeError(message)
+        if not isinstance(self.execution, CampaignExecutionSettings):
+            message = "execution must be CampaignExecutionSettings"
+            raise TypeError(message)
+        if not isinstance(self.schedule, DailySchedule):
+            message = "schedule must be DailySchedule"
+            raise TypeError(message)
+        if not isinstance(self.failure_retry_delay, DelayRange):
+            message = "failure_retry_delay must be a DelayRange"
+            raise TypeError(message)
+        validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
+        if not _MIN_RESOURCE_RETRY <= self.resource_retry_delay <= _MAX_RESOURCE_RETRY:
+            message = "resource_retry_delay must be between 120 and 240 minutes"
+            raise ValueError(message)
+        if not isinstance(self.limits, CampaignLimits):
+            message = "limits must be CampaignLimits"
+            raise TypeError(message)
+        if self.task_balancer is not None and not isinstance(self.task_balancer, TaskBalancerPolicy):
+            message = "task_balancer must be a TaskBalancerPolicy or None"
+            raise TypeError(message)
+
+    def _validate_gems_settings(self) -> None:
+        if self.kind is CampaignJobKind.GEMS_FARMING:
+            if not isinstance(self.gems_farming, GemsFarmingSettings):
+                message = "gems_farming jobs require GemsFarmingSettings"
+                raise TypeError(message)
+        elif self.gems_farming is not None:
+            message = "gems_farming settings are only valid for gems_farming jobs"
+            raise ValueError(message)
+
+    @property
+    def kind(self) -> CampaignJobKind:
+        return CAMPAIGN_JOB_KINDS[self.task_id]
+
+    def _validate_stage_refs(self) -> None:
+        if not isinstance(self.stage_refs, tuple):
+            message = "stage_refs must be a tuple"
+            raise TypeError(message)
+        if any(not isinstance(ref, StageRef) for ref in self.stage_refs):
+            message = "stage_refs must contain StageRef values"
+            raise TypeError(message)
+        if len(set(self.stage_refs)) != len(self.stage_refs):
+            message = "stage_refs must not contain duplicates"
+            raise ValueError(message)
+        if self.kind is CampaignJobKind.EVENT_SP:
+            if len(self.stage_refs) > 1:
+                message = "event_sp stage_refs must contain at most one stage"
+                raise ValueError(message)
+        elif self.kind is not CampaignJobKind.EVENT_DAILY and len(self.stage_refs) != 1:
+            message = f"{self.kind.value} stage_refs must contain exactly one stage"
+            raise ValueError(message)
+
+    def _validate_limit_scope(self) -> None:
+        supports_event_limits = self.kind in {
+            CampaignJobKind.EVENT,
+            CampaignJobKind.EVENT_SP,
+            CampaignJobKind.EVENT_DAILY,
+            CampaignJobKind.GEMS_FARMING,
+        }
+        if not supports_event_limits and (self.limits.event_points or self.limits.event_deadline_at is not None):
+            message = "event limits are only valid for event or gems-farming jobs"
+            raise ValueError(message)
+
+
+@dataclass(frozen=True, slots=True)
 class GemsFarmingPolicy:
     fallback_session: CampaignSession
     flagship_change: GemsFlagshipChange

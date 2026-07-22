@@ -2395,33 +2395,13 @@
       "Waiting": "等待中",
       "NoTask": "无任务"
     },
-    "AddAlas": {
-      "PopupTitle": "添加新配置",
-      "NewName": "新的配置文件名",
-      "CopyFrom": "从现有的配置中复制",
-      "Confirm": "添加",
-      "FileExist": "存在同名的配置文件，请重新输入一个",
-      "InvalidChar": "配置文件名不能包含下列任何字符：.\\/:*?\"<>|",
-      "InvalidPrefixTemplate": "配置文件名不能以 template 开头",
-      "Manage": "管理"
-    },
     "AppManage": {
-      "PageTitle": "管理配置文件",
-      "TitleNew": "添加新配置",
-      "NewName": "新的配置文件名",
-      "CopyFrom": "从现有的配置中复制",
-      "NameExist": "存在同名的配置文件，请重新输入一个",
-      "InvalidChar": "配置文件名不能包含下列任何字符：.\\/:*?\"<>|",
-      "InvalidPrefixTemplate": "配置文件名不能以 template 开头",
+      "PageTitle": "alas.json 导入/导出",
       "Back": "返回",
-      "New": "添加",
       "Import": "导入",
       "Export": "导出",
-      "OverrideWarning": "将会覆盖现有的配置文件",
-      "ImportSuccess": "导入成功",
-      "NewSuccess": "添加成功",
-      "Name": "配置名称",
-      "Actions": "操作"
+      "OverrideWarning": "将覆盖当前 alas.json",
+      "ImportSuccess": "alas.json 导入成功"
     },
     "Text": {
       "InvalidFeedBack": "格式错误。 示例：{0}",
