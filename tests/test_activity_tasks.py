@@ -453,18 +453,27 @@ def test_activity_abort_before_entry_prevents_external_work() -> None:
     assert workflow.specs == []
 
 
-def test_activity_abort_during_work_is_honored_at_the_returned_safe_point() -> None:
+def test_activity_abort_during_work_checkpoints_the_returned_safe_point() -> None:
     abort = AbortToken()
     workflow = _ActivityWorkflow(
-        ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.COMPLETED, _OBSERVED_AT, 1),
+        ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.IN_PROGRESS, _OBSERVED_AT, 1),
         on_execute=lambda: _request_abort(abort, "stop after the current operation"),
     )
+    task = ActivityTask(
+        workflow,
+        ActivitySpec.minigame(schedule=_SERVER_UPDATE_SCHEDULE, operation_limit=2),
+    )
 
+    result = task.run(_context("minigame", abort=abort))
+
+    assert result == TaskResult(
+        outcome=Deferred("activity batch is still in progress"),
+        effects=(RescheduleSelf(_OBSERVED_AT),),
+        state_effects=(_progress_effect(1),),
+    )
+    assert len(workflow.specs) == 1
     with pytest.raises(AbortRequested, match="stop after the current operation"):
-        ActivityTask(workflow, ActivitySpec.minigame(schedule=_SERVER_UPDATE_SCHEDULE)).run(
-            _context("minigame", abort=abort)
-        )
-
+        task.run(_context("minigame", abort=abort))
     assert len(workflow.specs) == 1
 
 
@@ -616,15 +625,23 @@ def test_balancer_stop_defers_self_and_wakes_the_typed_target(command: Encounter
     )
 
 
-def test_encounter_abort_after_workflow_discards_the_report_and_effects() -> None:
+def test_encounter_abort_after_workflow_checkpoints_the_completed_run() -> None:
     abort = AbortToken()
-    command = EncounterCommand.HOSPITAL
-    report = _encounter_report(command, EncounterStopReason.COMPLETED, runs_completed=1)
+    command = EncounterCommand.RAID
+    report = _encounter_report(command, EncounterStopReason.IN_PROGRESS, runs_completed=1)
     workflow = _EncounterWorkflow(report, on_execute=lambda: _request_abort(abort, "stop after battle"))
+    task = EncounterTask(workflow, _encounter_spec(command, run_limit=2))
 
+    result = task.run(_context(command.value, abort=abort))
+
+    assert result == TaskResult(
+        outcome=Deferred("encounter batch is still in progress"),
+        effects=(RescheduleSelf(_OBSERVED_AT),),
+        state_effects=(_encounter_progress_effect(command, 1),),
+    )
+    assert len(workflow.specs) == 1
     with pytest.raises(AbortRequested, match="stop after battle"):
-        EncounterTask(workflow, _encounter_spec(command)).run(_context(command.value, abort=abort))
-
+        task.run(_context(command.value, abort=abort))
     assert len(workflow.specs) == 1
 
 

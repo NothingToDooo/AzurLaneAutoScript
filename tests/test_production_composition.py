@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -17,10 +17,14 @@ from module.application import (
     Faulted,
     OperatorNotificationKind,
     OperatorNotificationRequest,
+    RecoverableFault,
+    RescheduleSelf,
     RunMetadata,
     Succeeded,
     TaskId,
     TaskResult,
+    WakePolicy,
+    WakeTask,
 )
 from module.application.state_effects import UpsertTaskState
 from module.bootstrap.assembly_source import ConfigurationLoadError, JsonConfigurationDocumentSource
@@ -28,6 +32,7 @@ from module.bootstrap.configuration_compiler import ConfigurationCompileError, W
 from module.bootstrap.production import (
     PersonalRuntimeBuilder,
     PersonalRuntimeConfig,
+    PersonalSchedulerResources,
     SystemLoopClock,
     ensure_personal_configuration,
     validate_personal_configuration,
@@ -36,6 +41,7 @@ from module.content.manifest import load_default_event_manifests
 from module.device.device import Device
 from module.diagnostics import ScreenshotHistory
 from module.equipment.equipment_code import EquipmentCodeHandler
+from module.exception import GameStuckError
 from module.notify.configuration import SmtpNotificationConfig, SmtpTransport
 from module.runtime.factories import ConfiguredTaskFactory, TaskBinding, validate_task_bindings
 from module.runtime.runner import CommandStatus, RuntimeRunner
@@ -50,6 +56,7 @@ if TYPE_CHECKING:
     from module.content.campaign_session import CampaignRunVariant, CampaignSession
     from module.content.campaign_session_source import CampaignStageSelection
     from module.content.models import EventPack, StageRef
+    from module.device.runtime import DeviceRuntime
     from module.runtime.factories import TaskBuildContext
 
 
@@ -208,7 +215,7 @@ def test_scheduler_builder_builds_every_domain_from_personal_configuration(
     document = _template()
     config_factory, configs = _personal_config_factory(document)
 
-    compiled, bindings, _repository, screenshots = _builder(config_factory=config_factory).build(
+    compiled, bindings, _repository, screenshots, device = _builder(config_factory=config_factory).build(
         document,
         clock=SystemLoopClock(),
     )
@@ -217,6 +224,7 @@ def test_scheduler_builder_builds_every_domain_from_personal_configuration(
     assert bindings[TaskId("main")].content_revision == "campaign-test"
     assert bindings[TaskId("benchmark")].content_revision == "builtin-content-v1"
     assert isinstance(screenshots, ScreenshotHistory)
+    assert device.config is configs[0]
     assert configs[0].config_name == "alas"
     assert configs[0].Emulator_Serial == compiled.device_serial
 
@@ -240,7 +248,7 @@ def test_direct_benchmark_skips_campaign_content_and_builds_its_factory_once(
         lambda _services: {"benchmark": factory},
     )
 
-    _compiled, bindings, repository, _screenshots = PersonalRuntimeBuilder(
+    _compiled, bindings, repository, _screenshots, _device = PersonalRuntimeBuilder(
         Path(),
         "benchmark",
         config_factory=config_factory,
@@ -310,7 +318,7 @@ def test_complete_configuration_builds_the_exact_task_catalog(
         event_revision=_Revision("event-test"),
         campaign_revision=_Revision("campaign-test"),
     )
-    _compiled, bindings, _repository, _screenshots = builder.build(document, clock=SystemLoopClock())
+    _compiled, bindings, _repository, _screenshots, _device = builder.build(document, clock=SystemLoopClock())
 
     validate_task_bindings(bindings)
     assert tuple(task_id.value for task_id in bindings) == tuple(TASK_SPECS)
@@ -387,6 +395,117 @@ def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications
             "<main> campaign_main/12-4 reached run count limit",
         ),
     ]
+
+
+def test_recoverable_fault_observer_saves_diagnostics_without_crash_notification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = GameStuckError("stuck")
+    screenshots = ScreenshotHistory(max_frames=1)
+    saved: list[BaseException] = []
+    sent: list[tuple[str, str]] = []
+    retry_at = datetime(2026, 7, 22, 4, 0, 10, tzinfo=UTC)
+    smtp = SmtpNotificationConfig(
+        host="smtp.example.com",
+        user="sender@example.com",
+        password=tmp_path.name,
+        recipients=("operator@example.com",),
+        port=587,
+        transport=SmtpTransport.STARTTLS,
+    )
+
+    def save_error_bundle(**kwargs: object) -> str:
+        saved.append(cast("BaseException", kwargs["error"]))
+        return "log/error/recoverable"
+
+    def send_notification(
+        _config: SmtpNotificationConfig,
+        *,
+        title: str,
+        content: str,
+    ) -> bool:
+        sent.append((title, content))
+        return True
+
+    monkeypatch.setattr(production_module, "_save_error_bundle", save_error_bundle)
+    monkeypatch.setattr(production_module, "send_notification", send_notification)
+
+    bundle = production_module._observe_result(  # ruff:ignore[private-member-access] - 验证恢复诊断不会误报进程崩溃。
+        TaskId("research"),
+        TaskResult(
+            RecoverableFault(error),
+            effects=(
+                RescheduleSelf(retry_at),
+                WakeTask(TaskId("restart"), retry_at - timedelta(seconds=10), WakePolicy.FORCE_ENABLE),
+            ),
+        ),
+        root=tmp_path,
+        command="alas",
+        screenshots=screenshots,
+        notification=smtp,
+    )
+
+    assert bundle == "log/error/recoverable"
+    assert saved == [error]
+    assert sent == []
+
+
+def test_personal_scheduler_resources_release_assets_and_the_same_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str | None]] = []
+
+    class _Runtime:
+        @staticmethod
+        def release_serial() -> None:
+            calls.append(("device", None))
+
+    def release_resources(next_task: str = "") -> None:
+        calls.append(("assets", next_task or None))
+
+    monkeypatch.setattr(production_module, "release_resources", release_resources)
+    device = object.__new__(Device)
+    device._runtime = cast("DeviceRuntime", _Runtime())  # ruff:ignore[private-member-access] - 注入真实 Device runtime owner。
+    lifecycle = PersonalSchedulerResources(device)
+
+    lifecycle.before_task(TaskId("research"))
+    lifecycle.before_wait()
+
+    assert calls == [
+        ("assets", "research"),
+        ("assets", None),
+        ("device", None),
+    ]
+
+
+def test_personal_scheduler_resources_preserve_both_idle_cleanup_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    asset_error = ValueError("asset cleanup failed")
+    device_error = OSError("device cleanup failed")
+
+    class _Runtime:
+        @staticmethod
+        def release_serial() -> None:
+            calls.append("device")
+            raise device_error
+
+    def release_resources() -> None:
+        calls.append("assets")
+        raise asset_error
+
+    monkeypatch.setattr(production_module, "release_resources", release_resources)
+    device = object.__new__(Device)
+    device._runtime = cast("DeviceRuntime", _Runtime())  # ruff:ignore[private-member-access] - 注入真实 Device runtime owner。
+    resources = PersonalSchedulerResources(device)
+
+    with pytest.raises(ExceptionGroup) as raised:
+        resources.before_wait()
+
+    assert calls == ["assets", "device"]
+    assert raised.value.exceptions == (asset_error, device_error)
 
 
 def test_personal_configuration_validation_is_pure_and_skips_runtime_composition(

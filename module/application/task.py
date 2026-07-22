@@ -16,7 +16,16 @@ from module.application.effects import (
 from module.application.identifiers import TaskId
 from module.application.metadata import RunMetadata
 from module.application.notifications import OperatorNotificationRequest
-from module.application.outcomes import Blocked, Cancelled, Deferred, Faulted, Retryable, RunOutcome, Succeeded
+from module.application.outcomes import (
+    Blocked,
+    Cancelled,
+    Deferred,
+    Faulted,
+    RecoverableFault,
+    Retryable,
+    RunOutcome,
+    Succeeded,
+)
 from module.application.state_effects import DeleteTaskState, StateEffect, UpsertTaskState
 
 
@@ -96,7 +105,10 @@ class TaskResult:
     notifications: tuple[OperatorNotificationRequest, ...] = ()
 
     def __post_init__(self) -> None:
-        if not isinstance(self.outcome, Succeeded | Deferred | Retryable | Blocked | Cancelled | Faulted):
+        if not isinstance(
+            self.outcome,
+            Succeeded | Deferred | Retryable | Blocked | Cancelled | Faulted | RecoverableFault,
+        ):
             message = "outcome must be a RunOutcome"
             raise TypeError(message)
         if not isinstance(self.effects, tuple):

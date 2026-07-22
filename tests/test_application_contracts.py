@@ -16,6 +16,7 @@ from module.application import (
     Faulted,
     OperatorNotificationKind,
     OperatorNotificationRequest,
+    RecoverableFault,
     RequestAppRestart,
     RescheduleSelf,
     RescheduleTask,
@@ -146,6 +147,14 @@ def test_faulted_keeps_the_original_exception() -> None:
     assert Faulted(error).error is error
     with pytest.raises(TypeError, match="error must be an Exception"):
         Faulted(cast("Exception", "broken task"))
+
+
+def test_recoverable_fault_keeps_the_original_exception() -> None:
+    error = RuntimeError("temporary task failure")
+
+    assert RecoverableFault(error).error is error
+    with pytest.raises(TypeError, match="error must be an Exception"):
+        RecoverableFault(cast("Exception", "broken task"))
 
 
 def test_schedule_effects_use_aware_time_and_explicit_wake_policy() -> None:

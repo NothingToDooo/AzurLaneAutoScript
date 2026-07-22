@@ -130,6 +130,12 @@ class _Session:
         del show_log
         return [self.package]
 
+    def bind_serial(self, serial: str) -> bool:
+        if serial == self.serial:
+            return False
+        self.serial = serial
+        return True
+
 
 def _instance(tmp_path: Path, *, instance_id: int = 0, name: str = "MuMuPlayer-15.0-0") -> MuMuInstance:
     executable = tmp_path / "MuMu Player 12" / "nx_main" / "MuMuNxMain.exe"

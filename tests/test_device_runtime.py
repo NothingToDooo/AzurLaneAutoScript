@@ -45,6 +45,7 @@ class _DeviceSessionDouble:
         self._forward_remove_error = forward_remove_error
         self._config = _MinitouchConfigDouble()
         self._adb_client = AdbClient()
+        self._serial = "127.0.0.1:16384"
 
     def _record(self, name: str) -> None:
         self.accesses.append(name)
@@ -70,7 +71,7 @@ class _DeviceSessionDouble:
     @property
     def serial(self) -> str:
         self._record("serial")
-        return "127.0.0.1:16384"
+        return self._serial
 
     @property
     def is_mumu_family(self) -> bool:
@@ -179,6 +180,13 @@ class _DeviceSessionDouble:
         self._record("list_known_packages")
         return []
 
+    def bind_serial(self, serial: str) -> bool:
+        self._record("bind_serial")
+        if serial == self._serial:
+            return False
+        self._serial = serial
+        return True
+
 
 class _MumuRuntimeDouble:
     def __init__(
@@ -197,39 +205,10 @@ class _MumuRuntimeDouble:
             name="MuMuPlayer-15.0-0",
             config_dir=Path("C:/MuMu/vms/MuMuPlayer-15.0-0/configs"),
         )
-        self._lifecycle_result = True
-        self.lifecycle_calls: list[str] = []
-        self.health_check_calls: list[str] = []
 
     @property
     def emulator_instance(self) -> MuMuInstance:
         return self._emulator_instance
-
-    def emulator_start(self) -> bool:
-        self.lifecycle_calls.append("start")
-        return self._lifecycle_result
-
-    def emulator_stop(self) -> bool:
-        self.lifecycle_calls.append("stop")
-        return self._lifecycle_result
-
-    def emulator_start_watch(self) -> bool:
-        self.lifecycle_calls.append("watch")
-        return self._lifecycle_result
-
-    def check_mumu_app_keep_alive(self) -> bool:
-        self.health_check_calls.append("app_keep_alive")
-        return self._lifecycle_result
-
-    def check_mumu_bridge_network(self) -> bool:
-        self.health_check_calls.append("bridge_network")
-        return self._lifecycle_result
-
-    def check_after_connected(self) -> None:
-        self.health_check_calls.append("after_connected")
-
-    def diagnose_adb_connect_refused(self) -> None:
-        self.health_check_calls.append("diagnose_refused")
 
     def invalidate_serial(self) -> None:
         self._calls.append("mumu")

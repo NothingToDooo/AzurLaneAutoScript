@@ -382,9 +382,6 @@ class MinitouchController:
         del_cached_property(self, "_minitouch_builder")
         raise_cleanup_errors(errors, message="minitouch resource cleanup failed")
 
-    def release_resource(self) -> None:
-        self.release()
-
     def _close_minitouch_client(self) -> None:
         client = self._minitouch_client
         if client is None:

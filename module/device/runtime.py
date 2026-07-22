@@ -10,6 +10,8 @@ from module.base.decorator import cached_property, del_cached_property, run_once
 from module.base.failure import raise_cleanup_errors
 from module.base.timer import Timer
 from module.config.deep import deep_get
+from module.device.mumu import mumu12_endpoint_candidates
+from module.device.mumu_connection import select_mumu_endpoint
 from module.device.mumu_instance import MuMuInstance, resolve_mumu_instance
 from module.device.service_retry import session_retry
 from module.device.services import AppController, MinitouchController, NemuIpcCapture
@@ -60,7 +62,6 @@ class MumuRuntime:
         "nemud_app_keep_alive",
         "nemud_player_version",
         "is_mumu_over_version_400",
-        "is_mumu_over_version_356",
     )
 
     def __init__(self, session: DeviceSession) -> None:
@@ -144,14 +145,6 @@ class MumuRuntime:
             return False
         return self.nemud_player_version == ""
 
-    @cached_property
-    def is_mumu_over_version_356(self) -> bool:
-        if not self.is_mumu_family:
-            return False
-        if self.is_mumu_over_version_400:
-            return True
-        return self.nemud_app_keep_alive != ""
-
     def diagnose_adb_connect_refused(self) -> None:
         self.check_mumu_bridge_network()
 
@@ -211,15 +204,6 @@ class MumuRuntime:
         logger.error(f"Emulator function {func_name}() failed")
         return False
 
-    def _adb_connect_for_start_watch(self) -> bool:
-        msg = self.session.adb_client.connect(self.serial)
-        if "connected" in msg:
-            # 已连接时会输出：Connected to 127.0.0.1:59865。
-            # 重复连接会输出：Already connected to 127.0.0.1:59865。
-            return False
-        # 10061 表示本机端口拒绝连接，不算成功连接。
-        return "(10061)" not in msg
-
     @staticmethod
     def _log_emulator_online(device: AdbDeviceWithStatus) -> None:
         logger.info(f"Emulator online: {device}")
@@ -244,21 +228,30 @@ class MumuRuntime:
             return detected_window
         return 0
 
-    def _check_start_watch_device(self, serial: str) -> AdbDeviceWithStatus | None:
-        devices = self.session.list_device().select(serial=serial)
-        if not devices:
-            self._adb_connect_for_start_watch()
-            return None
+    def _probe_start_watch_candidates(self, candidates: tuple[str, ...]) -> None:
+        for serial in candidates:
+            try:
+                self.session.adb_client.connect(serial)
+            except (AdbError, OSError) as error:
+                logger.info(error)
 
-        device: AdbDeviceWithStatus | None = devices.first_or_none()
-        if device is None:
-            self._adb_connect_for_start_watch()
+    def _check_start_watch_device(self) -> AdbDeviceWithStatus | None:
+        configured_serial = self.session.config.Emulator_Serial
+        candidates = mumu12_endpoint_candidates(configured_serial)
+        devices = self.session.list_device()
+        allowed = set(candidates)
+        for device in devices:
+            if device.serial in allowed and device.status == "offline":
+                self.session.adb_client.disconnect(device.serial)
+
+        endpoint = select_mumu_endpoint(configured_serial, devices)
+        if endpoint is None:
+            self._probe_start_watch_candidates(candidates)
             return None
-        if device.status == "offline":
-            self.session.adb_client.disconnect(serial)
-            self._adb_connect_for_start_watch()
-            return None
-        return device
+        if endpoint != self.serial:
+            logger.info(f"MuMu12 live endpoint switched {self.serial} -> {endpoint}")
+            self.session.bind_serial(endpoint)
+        return devices.select(serial=endpoint).first_or_none()
 
     def _check_start_watch_shell(self) -> str | None:
         try:
@@ -289,7 +282,6 @@ class MumuRuntime:
         """模拟器启动完成返回 True，180 秒超时返回 False。"""
         logger.hr("Emulator start", level=2)
         current_window = get_focused_window()
-        serial = self.serial
         logger.info(f"Current window: {current_window}")
 
         show_online = run_once(self._log_emulator_online)
@@ -308,7 +300,7 @@ class MumuRuntime:
 
             new_window = self._focus_back_from_new_window(current_window, new_window)
 
-            device = self._check_start_watch_device(serial)
+            device = self._check_start_watch_device()
             if device is None:
                 continue
             show_online(device)
@@ -343,18 +335,6 @@ class MumuRuntime:
             return False
 
         logger.error("Failed to start emulator 3 times, stopped")
-        return False
-
-    def emulator_stop(self) -> bool:
-        logger.hr("Emulator stop", level=1)
-        for _ in range(3):
-            if self._emulator_function_wrapper(self._emulator_stop):
-                return True
-            if self._emulator_function_wrapper(self._emulator_start):
-                continue
-            return False
-
-        logger.error("Failed to stop emulator 3 times, stopped")
         return False
 
 
@@ -403,6 +383,3 @@ class DeviceRuntime:
             except BaseException as error:  # ruff:ignore[blind-except] - 独立清理步骤失败后仍须继续释放其余资源。
                 errors.append(error)
         raise_cleanup_errors(errors, message="device serial resource cleanup failed")
-
-    def release(self) -> None:
-        self.release_serial()

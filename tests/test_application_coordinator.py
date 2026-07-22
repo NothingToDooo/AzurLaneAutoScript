@@ -11,6 +11,7 @@ from module.application import (
     DisableTask,
     ExecutionMode,
     Faulted,
+    RecoverableFault,
     RescheduleSelf,
     RescheduleTask,
     RunCoordinator,
@@ -20,6 +21,7 @@ from module.application import (
     Succeeded,
     Task,
     TaskContext,
+    TaskErrorRecovery,
     TaskId,
     TaskResult,
     UpsertTaskState,
@@ -107,6 +109,20 @@ class _StopRun(BaseException):
 
 class _NoTaskRun:
     pass
+
+
+class _RecoverDeviceFailure(TaskErrorRecovery):
+    def __init__(self, expected: Exception, result: TaskResult) -> None:
+        self.expected = expected
+        self.result = result
+        self.calls: list[tuple[TaskContext, Exception]] = []
+
+    @override
+    def recover(self, context: TaskContext, error: Exception) -> TaskResult | None:
+        self.calls.append((context, error))
+        if error is self.expected:
+            return self.result
+        return None
 
 
 def test_execute_begins_runs_and_finalizes_in_order() -> None:
@@ -293,6 +309,56 @@ def test_ordinary_exception_becomes_faulted_with_the_original_error() -> None:
 
     assert isinstance(result.outcome, Faulted)
     assert result.outcome.error is error
+    assert repository.finalize_calls == [result]
+
+
+def test_recoverable_exception_is_translated_before_finalize() -> None:
+    events: list[str] = []
+    repository = _RecordingRepository(events)
+    error = RuntimeError("temporary device failure")
+    retry_at = datetime(2026, 7, 13, 0, 0, 10, tzinfo=UTC)
+    expected = TaskResult(
+        outcome=RecoverableFault(error),
+        effects=(
+            RescheduleSelf(retry_at),
+            WakeTask(TaskId("restart"), retry_at, WakePolicy.FORCE_ENABLE),
+        ),
+    )
+    recovery = _RecoverDeviceFailure(error, expected)
+
+    result = RunCoordinator(repository, error_recovery=recovery).execute(
+        TaskId("commission"),
+        ExecutionMode.SCHEDULED_JOB,
+        _metadata(),
+        _RaisingTask(error, events),
+    )
+
+    assert result is expected
+    assert repository.finalize_calls == [expected]
+    assert recovery.calls[0][0].task_id == TaskId("commission")
+    assert recovery.calls[0][1] is error
+
+
+def test_error_recovery_can_decline_an_unknown_exception() -> None:
+    events: list[str] = []
+    repository = _RecordingRepository(events)
+    expected_error = RuntimeError("temporary device failure")
+    unknown_error = ValueError("invalid task state")
+    retry_at = datetime(2026, 7, 13, 0, 0, 10, tzinfo=UTC)
+    recovery = _RecoverDeviceFailure(
+        expected_error,
+        TaskResult(RecoverableFault(expected_error), effects=(RescheduleSelf(retry_at),)),
+    )
+
+    result = RunCoordinator(repository, error_recovery=recovery).execute(
+        TaskId("commission"),
+        ExecutionMode.SCHEDULED_JOB,
+        _metadata(),
+        _RaisingTask(unknown_error, events),
+    )
+
+    assert isinstance(result.outcome, Faulted)
+    assert result.outcome.error is unknown_error
     assert repository.finalize_calls == [result]
 
 

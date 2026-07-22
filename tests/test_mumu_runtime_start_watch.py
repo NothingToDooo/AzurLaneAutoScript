@@ -5,6 +5,7 @@ import pytest
 from adbutils import AdbClient
 
 from module.device import runtime as runtime_module
+from module.device.mumu import mumu12_endpoint_candidates
 from module.device.runtime import MumuRuntime
 from module.map.map_grids import SelectedGrids
 
@@ -103,6 +104,7 @@ class _Session:
         self.package_calls = 0
         self.recovery_calls = 0
         self.prop_calls: list[str] = []
+        self.bind_calls: list[str] = []
 
     @overload
     def adb_shell(
@@ -195,6 +197,13 @@ class _Session:
         self.package_calls += 1
         return self.package_results.pop(0)
 
+    def bind_serial(self, serial: str) -> bool:
+        if serial == self.serial:
+            return False
+        self.bind_calls.append(serial)
+        self.serial = serial
+        return True
+
 
 def _device(serial: str, status: str) -> _Device:
     return _Device(serial=serial, status=status)
@@ -248,15 +257,15 @@ def test_emulator_start_watch_uses_live_serial_after_dynamic_shift() -> None:
     configured_serial = "127.0.0.1:16384"
     live_serial = "127.0.0.1:16385"
     runtime = _make_runtime(
-        serial=live_serial,
-        device_batches=[[_device(live_serial, "device")]],
+        serial=configured_serial,
+        device_batches=[[], [_device(live_serial, "device")]],
     )
-    runtime.session.config.Emulator_Serial = configured_serial
 
     assert runtime.emulator_start_watch()
     assert runtime.session.serial == live_serial
     assert runtime.session.config.Emulator_Serial == configured_serial
-    assert runtime.session.adb_client.connect_calls == []
+    assert runtime.session.bind_calls == [live_serial]
+    assert runtime.session.adb_client.connect_calls == list(mumu12_endpoint_candidates(configured_serial))
 
 
 def test_emulator_start_watch_disconnects_offline_device_before_retrying() -> None:
@@ -269,7 +278,7 @@ def test_emulator_start_watch_disconnects_offline_device_before_retrying() -> No
 
     assert runtime.emulator_start_watch()
     assert runtime.session.adb_client.disconnect_calls == ["127.0.0.1:16384"]
-    assert runtime.session.adb_client.connect_calls == ["127.0.0.1:16384"]
+    assert runtime.session.adb_client.connect_calls == list(mumu12_endpoint_candidates(runtime.session.serial))
 
 
 def test_emulator_start_watch_connects_when_device_is_missing() -> None:
@@ -281,7 +290,7 @@ def test_emulator_start_watch_connects_when_device_is_missing() -> None:
     )
 
     assert runtime.emulator_start_watch()
-    assert runtime.session.adb_client.connect_calls == ["127.0.0.1:16384"]
+    assert runtime.session.adb_client.connect_calls == list(mumu12_endpoint_candidates(runtime.session.serial))
 
 
 def test_emulator_start_watch_waits_until_shell_command_is_ready() -> None:

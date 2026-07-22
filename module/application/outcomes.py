@@ -50,4 +50,16 @@ class Faulted:
             raise TypeError(message)
 
 
-type RunOutcome = Succeeded | Deferred | Retryable | Blocked | Cancelled | Faulted
+@dataclass(frozen=True, slots=True)
+class RecoverableFault:
+    """保留原始异常，并显式声明 scheduler 可以继续。"""
+
+    error: Exception
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.error, Exception):
+            message = "error must be an Exception"
+            raise TypeError(message)
+
+
+type RunOutcome = Succeeded | Deferred | Retryable | Blocked | Cancelled | Faulted | RecoverableFault

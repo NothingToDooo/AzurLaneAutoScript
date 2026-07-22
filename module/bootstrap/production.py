@@ -23,10 +23,13 @@ from module.application import (
     AbortToken,
     Faulted,
     OperatorNotificationKind,
+    RecoverableFault,
     TaskId,
     TaskResult,
 )
 from module.base.atomic import atomic_write
+from module.base.failure import raise_cleanup_errors
+from module.base.resource import release_resources
 from module.bootstrap.assembly_source import (
     JsonConfigurationDocumentSource,
 )
@@ -69,7 +72,8 @@ from module.notify.direct import send_notification
 from module.project_paths import PROJECT_ROOT
 from module.runtime.errors import RuntimeCompositionError
 from module.runtime.factories import TaskBinding, TaskFactory, bind_tasks
-from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner
+from module.runtime.recovery import GameErrorRecovery
+from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner, SchedulerResourceLifecycle
 from module.state.config_repository import ConfigRepositoryClock, ConfigStateRepository
 from module.task_registry import (
     TASK_SPECS,
@@ -267,7 +271,7 @@ def _observe_result(  # ruff:ignore[too-many-arguments] - 结果边界需要运�
     notification: NotificationConfig,
 ) -> str | None:
     bundle: str | None = None
-    if isinstance(result.outcome, Faulted):
+    if isinstance(result.outcome, Faulted | RecoverableFault):
         error = result.outcome.error
         bundle = _save_error_bundle(
             root=root,
@@ -279,7 +283,8 @@ def _observe_result(  # ruff:ignore[too-many-arguments] - 结果边界需要运�
         summary = f"<{task_id.value}> {type(error).__name__}: {error}"
         if bundle is not None:
             summary = f"{summary}\nError bundle: {bundle}"
-        _notify(notification, title="Alas crashed", content=summary)
+        if isinstance(result.outcome, Faulted):
+            _notify(notification, title="Alas crashed", content=summary)
 
     for request in result.notifications:
         reason = _CAMPAIGN_NOTIFICATION_REASONS.get(request.kind)
@@ -379,6 +384,32 @@ class SystemLoopClock:
             time.sleep(interval)
 
 
+class PersonalSchedulerResources(SchedulerResourceLifecycle):
+    """把通用 scheduler 生命周期接到个人 runtime 的资源 owner。"""
+
+    __slots__ = ("_device",)
+
+    def __init__(self, device: Device) -> None:
+        if not isinstance(device, Device) or not callable(getattr(device.runtime, "release_serial", None)):
+            message = "device must expose runtime.release_serial()"
+            raise TypeError(message)
+        self._device = device
+
+    @override
+    def before_task(self, next_task: TaskId) -> None:
+        release_resources(next_task=next_task.value)
+
+    @override
+    def before_wait(self) -> None:
+        errors: list[BaseException] = []
+        for cleanup in (release_resources, self._device.runtime.release_serial):
+            try:
+                cleanup()
+            except BaseException as error:  # ruff:ignore[blind-except] - 两个独立资源 owner 都必须获得清理机会。
+                errors.append(error)
+        raise_cleanup_errors(errors, message="scheduler idle resource cleanup failed")
+
+
 class PersonalRuntimeBuilder:
     """按命令组装一次个人 MuMu12 runtime。"""
 
@@ -464,7 +495,7 @@ class PersonalRuntimeBuilder:
         document: ConfigurationDocument,
         *,
         clock: ConfigRepositoryClock,
-    ) -> tuple[CompiledConfiguration, Mapping[TaskId, TaskBinding], ConfigStateRepository, ScreenshotHistory]:
+    ) -> tuple[CompiledConfiguration, Mapping[TaskId, TaskBinding], ConfigStateRepository, ScreenshotHistory, Device]:
         """编译候选配置，并只组装当前命令需要的领域。"""
 
         configuration = WebConfigurationCompiler().compile(document)
@@ -518,7 +549,7 @@ class PersonalRuntimeBuilder:
             settings=configuration.tasks,
             content_revisions=self._content_revisions(specs),
         )
-        return configuration, bindings, repository, device.error_screenshots
+        return configuration, bindings, repository, device.error_screenshots, device
 
     def _selected_domains(self) -> tuple[TaskDomain, ...]:
         if self._command == "alas":
@@ -612,12 +643,14 @@ def run_default_command(
         config_path = ensure_personal_configuration(root)
         document = JsonConfigurationDocumentSource(config_path).load()
         clock = SystemLoopClock()
-        compiled, bindings, repository, screenshots = builder.build(document, clock=clock)
+        compiled, bindings, repository, screenshots, device = builder.build(document, clock=clock)
         notification = compiled.notification
         runner = RuntimeRunner(
             bindings=bindings,
             repository=repository,
             clock=clock,
+            error_recovery=GameErrorRecovery(lambda: device.config.Error_HandleError, clock.now),
+            lifecycle=PersonalSchedulerResources(device),
             observer=lambda task_id, result: _observe_result(
                 task_id,
                 result,

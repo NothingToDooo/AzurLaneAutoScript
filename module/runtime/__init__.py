@@ -3,6 +3,7 @@ from module.runtime.decoder import SettingsDecoder
 from module.runtime.errors import (
     FactoryCoverageError,
     InvalidTaskFactoryError,
+    RecoveryLimitExceededError,
     RuntimeCompositionError,
     SettingsDocumentError,
     TaskStateDocumentError,
@@ -18,6 +19,7 @@ from module.runtime.factories import (
     require_task_settings,
     validate_task_bindings,
 )
+from module.runtime.recovery import GameErrorRecovery
 from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner
 from module.runtime.settings import (
     CompiledTaskSettings,
@@ -37,8 +39,10 @@ __all__ = [
     "FactoryCoverageError",
     "FrozenJsonValue",
     "FrozenTaskSettings",
+    "GameErrorRecovery",
     "InvalidTaskFactoryError",
     "JsonValue",
+    "RecoveryLimitExceededError",
     "RuntimeCompositionError",
     "RuntimeRunner",
     "SettingsDecoder",
