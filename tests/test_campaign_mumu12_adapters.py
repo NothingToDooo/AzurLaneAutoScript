@@ -18,6 +18,7 @@ from module.adapters.campaign_mumu12 import (
     Mumu12CampaignAttempt,
     Mumu12CampaignRuntimeProvider,
     Mumu12HardCampaignPort,
+    Mumu12HardCampaignSession,
     campaign_execution_overlay,
     campaign_stage_overlay,
     compile_campaign_map,
@@ -142,9 +143,8 @@ from module.map.map_spawn_gap import MapSpawnProgress
 from module.ui.page import page_campaign_menu, page_event
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
-    from module.adapters.campaign_mumu12 import Mumu12CampaignHardAssembly
     from module.adapters.campaign_profile_services import CampaignProfileServices
     from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
     from module.application import CancellationSource
@@ -941,20 +941,29 @@ def test_runtime_factory_builds_complete_attempt_before_publication() -> None:
     assert runtime.calls.count("discard_runtime") == 1
 
 
-def test_runtime_factory_builds_hard_assembly_before_interaction() -> None:
+def test_runtime_factory_opens_complete_hard_session_before_publication() -> None:
     _FakeDeclarativeRuntime.created.clear()
     factory = DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
     definition = compose_campaign_attempt_definition(_definition(), CampaignDifficulty.HARD)
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
+    stage = StageRef("campaign_main", "11-4")
 
-    assembly = factory.build_hard(
-        in_memory_config("campaign-hard-assembly", {}),
-        object.__new__(Device),
+    session = factory.open_hard_session(
+        in_memory_config("campaign-hard-session", {}),
+        device,
         definition,
+        stage=stage,
+        cancellation=AbortToken(),
+        remaining_reader=lambda _device: 1,
     )
 
-    runtime = cast("_FakeDeclarativeRuntime", assembly.runtime)
-    assembly.owner.release()
-    assembly.owner.release()
+    runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
+    assert session.stage == stage
+    assert session.remaining == 1
+    session.close()
+    session.close()
     assert runtime.calls.count("reset_runtime") == 1
     assert runtime.calls.count("discard_runtime") == 1
 
@@ -1016,16 +1025,28 @@ class _OpaqueFakeRuntimeFactory(DeclarativeCampaignRuntimeFactory):
         return attempt
 
     @override
-    def build_hard(
+    def open_hard_session(
         self,
         config: AzurLaneConfig,
         device: Device,
         definition: CampaignStageDefinition,
-    ) -> Mumu12CampaignHardAssembly:
-        assembly = super().build_hard(config, device, definition)
-        vars(assembly.runtime).pop("_runtime_profile_lease")
-        vars(assembly.runtime).pop("_hard_behavior")
-        return assembly
+        *,
+        stage: StageRef,
+        cancellation: CancellationSource,
+        remaining_reader: Callable[[Device], int],
+    ) -> Mumu12HardCampaignSession:
+        session = super().open_hard_session(
+            config,
+            device,
+            definition,
+            stage=stage,
+            cancellation=cancellation,
+            remaining_reader=remaining_reader,
+        )
+        runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
+        vars(runtime).pop("_runtime_profile_lease")
+        vars(runtime).pop("_hard_behavior")
+        return session
 
 
 def test_map_provider_consumes_attempt_without_runtime_private_fields() -> None:
@@ -1045,16 +1066,16 @@ def test_map_provider_consumes_attempt_without_runtime_private_fields() -> None:
     assert "reset_runtime" in runtime.calls
 
 
-def test_hard_port_consumes_assembly_without_runtime_private_fields() -> None:
+def test_hard_port_consumes_session_without_runtime_private_fields() -> None:
     _FakeDeclarativeRuntime.created.clear()
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
     port = Mumu12HardCampaignPort(
-        in_memory_config("campaign-opaque-hard-assembly", {}),
+        in_memory_config("campaign-opaque-hard-session", {}),
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=_OpaqueFakeRuntimeFactory(),
+        runtime_factory=_OpaqueFakeRuntimeFactory(),
         remaining_reader=lambda _device: 1,
     )
 
@@ -2535,7 +2556,7 @@ def test_hard_port_uses_explicit_override_or_main_map_and_settles_one_attempt(
         config,
         device,
         source,
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=lambda _device: 2,
     )
     settings = _hard_settings(stage)
@@ -2575,7 +2596,7 @@ def test_hard_workflow_closes_each_real_runtime_across_three_attempts(
         config,
         device,
         source,
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=lambda _device: next(remaining),
     )
     _disable_hard_activation(monkeypatch, device)
@@ -2625,7 +2646,7 @@ def test_hard_workflow_releases_real_runtime_before_retry(
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FailingHardRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FailingHardRuntime),
         remaining_reader=lambda _device: next(remaining),
     )
     _disable_hard_activation(monkeypatch, device)
@@ -2669,7 +2690,7 @@ def test_hard_workflow_releases_real_runtime_after_cancellation(
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=read_remaining,
     )
     _disable_hard_activation(monkeypatch, device)
@@ -2705,7 +2726,7 @@ def test_hard_workflow_releases_real_runtime_after_unexpected_error(
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FailingHardRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FailingHardRuntime),
         remaining_reader=lambda _device: next(remaining),
     )
     _disable_hard_activation(monkeypatch, device)
@@ -2748,7 +2769,7 @@ def test_hard_port_preserves_attempt_discovery_and_cleanup_failures() -> None:
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingRuntime),
         remaining_reader=fail_remaining,
     )
 
@@ -2756,14 +2777,14 @@ def test_hard_port_preserves_attempt_discovery_and_cleanup_failures() -> None:
         port.remaining_attempts(_hard_settings(), AbortToken())
 
     assert raised.value.exceptions == (discovery_error, cleanup_error)
-    assert port._handle is None  # ruff:ignore[private-member-access] - discovery 失败不得发布半初始化 handle。
+    assert port._session is None  # ruff:ignore[private-member-access] - discovery 失败不得发布半初始化 session。
     runtime = cast("_CleanupFailingRuntime", _CleanupFailingRuntime.created[0])
-    assert runtime._runtime_profile_lease.state is RuntimeProfileLeaseState.CLOSED  # ruff:ignore[private-member-access] - owner 即使 cleanup 失败也必须关闭唯一 lease。
+    assert runtime._runtime_profile_lease.state is RuntimeProfileLeaseState.CLOSED  # ruff:ignore[private-member-access] - session 即使 cleanup 失败也必须关闭唯一 lease。
     assert runtime.calls.count("discard_runtime") == 1
     assert runtime.calls[-1] == "discard_runtime"
 
 
-def test_hard_port_records_interrupted_owner_outcome_for_mid_attempt_cancellation() -> None:
+def test_hard_port_records_interrupted_session_outcome_for_mid_attempt_cancellation() -> None:
     _FakeDeclarativeRuntime.created.clear()
 
     class _CancelAfterLeaseStart:
@@ -2775,7 +2796,7 @@ def test_hard_port_records_interrupted_owner_outcome_for_mid_attempt_cancellatio
                     reason = "cancel hard attempt"
                     raise AbortRequested(reason)
 
-    config = in_memory_config("hard-owner-cancel", {})
+    config = in_memory_config("hard-session-cancel", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
@@ -2783,7 +2804,7 @@ def test_hard_port_records_interrupted_owner_outcome_for_mid_attempt_cancellatio
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=lambda _device: 1,
     )
     cancellation = _CancelAfterLeaseStart()
@@ -2802,7 +2823,7 @@ def test_hard_port_records_interrupted_owner_outcome_for_mid_attempt_cancellatio
     assert runtime.calls.count("reset_runtime") == 1
 
 
-def test_hard_port_release_clears_handle_before_owner_cleanup_failure() -> None:
+def test_hard_port_release_clears_session_before_cleanup_failure() -> None:
     cleanup_error = OSError("runtime cleanup failed")
 
     class _CleanupFailingRuntime(_FakeDeclarativeRuntime):
@@ -2817,7 +2838,7 @@ def test_hard_port_release_clears_handle_before_owner_cleanup_failure() -> None:
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_CleanupFailingRuntime),
         remaining_reader=lambda _device: 1,
     )
 
@@ -2826,47 +2847,10 @@ def test_hard_port_release_clears_handle_before_owner_cleanup_failure() -> None:
         port.release()
 
     assert raised.value is cleanup_error
-    assert port._handle is None  # ruff:ignore[private-member-access] - cleanup 失败也不能复用已移交的 handle。
+    assert port._session is None  # ruff:ignore[private-member-access] - cleanup 失败也不能复用已移交的 session。
     port.release()
     runtime = cast("_CleanupFailingRuntime", _CleanupFailingRuntime.created[-1])
     assert runtime.calls.count("discard_runtime") == 1
-
-
-def test_hard_port_owner_contract_failure_discards_lease_before_interaction() -> None:
-    interactions: list[str] = []
-
-    class _InvalidHardRuntime(_FakeDeclarativeRuntime):
-        created: ClassVar[list[object]] = []
-
-        def __init__(self, config: AzurLaneConfig, device: Device, definition: CampaignStageDefinition) -> None:
-            super().__init__(config, device, definition)
-            vars(self)["auto_search_execute_a_battle"] = None
-
-    config = in_memory_config("hard-owner-contract-failure", {})
-    device = object.__new__(Device)
-    vars(device)["screenshot"] = lambda: interactions.append("screenshot")
-    vars(device)["image"] = object()
-
-    def read_remaining(_device: Device) -> int:
-        interactions.append("ocr")
-        return 1
-
-    port = Mumu12HardCampaignPort(
-        config,
-        device,
-        _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_InvalidHardRuntime),
-        remaining_reader=read_remaining,
-    )
-
-    with pytest.raises(TypeError, match="hard attempt runtime"):
-        port.remaining_attempts(_hard_settings(), AbortToken())
-
-    runtime = cast("_InvalidHardRuntime", _InvalidHardRuntime.created[-1])
-    assert interactions == []
-    assert not any(isinstance(call, tuple) and call[0] == "select_stage" for call in runtime.calls)
-    assert runtime.calls == ["reset_runtime", "discard_runtime"]
-    assert port._handle is None  # ruff:ignore[private-member-access] - owner 构造失败不得发布 handle。
 
 
 @pytest.mark.parametrize("hard_behavior", [None, object()], ids=("missing", "wrong-type"))
@@ -2895,7 +2879,7 @@ def test_hard_port_rejects_invalid_typed_behavior_before_stage_or_ocr_interactio
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_InvalidHardBehaviorRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_InvalidHardBehaviorRuntime),
         remaining_reader=read_remaining,
     )
 
@@ -2906,35 +2890,32 @@ def test_hard_port_rejects_invalid_typed_behavior_before_stage_or_ocr_interactio
     assert interactions == []
     assert not any(isinstance(call, tuple) and call[0] == "select_stage" for call in runtime.calls)
     assert runtime.calls == ["reset_runtime", "discard_runtime"]
-    assert port._handle is None  # ruff:ignore[private-member-access] - 无 typed behavior 不得发布 handle。
+    assert port._session is None  # ruff:ignore[private-member-access] - 无 typed behavior 不得发布 session。
 
 
-def test_hard_port_releases_real_runtime_before_the_next_attempt(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    entrance = Button(area=(), color=(), button=(1, 2, 3, 4), name="HARD_ENTRANCE")
-
-    def discover_without_ui(
-        _port: Mumu12HardCampaignPort,
-        _runtime: DeclarativeCampaignMapRuntime,
-        _settings: HardSettings,
-        _cancellation: CancellationSource,
-    ) -> tuple[int, Button]:
-        return 1, entrance
-
-    monkeypatch.setattr(Mumu12HardCampaignPort, "_read_remaining_attempts", discover_without_ui)
-    config = in_memory_config("hard-real-owner-wiring", {})
+def test_hard_port_releases_session_before_the_next_attempt() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = in_memory_config("hard-session-wiring", {})
     device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
     port = Mumu12HardCampaignPort(
         config,
         device,
-        _FakeSessionSource(load_default_stage(StageRef("campaign_main", "8-1"))),
+        _FakeSessionSource(_definition()),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        remaining_reader=lambda _device: 1,
     )
 
-    assert port.remaining_attempts(_hard_settings("8-1"), AbortToken()) == 1
+    assert port.remaining_attempts(_hard_settings(), AbortToken()) == 1
     port.release()
-    assert port.remaining_attempts(_hard_settings("8-1"), AbortToken()) == 1
+    assert port.remaining_attempts(_hard_settings(), AbortToken()) == 1
     port.release()
+
+    assert len(_FakeDeclarativeRuntime.created) == 2
+    for created in _FakeDeclarativeRuntime.created:
+        runtime = cast("_FakeDeclarativeRuntime", created)
+        assert runtime.calls.count("discard_runtime") == 1
 
 
 def test_hard_port_stage_mismatch_can_be_released_without_cancellation() -> None:
@@ -2947,7 +2928,7 @@ def test_hard_port_stage_mismatch_can_be_released_without_cancellation() -> None
         config,
         device,
         _FakeSessionSource(_definition()),
-        assembly_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
+        runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime),
         remaining_reader=lambda _device: 1,
     )
     first = _hard_settings("11-4")
