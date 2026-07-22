@@ -182,7 +182,7 @@ class CoalitionUI(Combat):
             return True
         return self.handle_combat_automation_confirm() or self.handle_popup_confirm("COALITION")
 
-    def enter_map(self) -> None:
+    def enter_coalition_map(self) -> None:
         """从联合作战页进入已解析的关卡，结束于战斗准备页。"""
         stage_assets = self.client.profile.stage_assets(self.client.stage.stage_id)
         entrance = stage_assets.entrance

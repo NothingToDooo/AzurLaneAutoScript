@@ -238,14 +238,12 @@ def _decode_find_peaks_parameters(
 ) -> Mapping[str, RuntimeConfigValue]:
     if not isinstance(value, Mapping):
         raise _invalid_type(key, "a find_peaks parameter mapping", value)
-    unknown = sorted(set(value) - _FIND_PEAKS_FIELDS)
+    parameters = cast("Mapping[str, RuntimeTuningValue]", value)
+    unknown = sorted(set(parameters) - _FIND_PEAKS_FIELDS)
     if unknown:
         raise _invalid_value(key, f"a find_peaks mapping without unknown field {unknown[0]!r}", value)
     return MappingProxyType(
-        {
-            name: _decode_find_peaks_parameter(parameter, key, name)
-            for name, parameter in cast("Mapping[str, RuntimeTuningValue]", value).items()
-        }
+        {name: _decode_find_peaks_parameter(parameter, key, name) for name, parameter in parameters.items()}
     )
 
 

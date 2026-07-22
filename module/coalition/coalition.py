@@ -126,6 +126,6 @@ class Coalition(CoalitionCombat):
             )
             self.config.apply_runtime_overlay(Emotion_Fleet1Control="prevent_yellow_face")
 
-        self.enter_map()
+        self.enter_coalition_map()
         self.coalition_combat()
         return CoalitionExecutionResult(content_id, stage.stage_id, stage.battle_count)
