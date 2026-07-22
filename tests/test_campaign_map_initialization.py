@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -7,9 +8,11 @@ from config_factory import in_memory_config
 from module.adapters.campaign_map_initialization import (
     CampaignMapInitializationContributor,
     CampaignMapInitializationRuntime,
+    CampaignMapInitializationService,
     build_campaign_map_initialization_service,
 )
-from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionOwner
+from module.adapters.campaign_mumu12 import Mumu12CampaignAttempt
+from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
 from module.adapters.campaign_runtime_implementations import load_default_campaign_runtime_executor_registry
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
@@ -21,6 +24,7 @@ from module.adapters.campaign_runtime_profile import (
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
 from module.adapters.campaign_submarine import STANDARD_CAMPAIGN_SUBMARINE_SERVICES
+from module.application import AbortToken
 from module.content.campaign_session import CampaignRunVariant
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -31,14 +35,18 @@ from module.content.runtime_profile import (
     RuntimeExecutorKind,
     RuntimeImplementationId,
 )
+from module.device.device import Device
+from module.gameplay.campaign import CampaignJobKind
 from module.map.map_base import CampaignMap
 from module.map_detection.utils_assets import ASSETS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionRuntime
+    from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
     from module.combat.combat import CombatEnd
+    from module.content.campaign_session import CampaignSession
+    from module.gameplay.campaign import CampaignJobSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,6 +164,12 @@ def test_manager_accessor_preserves_cross_kind_profile_order_for_initialization(
 
 class _Runtime:
     FUNCTION_NAME_BASE = "INITIALIZATION_TEST_"
+    _map_initialization_service: CampaignMapInitializationService
+    _program_capabilities: CampaignProgramCapabilityReader
+    _runtime_profile: CampaignRuntimeProfileManager
+    _runtime_profile_lease: RuntimeProfileLease
+    _submarine_services: SimpleNamespace
+    device: Device
 
     def __init__(self, failure_phase: str, trace: list[str]) -> None:
         self.MAP = CampaignMap("initialization-test")
@@ -230,6 +244,29 @@ def _failure_source(phase: str, trace: list[str]) -> _ContributorSource | None:
     return _ContributorSource(CampaignMapInitializationContributor(post_control=fail))
 
 
+def _attempt(
+    runtime: _Runtime,
+    manager: CampaignRuntimeProfileManager,
+    lease: RuntimeProfileLease,
+    initialization: CampaignMapInitializationService,
+) -> Mumu12CampaignAttempt:
+    runtime._runtime_profile_lease = lease  # ruff:ignore[private-member-access] - fake runtime 注入真实 lease。
+    runtime._submarine_services = SimpleNamespace(  # ruff:ignore[private-member-access] - fake runtime 只提供 attempt 需要的已编译 service。
+        fresh_combat=STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat
+    )
+    runtime._map_initialization_service = initialization  # ruff:ignore[private-member-access] - fake runtime 注入被测 service。
+    runtime._runtime_profile = manager  # ruff:ignore[private-member-access] - program state 不参与本测试。
+    runtime._program_capabilities = CampaignProgramCapabilityReader()  # ruff:ignore[private-member-access] - program 能力不参与本测试。
+    device = object.__new__(Device)
+    return Mumu12CampaignAttempt(
+        cast("DeclarativeCampaignMapRuntime", runtime),
+        cast("CampaignJobSpec", SimpleNamespace(kind=CampaignJobKind.STANDARD)),
+        cast("CampaignSession", SimpleNamespace()),
+        device,
+        AbortToken(),
+    )
+
+
 @pytest.mark.parametrize(
     ("failure_phase", "expected_trace"),
     [
@@ -257,14 +294,9 @@ def test_initialization_failure_closes_lease_and_restores_all_ui_mask_caches(
         sources.append(failure_source)
     initialization = build_campaign_map_initialization_service(sources)
     lease = RuntimeProfileLease(manager)
-    owner = Mumu12CampaignMapSessionOwner(
-        cast("Mumu12CampaignMapSessionRuntime", runtime),
-        lease,
-        STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
-        initialization,
-    )
+    attempt = _attempt(runtime, manager, lease, initialization)
     with pytest.raises(RuntimeError, match=rf"{failure_phase} failed"):
-        owner.initialize(CampaignRunVariant.NORMAL)
+        attempt.initialize(CampaignRunVariant.NORMAL)
 
     assert trace == expected_trace
     assert lease.state is RuntimeProfileLeaseState.CLOSED
