@@ -1,14 +1,12 @@
 import argparse
-from os import chdir
-from pathlib import Path
 
 import uvicorn
 
 from module.logger import configure_file_logging, logger
+from module.project_paths import PROJECT_ROOT
 
 DEFAULT_WEBUI_HOST = "127.0.0.1"
 DEFAULT_WEBUI_PORT = 22267
-PROJECT_ROOT = Path(__file__).resolve().parent
 
 
 def main() -> None:
@@ -26,7 +24,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    chdir(PROJECT_ROOT)
     configure_file_logging(PROJECT_ROOT, name="gui")
     port = args.port or DEFAULT_WEBUI_PORT
 

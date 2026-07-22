@@ -41,6 +41,7 @@ from module.config.utils import (
     read_file,
 )
 from module.logger import logger
+from module.project_paths import PROJECT_ROOT
 from module.state.config_repository import read_schedule_items
 from module.task_registry import TASK_CATALOG
 from module.webui import lang
@@ -915,7 +916,7 @@ def debug() -> None:
 
 
 def startup() -> None:
-    ensure_personal_configuration(Path(__file__).resolve().parents[2])
+    ensure_personal_configuration(PROJECT_ROOT)
     lang.reload()
 
 
@@ -936,7 +937,7 @@ def app(*, auto_run: bool = False) -> Starlette:
     logger.hr("Webui configs")
     logger.attr("Theme", AlasGUI.theme)
 
-    atomic_failure_cleanup("./config")
+    atomic_failure_cleanup(PROJECT_ROOT / "config")
 
     def index() -> None:
         gui = AlasGUI()

@@ -1,5 +1,4 @@
 from dataclasses import dataclass, replace
-from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, Unpack, cast
 
 import cv2
@@ -8,6 +7,7 @@ import numpy as np
 from module.base.utils import area_offset, color_similar, crop, extract_white_letters, load_image, rgb2gray, save_image
 from module.logger import logger
 from module.ocr.ocr import Digit
+from module.project_paths import project_path
 from module.statistics.utils import load_folder
 
 if TYPE_CHECKING:
@@ -292,8 +292,9 @@ class ItemGrid[ItemT: Item = Item]:
                 new[name] = item.image
 
         if folder is not None:
+            output_folder = project_path(folder)
             for name, im in new.items():
-                save_image(im, str(Path(folder) / f"{name}.png"))
+                save_image(im, output_folder / f"{name}.png")
 
         return new
 

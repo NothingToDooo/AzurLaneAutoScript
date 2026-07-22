@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def _isolate_process_setup(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(gui, "chdir", lambda _path: None, raising=False)
     monkeypatch.setattr(
         gui,
         "configure_file_logging",
@@ -32,9 +31,11 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import gui
 
+starting_cwd = Path.cwd()
+
 
 def ignore_server_start(*_args: object, **_kwargs: object) -> None:
-    assert Path.cwd() == Path(gui.__file__).resolve().parent
+    assert Path.cwd() == starting_cwd
 
 
 gui.uvicorn.run = ignore_server_start
@@ -53,7 +54,7 @@ gui.main()
     )
 
 
-def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     application = object()
     calls: list[tuple[object, dict[str, object]]] = []
     auto_run_values: list[bool] = []
@@ -72,8 +73,8 @@ def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None
         lifecycle.append(("configure_file_logging", root, name))
         return root / "log" / f"{name}.txt"
 
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, "argv", ["gui.py"])
-    monkeypatch.setattr(gui, "chdir", lambda root: lifecycle.append(("chdir", root)))
     monkeypatch.setattr(gui, "configure_file_logging", configure)
     monkeypatch.setattr(gui.uvicorn, "run", run)
     monkeypatch.setattr(webui_app, "app", build_app)
@@ -82,11 +83,11 @@ def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert auto_run_values == [False]
     assert lifecycle == [
-        ("chdir", gui.PROJECT_ROOT),
         ("configure_file_logging", gui.PROJECT_ROOT, "gui"),
         ("build_app", False),
         ("uvicorn",),
     ]
+    assert Path.cwd() == tmp_path
     assert calls == [
         (
             application,

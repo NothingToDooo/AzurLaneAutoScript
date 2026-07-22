@@ -2,6 +2,7 @@ import re
 from typing import TYPE_CHECKING
 
 from module.logger import logger
+from module.project_paths import PROJECT_ROOT
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -218,4 +219,4 @@ if __name__ == "__main__":
         """),
         )
 
-    generator.write("./module/research/preset.py")
+    generator.write(PROJECT_ROOT / "module" / "research" / "preset.py")

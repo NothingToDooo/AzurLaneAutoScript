@@ -67,6 +67,7 @@ from module.logger import get_log_file, logger
 from module.maintenance import build_maintenance_factories
 from module.notify.configuration import DisabledNotificationConfig, NotificationConfig, SmtpNotificationConfig
 from module.notify.direct import send_notification
+from module.project_paths import PROJECT_ROOT
 from module.runtime.errors import RuntimeCompositionError
 from module.runtime.factories import TaskFactory, TaskFactoryRegistry
 from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner
@@ -231,7 +232,7 @@ def validate_personal_configuration(
     """用真实内容和全部玩法 factory 校验候选配置，但不连接设备或写盘。"""
 
     root = _require_project_root(
-        Path(__file__).resolve().parents[2] if project_root is None else project_root,
+        PROJECT_ROOT if project_root is None else project_root,
     )
     try:
         compiled, registry, _repository, _screenshots = PersonalRuntimeBuilder(
@@ -570,8 +571,8 @@ class PersonalRuntimeBuilder:
             raise TypeError(message)
         return activities, sessions
 
-    @staticmethod
     def _build_domain_factories(  # ruff:ignore[complex-structure, too-many-return-statements] - 直接分支比第二套领域注册表更清楚。
+        self,
         domain: str,
         *,
         config: AzurLaneConfig,
@@ -580,7 +581,13 @@ class PersonalRuntimeBuilder:
         sessions: HardCampaignSessionSource | None,
     ) -> Mapping[str, TaskFactory]:
         if domain == "maintenance":
-            return build_maintenance_factories(build_mumu12_maintenance_services(config, device))
+            return build_maintenance_factories(
+                build_mumu12_maintenance_services(
+                    config,
+                    device,
+                    uncensored_toolkit_root=self._project_root / "toolkit" / "AzurLaneUncensored",
+                )
+            )
         if domain == "facility":
             return build_facility_factories(build_mumu12_facility_workflows(config, device))
         if domain == "composite":
@@ -637,7 +644,7 @@ def run_default_command(
 ) -> CommandOutcome:
     """构造一次个人运行时并执行 scheduler 或单个调试命令。"""
     root = _require_project_root(
-        Path(__file__).resolve().parents[2] if project_root is None else project_root,
+        PROJECT_ROOT if project_root is None else project_root,
     )
     screenshots: ScreenshotHistory | None = None
     notification: NotificationConfig = DisabledNotificationConfig()

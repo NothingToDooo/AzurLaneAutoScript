@@ -12,6 +12,7 @@ from PIL import Image
 
 from module.base.atomic import atomic_remove, atomic_write
 from module.logger import logger
+from module.project_paths import PROJECT_ROOT
 
 if TYPE_CHECKING:
     from module.base.type_alias import ImageArray
@@ -52,7 +53,7 @@ class OcrFailureStore:
 
     __slots__ = ("_root",)
 
-    def __init__(self, root: Path = Path("./log/ocr_failure")) -> None:
+    def __init__(self, root: Path) -> None:
         if not isinstance(root, Path):
             message = "root must be a Path"
             raise TypeError(message)
@@ -148,4 +149,4 @@ class OcrFailureStore:
         return buffer.getvalue()
 
 
-OCR_FAILURE_STORE = OcrFailureStore()
+OCR_FAILURE_STORE = OcrFailureStore(PROJECT_ROOT / "log" / "ocr_failure")

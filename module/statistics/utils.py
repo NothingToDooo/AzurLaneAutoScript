@@ -1,9 +1,9 @@
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import cv2
 
 from module.base.utils import crop, image_size
+from module.project_paths import project_path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -24,11 +24,12 @@ UNEXPECTED_IMAGE_SIZE_TEMPLATE = "Unexpected image size: {size}"
 
 def load_folder(folder: FilePath, ext: str = ".png") -> dict[str, str]:
     """返回目录中指定扩展名的 {文件名: 路径} 映射；目录不存在时返回空字典。"""
-    if not Path(folder).exists():
+    folder_path = project_path(folder)
+    if not folder_path.exists():
         return {}
 
     out: dict[str, str] = {}
-    for path in Path(folder).iterdir():
+    for path in folder_path.iterdir():
         if path.suffix == ext:
             out[path.stem] = path.as_posix()
 

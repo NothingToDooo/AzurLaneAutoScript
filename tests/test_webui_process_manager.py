@@ -2,6 +2,7 @@ import queue
 import threading
 from datetime import UTC, datetime
 from multiprocessing.reduction import ForkingPickler
+from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast, override
 
 import pytest
@@ -201,12 +202,6 @@ def _patch_process_boundary(monkeypatch: pytest.MonkeyPatch, calls: list[tuple[o
 
     monkeypatch.setattr(
         process_manager_module,
-        "chdir",
-        lambda root: calls.append(("chdir", root)),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        process_manager_module,
         "configure_file_logging",
         lambda root, *, name: calls.append(("configure_file_logging", root, name)),
         raising=False,
@@ -250,7 +245,7 @@ def test_execute_process_delegates_to_default_command(
         project_root: object | None = None,
         stop_signal: object | None = None,
     ) -> CommandOutcome:
-        assert project_root is None
+        assert project_root == process_manager_module.PROJECT_ROOT
         calls.append((command, stop_signal))
         return expected
 
@@ -280,16 +275,20 @@ def test_execute_process_rejects_unknown_ui_command(monkeypatch: pytest.MonkeyPa
     assert critical == ["No function matched: Main"]
 
 
-def test_run_process_publishes_default_command_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_process_publishes_default_command_outcome_without_changing_cwd(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     calls: list[tuple[object, ...]] = []
     expected = _outcome(CommandStatus.FINISHED)
     renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
     outcome_queue: queue.Queue[CommandOutcome] = queue.Queue()
     _patch_process_boundary(monkeypatch, calls)
+    monkeypatch.chdir(tmp_path)
 
     def execute(request: _ProcessRequest, stop_event: StopEvent | None) -> CommandOutcome:
         del request, stop_event
-        calls.append(("execute",))
+        calls.append(("execute", Path.cwd()))
         return expected
 
     monkeypatch.setattr(process_manager_module, "_execute_process", execute)
@@ -298,12 +297,12 @@ def test_run_process_publishes_default_command_outcome(monkeypatch: pytest.Monke
 
     assert outcome_queue.get_nowait() is expected
     assert renderable_queue.get_nowait() is None
-    assert calls[:4] == [
-        ("chdir", process_manager_module.PROJECT_ROOT),
+    assert calls[:3] == [
         ("configure_file_logging", process_manager_module.PROJECT_ROOT, "alas"),
         ("set_func_logger", renderable_queue.put),
-        ("execute",),
+        ("execute", tmp_path),
     ]
+    assert Path.cwd() == tmp_path
     assert ("info", "[alas] exited. Reason: finished\n") in calls
 
 

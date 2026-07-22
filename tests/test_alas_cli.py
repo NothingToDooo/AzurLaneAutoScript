@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def _isolate_process_setup(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(alas_module, "chdir", lambda _path: None, raising=False)
     monkeypatch.setattr(
         alas_module,
         "configure_file_logging",
@@ -54,10 +53,10 @@ def test_cli_delegates_to_default_command(
     status: CommandStatus,
     expected: int,
 ) -> None:
-    calls: list[tuple[str, StopEvent]] = []
+    calls: list[tuple[str, Path, StopEvent]] = []
 
-    def run(command: str, *, stop_signal: StopEvent) -> CommandOutcome:
-        calls.append((command, stop_signal))
+    def run(command: str, *, project_root: Path, stop_signal: StopEvent) -> CommandOutcome:
+        calls.append((command, project_root, stop_signal))
         return _outcome(status, command=command)
 
     monkeypatch.setattr(alas_module, "run_default_command", run)
@@ -66,16 +65,18 @@ def test_cli_delegates_to_default_command(
 
     assert result == expected
     assert len(calls) == 1
-    command, stop_signal = calls[0]
+    command, project_root, stop_signal = calls[0]
     assert command == "benchmark"
+    assert project_root == alas_module.PROJECT_ROOT
     assert not stop_signal.is_set()
 
 
 def test_cli_uses_personal_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
-    def run(command: str, *, stop_signal: StopEvent) -> CommandOutcome:
+    def run(command: str, *, project_root: Path, stop_signal: StopEvent) -> CommandOutcome:
         del stop_signal
+        assert project_root == alas_module.PROJECT_ROOT
         calls.append(command)
         return _outcome(CommandStatus.FINISHED, command=command)
 
@@ -85,35 +86,38 @@ def test_cli_uses_personal_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == ["alas"]
 
 
-def test_cli_initializes_process_before_running(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_initializes_process_without_changing_cwd(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     calls: list[tuple[object, ...]] = []
+    monkeypatch.chdir(tmp_path)
 
     def configure(root: Path, *, name: str) -> Path:
         calls.append(("configure_file_logging", root, name))
         return root / "log" / f"{name}.txt"
 
-    def run(command: str, *, stop_signal: StopEvent) -> CommandOutcome:
+    def run(command: str, *, project_root: Path, stop_signal: StopEvent) -> CommandOutcome:
         del stop_signal
-        calls.append(("run_default_command", command))
+        calls.append(("run_default_command", command, project_root, Path.cwd()))
         return _outcome(CommandStatus.FINISHED, command=command)
 
-    monkeypatch.setattr(alas_module, "chdir", lambda root: calls.append(("chdir", root)))
     monkeypatch.setattr(alas_module, "configure_file_logging", configure)
     monkeypatch.setattr(alas_module, "run_default_command", run)
 
     assert alas_module.main(["benchmark"]) == 0
     assert calls == [
-        ("chdir", alas_module.PROJECT_ROOT),
         ("configure_file_logging", alas_module.PROJECT_ROOT, "alas"),
-        ("run_default_command", "benchmark"),
+        ("run_default_command", "benchmark", alas_module.PROJECT_ROOT, tmp_path),
     ]
+    assert Path.cwd() == tmp_path
 
 
 def test_cli_restores_signal_handlers_when_runner_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     error = RuntimeError("runner failed")
 
-    def run(command: str, *, stop_signal: StopEvent) -> CommandOutcome:
-        del command, stop_signal
+    def run(command: str, *, project_root: Path, stop_signal: StopEvent) -> CommandOutcome:
+        del command, project_root, stop_signal
         raise error
 
     monkeypatch.setattr(alas_module, "run_default_command", run)
@@ -129,8 +133,8 @@ def test_cli_restores_signal_handlers_when_runner_raises(monkeypatch: pytest.Mon
 def test_cli_logs_failed_command_and_error_bundle(monkeypatch: pytest.MonkeyPatch) -> None:
     errors: list[str] = []
 
-    def run(command: str, *, stop_signal: StopEvent) -> CommandOutcome:
-        del stop_signal
+    def run(command: str, *, project_root: Path, stop_signal: StopEvent) -> CommandOutcome:
+        del project_root, stop_signal
         return _outcome(
             CommandStatus.FAILED,
             command=command,

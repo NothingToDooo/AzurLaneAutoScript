@@ -19,6 +19,7 @@ from module.notify.configuration import (
     SmtpNotificationConfig,
     build_notification_config,
 )
+from module.project_paths import PROJECT_ROOT
 from module.runtime.settings import FrozenTaskSettings, JsonValue, freeze_task_settings
 from module.task_registry import TASK_CATALOG, config_name_to_command
 
@@ -34,7 +35,7 @@ type ConfigurationDocument = Mapping[str, object]
 
 _ValueT = TypeVar("_ValueT", bool, int, float, str)
 _SENTINEL_DATE = datetime(2020, 1, 1)
-_DEFAULT_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "config" / "argument" / "args.json"
+_DEFAULT_SCHEMA_PATH = PROJECT_ROOT / "module" / "config" / "argument" / "args.json"
 _SCHEDULER_INTERVAL_FIELDS = frozenset({"SuccessInterval", "FailureInterval"})
 
 

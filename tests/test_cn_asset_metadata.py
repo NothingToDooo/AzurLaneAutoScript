@@ -9,7 +9,7 @@ def test_ocr_data_key_cn_metadata_matches_updated_asset() -> None:
         OCR_DATA_KEY.area,
         OCR_DATA_KEY.color,
         OCR_DATA_KEY.button,
-        OCR_DATA_KEY.file,
+        OCR_DATA_KEY.raw_file,
     ) == (
         (133, 39, 250, 72),
         (82, 80, 91),
@@ -23,7 +23,7 @@ def test_fleet_enter_cn_metadata_matches_updated_assets() -> None:
         FLEET_ENTER.area,
         FLEET_ENTER.color,
         FLEET_ENTER.button,
-        FLEET_ENTER.file,
+        FLEET_ENTER.raw_file,
     ) == (
         (502, 474, 517, 489),
         (165, 193, 232),
@@ -34,7 +34,7 @@ def test_fleet_enter_cn_metadata_matches_updated_assets() -> None:
         FLEET_ENTER_FLAGSHIP.area,
         FLEET_ENTER_FLAGSHIP.color,
         FLEET_ENTER_FLAGSHIP.button,
-        FLEET_ENTER_FLAGSHIP.file,
+        FLEET_ENTER_FLAGSHIP.raw_file,
     ) == (
         (577, 277, 605, 291),
         (219, 196, 174),
@@ -49,7 +49,7 @@ def test_nakhimov_cn_private_quarters_support_matches_updated_assets() -> None:
         PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.area,
         PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.color,
         PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.button,
-        PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.file,
+        PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.raw_file,
     ) == (
         (23, 502, 99, 528),
         (202, 203, 203),
@@ -60,7 +60,7 @@ def test_nakhimov_cn_private_quarters_support_matches_updated_assets() -> None:
         PRIVATE_QUARTERS_SHIP_NAKHIMOV.area,
         PRIVATE_QUARTERS_SHIP_NAKHIMOV.color,
         PRIVATE_QUARTERS_SHIP_NAKHIMOV.button,
-        PRIVATE_QUARTERS_SHIP_NAKHIMOV.file,
+        PRIVATE_QUARTERS_SHIP_NAKHIMOV.raw_file,
     ) == (
         (944, 386, 976, 431),
         (202, 197, 182),

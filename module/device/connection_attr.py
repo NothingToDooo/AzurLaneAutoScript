@@ -10,6 +10,7 @@ from module.base.decorator import del_cached_property
 from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial
 from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
+from module.project_paths import project_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -99,7 +100,7 @@ class ConnectionAttr:
     def adb_binary(self) -> str:
         configured = self.config.Emulator_AdbExecutable.strip()
         if configured:
-            configured_path = Path(configured.replace("\\", "/"))
+            configured_path = project_path(configured.replace("\\", "/"))
             if configured_path.is_file():
                 return str(configured_path.resolve())
 

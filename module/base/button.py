@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 from module.base.decorator import cached_property
 from module.base.resource import Resource
 from module.base.utils import area_offset, color_similar, crop, get_color, load_image, rgb2luma
+from module.project_paths import project_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -100,8 +101,9 @@ class Button(Resource):
         return button
 
     @cached_property
-    def file(self) -> FilePath | None:
-        return self.parse_property(self.raw_file)
+    def file(self) -> Path | None:
+        file = self.parse_property(self.raw_file)
+        return None if file is None else project_path(file)
 
     @cached_property
     def name(self) -> str:

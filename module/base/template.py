@@ -10,6 +10,7 @@ from module.base.decorator import cached_property
 from module.base.resource import Resource
 from module.base.utils import area_offset, load_image, rgb2luma
 from module.map_detection.utils import Points
+from module.project_paths import project_path
 
 if TYPE_CHECKING:
     from module.base.type_alias import FilePath, ImageArray, Point, Scalar
@@ -28,8 +29,8 @@ class Template(Resource):
     cached: ClassVar[tuple[str, ...]] = ("file", "name", "is_gif")
 
     @cached_property
-    def file(self) -> FilePath:
-        return self.parse_property(self.raw_file)
+    def file(self) -> Path:
+        return project_path(self.parse_property(self.raw_file))
 
     @cached_property
     def name(self) -> str:

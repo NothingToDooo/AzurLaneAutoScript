@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 import numpy as np
 import yaml
 
-import module.logger
 from dev_tools.utils import LuaLoader, require_lua_int, require_lua_str, require_lua_table
 from module.base.utils import location2node
 from module.map.utils import camera_2d, camera_spawn_point, get_map_active_area
+from module.project_paths import PROJECT_ROOT
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping, Sequence
@@ -27,11 +27,8 @@ type StageScalar = str | int | bool | None
 type StageValue = StageScalar | Sequence[StageValue] | Mapping[str, StageValue] | Mapping[int, StageValue]
 type BattleDocument = dict[int, StageValue]
 
-# 导入 module.logger 会切换到项目根目录。
-_ = module.logger
-
-FILE = "../AzurLaneLuaScripts"
-FOLDER = "./content/events/event_20260417_cn/stages"
+FILE = PROJECT_ROOT.parent / "AzurLaneLuaScripts"
+FOLDER = PROJECT_ROOT / "content" / "events" / "event_20260417_cn" / "stages"
 KEYWORD = "2020001"
 SELECT = True
 OVERWRITE = True
@@ -885,7 +882,7 @@ class ChapterTemplate:
 先克隆 https://github.com/AzurLaneTools/AzurLaneLuaScripts 获取解密后的 Lua 脚本。
 Arguments:
     FILE:            Lua 脚本仓库路径
-    FOLDER:          保存目录，例如 './content/events/event_future_cn/stages'
+    FOLDER:          保存目录，例如 PROJECT_ROOT / 'content/events/event_future_cn/stages'
     KEYWORD:         地图名称关键词，例如 '短兵相接'；也可以是地图 ID，例如 702
     SELECT:          是否选择同活动的全部地图
     OVERWRITE:       是否覆盖已有文件

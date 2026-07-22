@@ -27,6 +27,7 @@ from module.config.utils import (
 from module.content.activity_profile import CoalitionDefinition, CoalitionFleetRule, RaidDefinition, RaidMode
 from module.content.manifest import load_default_event_manifests, render_campaign_readme
 from module.content.models import EventPack, EventRelease
+from module.project_paths import PROJECT_ROOT
 from module.task_registry import TASK_CATALOG, command_to_config_name, get_task_definition
 
 if TYPE_CHECKING:
@@ -34,8 +35,6 @@ if TYPE_CHECKING:
 
     from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue
     from module.config.utils import ArgumentDefinition
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
 
 CONFIG_IMPORT = """
 import datetime
@@ -991,7 +990,7 @@ class ConfigGenerator:
 
     @staticmethod
     def write_campaign_readme(packs: tuple[EventPack, ...]) -> None:
-        atomic_write(REPO_ROOT / "campaign" / "Readme.md", render_campaign_readme(packs))
+        atomic_write(PROJECT_ROOT / "campaign" / "Readme.md", render_campaign_readme(packs))
 
     @timer
     def generate(self) -> None:

@@ -37,9 +37,10 @@ from module.content.models import (
 from module.content.runtime_profile import CampaignRuntimeProfileId
 from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
 from module.content.yaml_loader import load_strict_yaml_mapping
+from module.project_paths import PROJECT_ROOT
 
 SCHEMA_VERSION = 1
-DEFAULT_EVENT_MANIFEST_PATH = Path(__file__).resolve().parents[2] / "content" / "events"
+DEFAULT_EVENT_MANIFEST_PATH = PROJECT_ROOT / "content" / "events"
 _TOP_LEVEL_FIELDS = {
     "schema_version",
     "id",

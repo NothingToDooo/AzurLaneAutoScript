@@ -241,20 +241,20 @@ def build_mumu12_maintenance_services(
     config: AzurLaneConfig,
     device: Device,
     *,
-    uncensored_toolkit_root: Path | None = None,
+    uncensored_toolkit_root: Path,
 ) -> MaintenanceServices:
     """构造四个 maintenance task 共用的 production 依赖。"""
 
-    toolkit_root = (
-        Path.cwd() / "toolkit" / "AzurLaneUncensored" if uncensored_toolkit_root is None else uncensored_toolkit_root
-    )
+    if not isinstance(uncensored_toolkit_root, Path):
+        message = "uncensored_toolkit_root must be a Path"
+        raise TypeError(message)
     app = Mumu12DeviceAppLifecycle(device)
     login = Mumu12LoginFlow(config, device)
     benchmark = Mumu12BenchmarkAdapter(config, device)
     return MaintenanceServices(
         app=app,
         login=login,
-        uncensored_assets=LocalUncensoredAssetBuilder(toolkit_root),
+        uncensored_assets=LocalUncensoredAssetBuilder(uncensored_toolkit_root),
         uncensored_installer=Mumu12UncensoredAssetInstaller(config, device),
         benchmark_environment=benchmark,
         benchmark_engine=benchmark,

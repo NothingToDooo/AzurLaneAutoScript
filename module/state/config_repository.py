@@ -42,7 +42,6 @@ if TYPE_CHECKING:
 type JsonValue = bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
 
 
-DEFAULT_CONFIG_PATH = Path("config/alas.json")
 _CHECKPOINT_FIELDS = frozenset({"schema_version", "payload", "updated_at"})
 
 
@@ -223,7 +222,7 @@ def _read_schedule_items(config_path: Path, *, timezone: ZoneInfo) -> tuple[Sche
 
 
 def read_schedule_items(
-    config_path: Path = DEFAULT_CONFIG_PATH,
+    config_path: Path,
     *,
     timezone_name: str = "Asia/Shanghai",
 ) -> tuple[ScheduleItem, ...]:
@@ -295,7 +294,7 @@ class ConfigStateRepository(RunRepository, ScheduleSource):
         self,
         clock: ConfigRepositoryClock,
         *,
-        config_path: Path = DEFAULT_CONFIG_PATH,
+        config_path: Path,
         timezone_name: str = "Asia/Shanghai",
         initial_document: Mapping[str, object] | None = None,
         initial_runtime_document: MutableDeepData | None = None,

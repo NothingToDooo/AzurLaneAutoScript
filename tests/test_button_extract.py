@@ -162,8 +162,8 @@ def test_worker_generates_importable_cn_scalar_assets(tmp_path: Path, monkeypatc
     assert button.area == (10, 20, 30, 40)
     assert button.color == (12, 34, 56)
     assert button.button == (10, 20, 30, 40)
-    assert button.file == "./assets/cn/demo/BUTTON.png"
-    assert template.file == "./assets/cn/demo/TEMPLATE_SAMPLE.png"
+    assert button.raw_file == "./assets/cn/demo/BUTTON.png"
+    assert template.raw_file == "./assets/cn/demo/TEMPLATE_SAMPLE.png"
 
 
 def test_image_extractor_rejects_wrong_resolution_directly(tmp_path: Path) -> None:

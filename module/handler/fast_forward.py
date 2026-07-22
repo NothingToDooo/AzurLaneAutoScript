@@ -1,9 +1,9 @@
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Literal
 
 from module.base.timer import Timer
 from module.base.utils import color_bar_percentage
+from module.content.manifest import load_default_event_manifests
 from module.handler import assets as handler_assets
 from module.handler.auto_search import AutoSearchHandler
 from module.logger import logger
@@ -29,23 +29,14 @@ AUTO_SEARCH.add_state("off", check_button=handler_assets.AUTO_SEARCH_OFF3)
 AUTO_SEARCH.add_state("off", check_button=handler_assets.AUTO_SEARCH_OFF4)
 
 
-def map_files(event: str) -> list[str]:
-    """返回 ./campaign/<event> 下的地图文件名，例如 ['sp1', 'sp2', 'sp3']。"""
-    folder = f"./campaign/{event}"
+def event_stage_ids(event: str) -> tuple[str, ...]:
+    """返回内容清单中指定活动的关卡 ID。"""
 
-    if not Path(folder).exists():
-        logger.warning(f"Map file folder: {folder} does not exist, can not get map files")
-        return []
-
-    files = []
-    for path in Path(folder).iterdir():
-        if path.suffix != ".py":
-            continue
-        name = path.stem
-        if name == "campaign_base":
-            continue
-        files.append(name)
-    return files
+    for pack in load_default_event_manifests():
+        if str(pack.pack_id) == event:
+            return tuple(str(stage.ref.stage_id) for stage in pack.stages)
+    logger.warning(f"Event content pack does not exist: {event}")
+    return ()
 
 
 def to_map_input_name(name: str) -> str:
@@ -321,7 +312,7 @@ class FastForwardHandler(AutoSearchHandler):
                     # 主线文件名与用户输入格式不同，且默认所有主线关卡都存在。
                     if self.config.Campaign_Event == "campaign_main":
                         return new
-                    existing = map_files(self.config.Campaign_Event)
+                    existing = event_stage_ids(self.config.Campaign_Event)
                     logger.info(f"Existing files: {existing}")
                     if new.lower() in existing:
                         return new
