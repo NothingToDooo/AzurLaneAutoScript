@@ -2,10 +2,12 @@ import argparse
 import signal
 import sys
 import threading
+from os import chdir
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from module.bootstrap.production import run_default_command
-from module.logger import logger
+from module.logger import configure_file_logging, logger
 from module.runtime.runner import CommandStatus
 
 if TYPE_CHECKING:
@@ -15,6 +17,7 @@ if TYPE_CHECKING:
 
 EXIT_RESTART_REQUESTED = 75
 EXIT_STOPPED = 130
+PROJECT_ROOT = Path(__file__).resolve().parent
 
 
 class _ProcessStopSignal:
@@ -38,6 +41,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    chdir(PROJECT_ROOT)
+    configure_file_logging(PROJECT_ROOT, name="alas")
     stop = _ProcessStopSignal()
     previous: dict[signal.Signals, object] = {}
     supported = tuple(

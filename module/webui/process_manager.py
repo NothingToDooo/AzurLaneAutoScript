@@ -5,11 +5,13 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from os import chdir
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Self, cast
 
 from rich.console import ConsoleRenderable
 
-from module.logger import logger, set_file_logger, set_func_logger
+from module.logger import configure_file_logging, logger, set_func_logger
 from module.runtime.runner import CommandOutcome, CommandStatus
 from module.task_registry import get_tool_task_command
 
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
 
 KILL_JOIN_SECONDS = 1
 QUEUE_POLL_SECONDS = 0.1
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 QUEUE_DRAIN_SECONDS = 1
 MONITOR_JOIN_SECONDS = 3
 MAX_OUTCOME_MESSAGE_LENGTH = 500
@@ -351,7 +354,8 @@ class ProcessManager:
     ) -> None:
         outcome: CommandOutcome | None = None
         try:
-            set_file_logger(name="alas")
+            chdir(PROJECT_ROOT)
+            configure_file_logging(PROJECT_ROOT, name="alas")
             set_func_logger(func=renderable_queue.put)
             outcome = _execute_process(request, stop_event)
         except SystemExit as error:

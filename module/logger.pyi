@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import Literal, TypedDict, Unpack
 
 from rich.console import Console, ConsoleRenderable, RenderableType
@@ -44,7 +45,6 @@ class RenderOptionSettings(TypedDict, total=False):
 WEB_THEME: Theme
 
 logger_debug: bool
-pyw_name: str
 
 file_formatter: logging.Formatter
 console_formatter: logging.Formatter
@@ -53,10 +53,8 @@ web_formatter: logging.Formatter
 stdout_console: Console
 console_hdlr: RichHandler
 
-def set_file_logger(
-    name: str = ...,
-) -> None: ...
-def get_log_file() -> str: ...
+def configure_file_logging(project_root: Path, *, name: str) -> Path: ...
+def get_log_file() -> Path: ...
 def set_func_logger(
     func: Callable[[ConsoleRenderable], None],
 ) -> None: ...
@@ -70,7 +68,7 @@ def emit_renderables(
 ) -> None: ...
 
 class AlasLogger(logging.Logger):
-    log_file: str
+    log_file: Path
 
     def rule(
         self,
@@ -97,10 +95,6 @@ class AlasLogger(logging.Logger):
         text: object,
         front: str = "",
         align: int = 22,
-    ) -> None: ...
-    def set_file_logger(
-        self,
-        name: str = ...,
     ) -> None: ...
     def set_func_logger(
         self,

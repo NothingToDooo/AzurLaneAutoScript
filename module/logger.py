@@ -1,10 +1,7 @@
 import datetime
 import logging
-import os
-import sys
 from dataclasses import dataclass
 from functools import wraps
-from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Literal, TypedDict, Unpack, cast
 
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, NewLine, RenderableType
@@ -17,20 +14,19 @@ from rich.traceback import Traceback
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
     from typing import Concatenate
 
     from rich.text import Text
 
     class AlasLogger(logging.Logger):
-        log_file: str
+        log_file: Path
 
         def hr(self, title: object, level: int = 3) -> None: ...
 
         def attr(self, name: object, text: object) -> None: ...
 
         def attr_align(self, name: object, text: object, front: str = "", align: int = 22) -> None: ...
-
-        def set_file_logger(self, name: str = ...) -> None: ...
 
         def set_func_logger(self, func: Callable[[ConsoleRenderable], None]) -> None: ...
 
@@ -161,7 +157,7 @@ WEB_THEME = Theme(
 logger_debug = False
 logger = cast("AlasLogger", logging.getLogger("alas"))
 logger.setLevel(logging.DEBUG if logger_debug else logging.INFO)
-_logger_state: dict[str, str | None] = {"log_file": None}
+_logger_state: dict[str, Path | None] = {"log_file": None}
 file_formatter = logging.Formatter(
     fmt="%(asctime)s.%(msecs)03d | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
@@ -179,16 +175,12 @@ console_hdlr = RichHandler(
 console_hdlr.setFormatter(console_formatter)
 logger.addHandler(console_hdlr)
 
-# 后续相对路径均以仓库根目录为基准。
-os.chdir(Path(__file__).resolve().parents[1])
 
-pyw_name = Path(sys.argv[0]).stem
-
-
-def set_file_logger(name: str = pyw_name) -> None:
+def configure_file_logging(project_root: Path, *, name: str) -> Path:
+    log_dir = project_root.resolve() / "log"
+    log_dir.mkdir(parents=True, exist_ok=True)
     today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
-    log_file = f"./log/{today}_{name}.txt"
-    Path("./log").mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"{today}_{name}.txt"
     file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
 
     file_console = Console(
@@ -218,9 +210,11 @@ def set_file_logger(name: str = pyw_name) -> None:
     logger.addHandler(hdlr)
     _logger_state["log_file"] = log_file
     vars(logger)["log_file"] = log_file
+    logger.hr("Start", level=0)
+    return log_file
 
 
-def get_log_file() -> str:
+def get_log_file() -> Path:
     log_file = _logger_state["log_file"]
     if log_file is None:
         msg = "File logger is not initialized"
@@ -404,9 +398,5 @@ vars(logger)["error"] = error_convert(logger.error)
 vars(logger)["hr"] = hr
 vars(logger)["attr"] = attr
 vars(logger)["attr_align"] = attr_align
-vars(logger)["set_file_logger"] = set_file_logger
 vars(logger)["set_func_logger"] = set_func_logger
 vars(logger)["rule"] = rule
-
-logger.set_file_logger()
-logger.hr("Start", level=0)

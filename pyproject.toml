@@ -80,6 +80,7 @@ ignore = [
 "tests/test_device_screenshot_interval.py" = ["float-equality-comparison"]
 "tests/test_grid_predictor_enemy_genre.py" = ["float-equality-comparison"]
 "tests/test_gui_cli.py" = ["suspicious-subprocess-import"]
+"tests/test_logger_lifecycle.py" = ["suspicious-subprocess-import"]
 "tests/test_map_operation_helpers.py" = ["float-equality-comparison"]
 "tests/test_ocr_result.py" = ["float-equality-comparison"]
 "tests/test_stage_spec_loader.py" = ["float-equality-comparison"]

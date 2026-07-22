@@ -1,5 +1,6 @@
 import signal
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -9,6 +10,17 @@ from module.runtime.runner import CommandOutcome, CommandStatus
 
 if TYPE_CHECKING:
     from module.base.stop_event import StopEvent
+
+
+@pytest.fixture(autouse=True)
+def _isolate_process_setup(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(alas_module, "chdir", lambda _path: None, raising=False)
+    monkeypatch.setattr(
+        alas_module,
+        "configure_file_logging",
+        lambda root, *, name: Path(root) / "log" / f"{name}.txt",
+        raising=False,
+    )
 
 
 def _outcome(
@@ -71,6 +83,30 @@ def test_cli_uses_personal_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert alas_module.main([]) == 0
     assert calls == ["alas"]
+
+
+def test_cli_initializes_process_before_running(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, ...]] = []
+
+    def configure(root: Path, *, name: str) -> Path:
+        calls.append(("configure_file_logging", root, name))
+        return root / "log" / f"{name}.txt"
+
+    def run(command: str, *, stop_signal: StopEvent) -> CommandOutcome:
+        del stop_signal
+        calls.append(("run_default_command", command))
+        return _outcome(CommandStatus.FINISHED, command=command)
+
+    monkeypatch.setattr(alas_module, "chdir", lambda root: calls.append(("chdir", root)))
+    monkeypatch.setattr(alas_module, "configure_file_logging", configure)
+    monkeypatch.setattr(alas_module, "run_default_command", run)
+
+    assert alas_module.main(["benchmark"]) == 0
+    assert calls == [
+        ("chdir", alas_module.PROJECT_ROOT),
+        ("configure_file_logging", alas_module.PROJECT_ROOT, "alas"),
+        ("run_default_command", "benchmark"),
+    ]
 
 
 def test_cli_restores_signal_handlers_when_runner_raises(monkeypatch: pytest.MonkeyPatch) -> None:
