@@ -3,11 +3,7 @@ from dataclasses import dataclass, replace
 from functools import partial
 from typing import TYPE_CHECKING, Final, cast
 
-from module.adapters.campaign_auto_search_mumu12 import (
-    Mumu12AutoSearchRuntime,
-    Mumu12CampaignAutoSearchExecutor,
-    Mumu12CommittedAutoSearchUnit,
-)
+from module.adapters.campaign_auto_search_mumu12 import Mumu12CampaignAutoSearchExecutor
 from module.adapters.campaign_live import (
     CampaignMapRuntime,
     CommittedCampaignUnit,
@@ -1533,17 +1529,6 @@ class Mumu12CampaignRuntimeProvider:
             attempt.program_capabilities,
         )
         return Mumu12CommittedBattleProgramUnit(port, attempt.cancellation)
-
-    def commit_auto_search_unit(
-        self,
-        session: CampaignSession,
-        cancellation: CancellationSource,
-    ) -> Mumu12CommittedAutoSearchUnit:
-        attempt = self._commit_active_runtime(session, cancellation)
-        return Mumu12CommittedAutoSearchUnit(
-            cast("Mumu12AutoSearchRuntime", attempt.runtime),
-            attempt.cancellation,
-        )
 
     def commit_active_unit(
         self,

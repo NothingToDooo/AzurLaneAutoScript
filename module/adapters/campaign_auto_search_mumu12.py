@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, assert_never
+from typing import TYPE_CHECKING, Protocol, assert_never, cast
 
 from module.content.campaign_session import (
     AutoSearchBattle,
@@ -15,6 +14,7 @@ from module.handler.assets import AUTO_SEARCH_MAP_OPTION_ON
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from module.adapters.campaign_live import CampaignSafeUnitSource
     from module.application import CancellationSource
     from module.content.stage_definition import CampaignStageDefinition
     from module.device.device import Device
@@ -49,26 +49,12 @@ class Mumu12AutoSearchRuntime(Protocol):
     def full_scan(self) -> object: ...
 
 
-@dataclass(frozen=True, slots=True)
-class Mumu12CommittedAutoSearchUnit:
-    runtime: Mumu12AutoSearchRuntime
-    cancellation: CancellationSource
-
-
-class Mumu12AutoSearchUnitSource(Protocol):
-    def commit_auto_search_unit(
-        self,
-        session: CampaignSession,
-        cancellation: CancellationSource,
-    ) -> Mumu12CommittedAutoSearchUnit: ...
-
-
 class Mumu12CampaignAutoSearchExecutor:
     """推进一个已提交的游戏自律 battle，并从地图事实闭合目标类型。"""
 
     __slots__ = ("_units",)
 
-    def __init__(self, units: Mumu12AutoSearchUnitSource) -> None:
+    def __init__(self, units: CampaignSafeUnitSource) -> None:
         self._units = units
 
     def execute(
@@ -89,9 +75,9 @@ class Mumu12CampaignAutoSearchExecutor:
             message = "MuMu12 auto-search executor requires a pending AutoSearchBattle attempt"
             raise ValueError(message)
 
-        unit = self._units.commit_auto_search_unit(session, cancellation)
+        unit = self._units.commit_active_unit(session, cancellation)
         return self._execute(
-            unit.runtime,
+            cast("Mumu12AutoSearchRuntime", unit.runtime),
             session.definition,
             state,
             attempt,

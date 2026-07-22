@@ -5,10 +5,9 @@ import pytest
 
 from module.adapters.campaign_auto_search_mumu12 import (
     Mumu12AutoSearchEvidenceError,
-    Mumu12AutoSearchRuntime,
     Mumu12CampaignAutoSearchExecutor,
-    Mumu12CommittedAutoSearchUnit,
 )
+from module.adapters.campaign_live import CampaignMapRuntime, CommittedCampaignUnit
 from module.application import AbortRequested, AbortToken
 from module.content.battle_policy import BossStrategy, ClearBoss, DefaultBattle, StagePolicy
 from module.content.campaign_session import (
@@ -117,18 +116,18 @@ class _UnitSource:
         self.on_commit = on_commit
         self.calls = 0
 
-    def commit_auto_search_unit(
+    def commit_active_unit(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
-    ) -> Mumu12CommittedAutoSearchUnit:
+    ) -> CommittedCampaignUnit:
         del session
         cancellation.raise_if_requested()
         self.calls += 1
         if self.on_commit is not None:
             self.on_commit()
-        return Mumu12CommittedAutoSearchUnit(
-            cast("Mumu12AutoSearchRuntime", self.runtime),
+        return CommittedCampaignUnit(
+            cast("CampaignMapRuntime", self.runtime),
             self.unit_cancellation,
         )
 
@@ -274,6 +273,24 @@ def test_auto_search_requires_the_pending_attempt_before_committing() -> None:
         )
 
     assert source.calls == 0
+
+
+def test_auto_search_honors_cancellation_before_committing() -> None:
+    session = _session((SpawnWave(battle=0, enemy=1),))
+    cancellation = AbortToken()
+    cancellation.request("stop before auto-search")
+    runtime = _Runtime(())
+    source = _UnitSource(runtime)
+
+    with pytest.raises(AbortRequested, match="stop before auto-search"):
+        Mumu12CampaignAutoSearchExecutor(source).execute(
+            session,
+            _pending_state(session),
+            cancellation,
+        )
+
+    assert source.calls == 0
+    assert runtime.calls == []
 
 
 def test_auto_search_rejects_unconfirmed_action() -> None:

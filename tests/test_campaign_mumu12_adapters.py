@@ -2154,7 +2154,7 @@ def test_provider_reports_failed_domain_state_to_runtime_lifecycle() -> None:
     assert ("finish_runtime_session", RuntimeSessionOutcome.FAILED) in runtime.calls
 
 
-def test_provider_commits_program_io_as_one_non_interruptible_safe_unit() -> None:
+def test_provider_reuses_one_committed_cancellation_until_campaign_checkpoint() -> None:
     _FakeDeclarativeRuntime.created.clear()
     config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
@@ -2165,13 +2165,54 @@ def test_provider_commits_program_io_as_one_non_interruptible_safe_unit() -> Non
     activated = provider.activate(_job(), cancellation)
     assert isinstance(activated, CampaignSession)
 
-    unit = provider.commit_active_unit(activated, cancellation)
+    standard_unit = provider.commit_active_unit(activated, cancellation)
+    auto_search_unit = provider.commit_active_unit(activated, cancellation)
     cancellation.request("defer until campaign checkpoint")
 
-    unit.cancellation.raise_if_requested()
-    assert unit.runtime is _FakeDeclarativeRuntime.created[-1]
+    assert auto_search_unit.cancellation is standard_unit.cancellation
+    standard_unit.cancellation.raise_if_requested()
+    auto_search_unit.cancellation.raise_if_requested()
+    assert standard_unit.runtime is _FakeDeclarativeRuntime.created[-1]
+    assert auto_search_unit.runtime is standard_unit.runtime
     with pytest.raises(AbortRequested, match="defer until campaign checkpoint"):
         cancellation.raise_if_requested()
+
+
+def test_provider_rejects_cancellation_before_committing_active_unit() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = in_memory_config("campaign-provider-pre-commit-cancellation", {})
+    device = object.__new__(Device)
+    provider = Mumu12CampaignRuntimeProvider(
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+    )
+    cancellation = AbortToken()
+    activated = provider.activate(_job(), cancellation)
+    assert isinstance(activated, CampaignSession)
+    cancellation.request("stop before campaign action")
+
+    with pytest.raises(AbortRequested, match="stop before campaign action"):
+        provider.commit_active_unit(activated, cancellation)
+
+
+def test_provider_rejects_non_active_session_before_committing_unit() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = in_memory_config("campaign-provider-session-mismatch", {})
+    device = object.__new__(Device)
+    provider = Mumu12CampaignRuntimeProvider(
+        config, device, runtime_factory=DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+    )
+    cancellation = AbortToken()
+    activated = provider.activate(_job(), cancellation)
+    assert isinstance(activated, CampaignSession)
+    other_variant = (
+        CampaignRunVariant.LOOP if activated.variant is CampaignRunVariant.NORMAL else CampaignRunVariant.NORMAL
+    )
+    mismatched = CampaignSession(activated.definition, other_variant)
+
+    with pytest.raises(CampaignRuntimeEvidenceError, match="no active safe unit"):
+        provider.commit_active_unit(mismatched, cancellation)
+
+    assert provider.commit_active_unit(activated, cancellation).runtime is _FakeDeclarativeRuntime.created[-1]
 
 
 def test_provider_returns_typed_map_achievement_evidence_from_entry_stop() -> None:
