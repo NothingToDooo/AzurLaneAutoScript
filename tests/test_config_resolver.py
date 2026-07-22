@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from module.config.resolved import resolve_task_config
+from module.config.resolved import resolve_task_config, task_bind_chain
 
 if TYPE_CHECKING:
     from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue
@@ -15,6 +15,34 @@ def _nested_items(value: MutableDeepValue) -> list[MutableDeepValue]:
     items = value["items"]
     assert isinstance(items, list)
     return items
+
+
+def test_task_bind_chain_drives_registry_scopes_and_resolution() -> None:
+    extra_scopes = ["CallerScope"]
+
+    chain = task_bind_chain("Event", extra_scopes)
+    snapshot = resolve_task_config(
+        task_name="Event",
+        bind_chain=chain,
+        data={
+            "General": {"Shared": {"Value": "general"}},
+            "Alas": {"Shared": {"Value": "alas"}},
+            "TaskBalancer": {"Balancer": {"Enable": True}},
+            "EventGeneral": {"EventDefaults": {"Mode": "general"}},
+            "Event": {"Campaign": {"Name": "D3"}},
+            "CallerScope": {"Runtime": {"Value": "caller"}},
+        },
+        overrides={},
+    )
+
+    assert extra_scopes == ["CallerScope"]
+    assert chain == ["General", "Alas", "TaskBalancer", "EventGeneral", "Event", "CallerScope"]
+    assert snapshot.bind_chain == tuple(chain)
+    assert snapshot.Shared_Value == "general"
+    assert snapshot.Balancer_Enable is True
+    assert snapshot.EventDefaults_Mode == "general"
+    assert snapshot.Campaign_Name == "D3"
+    assert snapshot.Runtime_Value == "caller"
 
 
 def test_resolver_keeps_first_value_and_full_source_path() -> None:

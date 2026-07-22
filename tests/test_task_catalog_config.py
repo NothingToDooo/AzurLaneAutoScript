@@ -6,10 +6,11 @@ import pytest
 
 from module.application import ExecutionMode
 from module.base.filter import Filter
-from module.config.config import AzurLaneConfig, Function
+from module.config.config import Function
 from module.config.config_generated import GeneratedConfig
 from module.config.config_manual import ManualConfig
 from module.config.config_updater import ConfigGenerator
+from module.config.resolved import task_bind_chain
 from module.config.utils import LANGUAGES, filepath_args, filepath_i18n, read_file, write_file
 from module.task_registry import (
     TASK_SPECS,
@@ -514,7 +515,7 @@ def test_execution_mode_is_the_only_launch_rule_and_determines_priority_shape() 
 def test_all_config_commands_keep_legacy_bind_chain(task_name: str, command: str) -> None:
     extra_scope = "CallerScope"
 
-    assert AzurLaneConfig.task_bind_chain(task_name, [extra_scope]) == [
+    assert task_bind_chain(task_name, [extra_scope]) == [
         "General",
         "Alas",
         *EXPECTED_SCOPES.get(command, ()),

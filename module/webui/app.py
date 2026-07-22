@@ -30,10 +30,9 @@ from module.application.scheduler import ScheduleItem, order_schedule_items
 from module.base.atomic import atomic_failure_cleanup, atomic_write
 from module.bootstrap.assembly_source import ConfigurationLoadError, parse_configuration_document
 from module.bootstrap.production import ensure_personal_configuration, validate_personal_configuration
-from module.config.config import AzurLaneConfig
 from module.config.configuration_file import iter_config_save_updates, read_config_file, write_config_file
 from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue, deep_get, deep_iter, deep_set
-from module.config.resolved import resolve_task_config
+from module.config.resolved import resolve_task_config, task_bind_chain
 from module.config.utils import (
     dict_to_kv,
     filepath_args,
@@ -275,7 +274,7 @@ class AlasGUI(Frame):
         config = read_config_file("alas")
         snapshot = resolve_task_config(
             task_name=task,
-            bind_chain=AzurLaneConfig.task_bind_chain(task),
+            bind_chain=task_bind_chain(task),
             data=config,
             overrides={},
         )
