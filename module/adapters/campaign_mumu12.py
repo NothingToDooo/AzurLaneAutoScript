@@ -8,12 +8,6 @@ from module.adapters.campaign_auto_search_mumu12 import (
     Mumu12CampaignAutoSearchExecutor,
     Mumu12CommittedAutoSearchUnit,
 )
-from module.adapters.campaign_clear_mode_config import (
-    CampaignClearModeConfigService,
-    build_campaign_clear_mode_config_service,
-)
-from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
-from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
 from module.adapters.campaign_hard_attempt_mumu12 import Mumu12CampaignHardAttemptOwner
 from module.adapters.campaign_live import (
     CampaignMapRuntime,
@@ -21,30 +15,17 @@ from module.adapters.campaign_live import (
     build_existing_campaign_map_workflow,
 )
 from module.adapters.campaign_map_data_mumu12 import apply_normal_enemy_candidate_mask
-from module.adapters.campaign_map_initialization import (
-    CampaignMapInitializationService,
-    build_campaign_map_initialization_service,
-)
-from module.adapters.campaign_map_observer import build_campaign_map_observer
 from module.adapters.campaign_map_session_mumu12 import (
     Mumu12CampaignMapSessionOwner,
 )
-from module.adapters.campaign_map_swipe import build_campaign_map_swipe_service
-from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
-from module.adapters.campaign_program_capabilities import (
-    CampaignProgramCapabilityReader,
-    build_campaign_program_capability_reader,
-)
+from module.adapters.campaign_profile_services import compile_campaign_profile_services
 from module.adapters.campaign_program_mumu12 import (
     Mumu12CampaignBattleProgramExecutor,
     Mumu12CommittedBattleProgramUnit,
     build_mumu12_battle_program_port,
     read_mumu12_battle_program_mode,
 )
-from module.adapters.campaign_runtime_hard import (
-    CampaignClearModeExecutor,
-    build_campaign_clear_mode_behavior,
-)
+from module.adapters.campaign_runtime_hard import CampaignClearModeExecutor
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
@@ -55,8 +36,6 @@ from module.adapters.campaign_runtime_profile import (
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease
 from module.adapters.campaign_stage_navigator import build_campaign_stage_navigator
-from module.adapters.campaign_strategy_set import build_campaign_strategy_set_service
-from module.adapters.campaign_submarine import CampaignSubmarineServices, build_campaign_submarine_services
 from module.adapters.gems_mumu12 import (
     GemsHardPreparationError,
     GemsHardRetryFleetPreparationService,
@@ -82,7 +61,6 @@ from module.content.runtime_profile import (
     CampaignRuntimeExtensionId,
     CampaignRuntimeProfile,
     CampaignRuntimeProfileId,
-    RuntimeExecutorKind,
 )
 from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
 from module.content.stage_definition import CampaignStageDefinition, RunVariant
@@ -129,6 +107,12 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from module.adapters.battle_program_read_mumu12 import RuntimeProgramState
+    from module.adapters.campaign_clear_mode_config import CampaignClearModeConfigService
+    from module.adapters.campaign_event_ui import CampaignEventUiServices
+    from module.adapters.campaign_map_initialization import CampaignMapInitializationService
+    from module.adapters.campaign_profile_services import CampaignProfileServices
+    from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
+    from module.adapters.campaign_submarine import CampaignSubmarineServices
     from module.application import CancellationSource
     from module.base.button import Button
     from module.combat.combat import CombatEnd
@@ -474,6 +458,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     _configured_boss_fleet: int
     _profile_fleet_preparation_service: FleetPreparationService
     _program_capabilities: CampaignProgramCapabilityReader
+    _profile_services: CampaignProfileServices
     _submarine_services: CampaignSubmarineServices
     _runtime_profile: CampaignRuntimeProfileManager
     _runtime_profile_lease: RuntimeProfileLease
@@ -497,9 +482,8 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             definition.runtime_profile,
             _RUNTIME_EXECUTOR_REGISTRY,
         )
-        self._hard_behavior = build_campaign_clear_mode_behavior(
-            self._runtime_profile.executor_instances(RuntimeExecutorKind.HARD_MODE)
-        )
+        self._profile_services = compile_campaign_profile_services(self._runtime_profile)
+        self._hard_behavior = self._profile_services.hard_behavior
         self.MAP = compile_campaign_map(
             definition,
             grid_class=self._runtime_profile.map_grid_class or GridInfo,
@@ -508,9 +492,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         if camera_grid_class is not None:
             self.grid_class = camera_grid_class
         self._runtime_profile.apply_config(config)
-        self._clear_mode_config_service = build_campaign_clear_mode_config_service(
-            self._runtime_profile.executor_instances_in_profile_order()
-        )
+        self._clear_mode_config_service = self._profile_services.clear_mode_config
         profile_boss_fleet = self._runtime_profile.configured_boss_fleet
         self._configured_boss_fleet = config.fleet_boss if profile_boss_fleet is None else profile_boss_fleet.index
         self.ENEMY_FILTER = definition.enemy_filter
@@ -522,24 +504,16 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         if self._hard_behavior is not None:
             self._hard_behavior.apply_runtime_config(self)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
-        self._map_initialization_service = build_campaign_map_initialization_service(
-            self._runtime_profile.executor_instances_in_profile_order()
-        )
-        mechanic_instances = self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
-        self._profile_fleet_preparation_service = build_campaign_fleet_preparation_service(mechanic_instances)
+        self._map_initialization_service = self._profile_services.map_initialization
+        self._profile_fleet_preparation_service = self._profile_services.fleet_preparation
         self._fleet_preparation_service = self._profile_fleet_preparation_service
-        self._submarine_services = build_campaign_submarine_services(mechanic_instances)
-        self._strategy_set_service = build_campaign_strategy_set_service(mechanic_instances)
-        self._program_capabilities = build_campaign_program_capability_reader(mechanic_instances)
-        self._map_observer = build_campaign_map_observer(
-            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
-            map_clear_percentage_multiplier=self._runtime_profile.map_clear_percentage_multiplier,
-        )
-        self._map_swipe_service = build_campaign_map_swipe_service(mechanic_instances)
-        self._mystery_item_service = build_campaign_mystery_item_service(mechanic_instances)
-        self._event_ui_services = build_campaign_event_ui_services(
-            self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
-        )
+        self._submarine_services = self._profile_services.submarine
+        self._strategy_set_service = self._profile_services.strategy_set
+        self._program_capabilities = self._profile_services.program_capabilities
+        self._map_observer = self._profile_services.map_observer
+        self._map_swipe_service = self._profile_services.map_swipe
+        self._mystery_item_service = self._profile_services.mystery_item
+        self._event_ui_services = self._profile_services.event_ui
         self._combat_result_ui = self._event_ui_services.combat_result
         self._map_transition_ui = self._event_ui_services.map_transition
         self.stage_navigator = build_campaign_stage_navigator(

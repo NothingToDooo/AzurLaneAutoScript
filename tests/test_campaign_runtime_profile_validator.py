@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from dev_tools.campaign_runtime_profile_validator import validate_campaign_content
+from module.adapters import campaign_profiles
 from module.adapters.campaign_profiles import validate_mumu12_campaign_runtime_profiles
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
@@ -75,6 +76,28 @@ def _executors(
 
 def test_current_runtime_profile_sources_are_self_contained_and_valid() -> None:
     validate_campaign_content(ROOT)
+
+
+def test_registry_validator_compiles_the_same_complete_profile_service_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profiles = CampaignRuntimeProfileRegistry((), (CampaignRuntimeProfile.core(),))
+    stages = (StageSpec(StageRef("campaign_main", "1-1"), "stages/1-1.yaml"),)
+    compiled: list[object] = []
+
+    def compile_services(manager: object) -> object:
+        compiled.append(manager)
+        return object()
+
+    monkeypatch.setattr(campaign_profiles, "compile_campaign_profile_services", compile_services)
+
+    validate_mumu12_campaign_runtime_profiles(
+        stages,
+        profiles,
+        CampaignRuntimeExecutorRegistry(()),
+    )
+
+    assert len(compiled) == 1
 
 
 def test_production_validator_rejects_unselected_profile_with_unknown_executor() -> None:

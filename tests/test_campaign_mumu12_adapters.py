@@ -146,6 +146,7 @@ if TYPE_CHECKING:
 
     from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionRuntime
     from module.adapters.campaign_mumu12 import Mumu12CampaignHardAssembly, Mumu12CampaignMapAssembly
+    from module.adapters.campaign_profile_services import CampaignProfileServices
     from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
     from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
@@ -200,11 +201,34 @@ def test_combat_stuck_detection_pause_is_scoped(monkeypatch: pytest.MonkeyPatch)
 def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    compile_services = campaign_adapters.compile_campaign_profile_services
+    compiled_services: list[CampaignProfileServices] = []
+
+    def record_services(manager: CampaignRuntimeProfileManager) -> CampaignProfileServices:
+        services = compile_services(manager)
+        compiled_services.append(services)
+        return services
+
+    monkeypatch.setattr(campaign_adapters, "compile_campaign_profile_services", record_services)
     config = in_memory_config("campaign-event-ui-wiring", {})
     definition = load_default_stage(StageRef("event_20250424_cn", "t1"))
     runtime = DeclarativeCampaignMapRuntime(config, object.__new__(Device), definition)
 
+    assert len(compiled_services) == 1
+    profile_services = compiled_services[0]
+    assert runtime._profile_services is profile_services  # ruff:ignore[private-member-access] - runtime 必须消费唯一 bundle。
+    assert runtime._hard_behavior is profile_services.hard_behavior  # ruff:ignore[private-member-access] - hard service 来自唯一 bundle。
+    assert runtime._clear_mode_config_service is profile_services.clear_mode_config  # ruff:ignore[private-member-access] - 全局顺序 service 来自唯一 bundle。
+    assert runtime._map_initialization_service is profile_services.map_initialization  # ruff:ignore[private-member-access] - 全局顺序 service 来自唯一 bundle。
+    assert runtime._profile_fleet_preparation_service is profile_services.fleet_preparation  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._submarine_services is profile_services.submarine  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._strategy_set_service is profile_services.strategy_set  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._program_capabilities is profile_services.program_capabilities  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._map_observer is profile_services.map_observer  # ruff:ignore[private-member-access] - observer 来自唯一 bundle。
+    assert runtime._map_swipe_service is profile_services.map_swipe  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
+    assert runtime._mystery_item_service is profile_services.mystery_item  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
     services = runtime._event_ui_services  # ruff:ignore[private-member-access] - 验证 runtime 构造期的能力 wiring。
+    assert services is profile_services.event_ui
     combat_result = runtime._combat_result_ui  # ruff:ignore[private-member-access] - 删除生产 wiring 时本测试必须失败。
     map_transition = runtime._map_transition_ui  # ruff:ignore[private-member-access] - transition 必须注入所有 consumer。
     assert combat_result is services.combat_result
