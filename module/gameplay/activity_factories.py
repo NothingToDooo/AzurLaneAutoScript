@@ -1,12 +1,10 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
-from module.application import TaskId
 from module.content.activity_catalog import ActivityCatalog
-from module.content.activity_profile import CoalitionStageId
 from module.content.errors import ContentValidationError
 from module.gameplay.activity import (
     ENCOUNTER_PROGRESS_KEY,
@@ -19,37 +17,32 @@ from module.gameplay.activity import (
     AssistSessionCommand,
     AssistSessionSpec,
     AssistSessionTask,
-    CoalitionFleetMode,
     CoalitionOptions,
-    DaemonOptions,
-    EncounterBalancerPolicy,
+    CoalitionSettings,
+    CoalitionSpSettings,
     EncounterCommand,
-    EncounterPolicy,
     EncounterProgress,
     EncounterSpec,
     EncounterTask,
+    EventStorySettings,
     HospitalOptions,
+    HospitalSettings,
     MaritimeEscortOptions,
-    MinigameKind,
+    MaritimeEscortSettings,
     MinigameProgress,
-    OpsiDaemonOptions,
+    MinigameSettings,
     RaidDailyOptions,
-    RaidMode,
+    RaidDailySettings,
     RaidOptions,
-)
-from module.gameplay.emotion import (
-    EmotionControl,
-    EmotionMode,
-    EmotionRecoverLocation,
-    EmotionSettings,
-    FleetEmotionSettings,
+    RaidSettings,
 )
 from module.runtime import (
+    ConfiguredTaskFactory,
     SettingsDecoder,
     SettingsDocumentError,
     TaskBuildContext,
     TaskStateDocumentError,
-    TypedTaskFactory,
+    require_task_settings,
 )
 
 if TYPE_CHECKING:
@@ -110,11 +103,11 @@ class ActivityFactoryDependencies:
             raise TypeError(message)
 
 
-def _minigame_spec(decoder: SettingsDecoder, progress: MinigameProgress | None = None) -> ActivitySpec:
+def _minigame_spec(settings: MinigameSettings, progress: MinigameProgress | None = None) -> ActivitySpec:
     return ActivitySpec.minigame(
-        schedule=decoder.daily_schedule("schedule"),
-        operation_limit=decoder.integer("operation_limit", minimum=1),
-        kind=decoder.enum("game", MinigameKind),
+        schedule=settings.schedule,
+        operation_limit=settings.operation_limit,
+        kind=settings.kind,
         progress=progress,
     )
 
@@ -161,204 +154,151 @@ class _MinigameTaskFactory:
         if context.spec.command != ActivityCommand.MINIGAME.value:
             message = "minigame factory requires the minigame task definition"
             raise ValueError(message)
-        decoder = SettingsDecoder(context.settings, path="$.tasks.minigame")
-        spec = _minigame_spec(decoder, _minigame_progress(context))
-        decoder.finish()
+        settings = require_task_settings(context, MinigameSettings)
+        spec = _minigame_spec(settings, _minigame_progress(context))
         return ActivityTask(self._workflow, spec)
 
 
-def _resolve_activity[T](resolver: Callable[[str], T], event: str, *, path: str) -> T:
+def _resolve_activity[T](resolver: Callable[[str], T], content_id: str, *, path: str) -> T:
     try:
-        return resolver(event)
+        return resolver(content_id)
     except (LookupError, ContentValidationError) as error:
         message = f"{path}.event: {error}"
         raise SettingsDocumentError(message) from error
 
 
-def _event_story_spec(decoder: SettingsDecoder, catalog: ActivityCatalog) -> ActivitySpec:
-    event = decoder.string("event")
+def _event_story_spec(settings: EventStorySettings, catalog: ActivityCatalog) -> ActivitySpec:
     return ActivitySpec.event_story(
-        activity=_resolve_activity(catalog.resolve_event_story, event, path="$.tasks.event_story"),
-        skip_battle=decoder.boolean("skip_battle"),
+        activity=_resolve_activity(
+            catalog.resolve_event_story,
+            settings.content_id.value,
+            path="$.tasks.event_story",
+        ),
+        skip_battle=settings.skip_battle,
     )
-
-
-def _fleet_emotion(decoder: SettingsDecoder) -> FleetEmotionSettings:
-    settings = FleetEmotionSettings(
-        control=decoder.enum("control", EmotionControl),
-        recover=decoder.enum("recover", EmotionRecoverLocation),
-        oath=decoder.boolean("oath"),
-    )
-    decoder.finish()
-    return settings
-
-
-def _emotion_settings(decoder: SettingsDecoder | None) -> EmotionSettings | None:
-    if decoder is None:
-        return None
-    settings = EmotionSettings(
-        mode=decoder.enum("mode", EmotionMode),
-        fleet1=_fleet_emotion(decoder.object("fleet1")),
-        fleet2=_fleet_emotion(decoder.object("fleet2")),
-    )
-    decoder.finish()
-    return settings
-
-
-def _encounter_policy(decoder: SettingsDecoder) -> EncounterPolicy:
-    deadline = decoder.nullable_object("event_deadline")
-    deadline_at = None
-    if deadline is not None:
-        deadline_at = deadline.datetime("at")
-        deadline.finish()
-    policy = EncounterPolicy(
-        failure_retry_delay=decoder.delay_range("failure_retry_seconds"),
-        resource_retry_delay=timedelta(seconds=decoder.integer("resource_retry_seconds", minimum=1)),
-        oil_limit=decoder.integer("oil_limit", minimum=0),
-        event_point_limit=decoder.integer("event_point_limit", minimum=0),
-        event_deadline_at=deadline_at,
-        use_2x_book=decoder.boolean("use_2x_book"),
-        emotion=_emotion_settings(decoder.nullable_object("emotion")),
-    )
-    decoder.finish()
-    return policy
-
-
-def _balancer_policy(decoder: SettingsDecoder) -> EncounterBalancerPolicy | None:
-    value = decoder.nullable_object("balancer")
-    if value is None:
-        return None
-    policy = EncounterBalancerPolicy(
-        target_task_id=TaskId(value.string("target_task_id")),
-        coin_limit=value.integer("coin_limit", minimum=0),
-        retry_delay=timedelta(seconds=value.integer("retry_seconds", minimum=1)),
-    )
-    value.finish()
-    return policy
-
-
-def _raid_modes(decoder: SettingsDecoder, name: str) -> tuple[RaidMode, ...]:
-    raw_modes = decoder.string_tuple(name, allow_empty=False)
-    try:
-        return tuple(RaidMode(raw) for raw in raw_modes)
-    except ValueError as error:
-        allowed = sorted(mode.value for mode in RaidMode)
-        message = f"$.tasks.raid_daily.{name} must contain only {allowed}"
-        raise SettingsDocumentError(message) from error
 
 
 def _raid_daily_spec(
-    decoder: SettingsDecoder,
+    settings: RaidDailySettings,
     progress: EncounterProgress | None,
     catalog: ActivityCatalog,
 ) -> EncounterSpec:
-    event = decoder.string("event")
     options = RaidDailyOptions(
-        activity=_resolve_activity(catalog.resolve_raid, event, path="$.tasks.raid_daily"),
-        stages=_raid_modes(decoder, "stages"),
-        use_ticket=decoder.boolean("use_ticket"),
-        collect_daily_mission=decoder.boolean("collect_daily_mission"),
-        policy=_encounter_policy(decoder.object("policy")),
+        activity=_resolve_activity(
+            catalog.resolve_raid,
+            settings.content_id.value,
+            path="$.tasks.raid_daily",
+        ),
+        stages=settings.stages,
+        use_ticket=settings.use_ticket,
+        collect_daily_mission=settings.collect_daily_mission,
+        policy=settings.policy,
     )
     return EncounterSpec(
         command=EncounterCommand.RAID_DAILY,
         options=options,
-        schedule=decoder.daily_schedule("schedule"),
+        schedule=settings.schedule,
         progress=progress,
     )
 
 
 def _maritime_escort_spec(
-    decoder: SettingsDecoder,
+    settings: MaritimeEscortSettings,
     progress: EncounterProgress | None,
     catalog: ActivityCatalog,
 ) -> EncounterSpec:
     del catalog
     return EncounterSpec(
         command=EncounterCommand.MARITIME_ESCORT,
-        options=MaritimeEscortOptions(policy=_encounter_policy(decoder.object("policy"))),
-        schedule=decoder.daily_schedule("schedule"),
+        options=MaritimeEscortOptions(policy=settings.policy),
+        schedule=settings.schedule,
         progress=progress,
     )
 
 
 def _raid_spec(
-    decoder: SettingsDecoder,
+    settings: RaidSettings,
     progress: EncounterProgress | None,
     catalog: ActivityCatalog,
 ) -> EncounterSpec:
-    event = decoder.string("event")
     options = RaidOptions(
-        activity=_resolve_activity(catalog.resolve_raid, event, path="$.tasks.raid"),
-        mode=decoder.enum("mode", RaidMode),
-        use_ticket=decoder.boolean("use_ticket"),
-        policy=_encounter_policy(decoder.object("policy")),
+        activity=_resolve_activity(
+            catalog.resolve_raid,
+            settings.content_id.value,
+            path="$.tasks.raid",
+        ),
+        mode=settings.mode,
+        use_ticket=settings.use_ticket,
+        policy=settings.policy,
     )
     return EncounterSpec(
         command=EncounterCommand.RAID,
         options=options,
-        run_limit=decoder.nullable_integer("run_limit", minimum=1),
-        balancer=_balancer_policy(decoder),
+        run_limit=settings.run_limit,
+        balancer=settings.balancer,
         progress=progress,
     )
 
 
 def _hospital_spec(
-    decoder: SettingsDecoder,
+    settings: HospitalSettings,
     progress: EncounterProgress | None,
     catalog: ActivityCatalog,
 ) -> EncounterSpec:
     del catalog
     options = HospitalOptions(
-        use_recommended_fleet=decoder.boolean("use_recommended_fleet"),
-        policy=_encounter_policy(decoder.object("policy")),
+        use_recommended_fleet=settings.use_recommended_fleet,
+        policy=settings.policy,
     )
     return EncounterSpec(
         command=EncounterCommand.HOSPITAL,
         options=options,
-        schedule=decoder.daily_schedule("schedule"),
+        schedule=settings.schedule,
         progress=progress,
     )
 
 
 def _coalition_options(
-    decoder: SettingsDecoder,
+    settings: CoalitionSettings | CoalitionSpSettings,
     catalog: ActivityCatalog,
     *,
     path: str,
 ) -> CoalitionOptions:
-    event = decoder.string("event")
     return CoalitionOptions(
-        activity=_resolve_activity(catalog.resolve_coalition, event, path=path),
-        stage=CoalitionStageId(decoder.string("stage")),
-        fleet=decoder.enum("fleet", CoalitionFleetMode),
-        policy=_encounter_policy(decoder.object("policy")),
+        activity=_resolve_activity(
+            catalog.resolve_coalition,
+            settings.content_id.value,
+            path=path,
+        ),
+        stage=settings.stage,
+        fleet=settings.fleet,
+        policy=settings.policy,
     )
 
 
 def _coalition_spec(
-    decoder: SettingsDecoder,
+    settings: CoalitionSettings,
     progress: EncounterProgress | None,
     catalog: ActivityCatalog,
 ) -> EncounterSpec:
     return EncounterSpec(
         command=EncounterCommand.COALITION,
-        options=_coalition_options(decoder, catalog, path="$.tasks.coalition"),
-        run_limit=decoder.nullable_integer("run_limit", minimum=1),
-        balancer=_balancer_policy(decoder),
+        options=_coalition_options(settings, catalog, path="$.tasks.coalition"),
+        run_limit=settings.run_limit,
+        balancer=settings.balancer,
         progress=progress,
     )
 
 
 def _coalition_sp_spec(
-    decoder: SettingsDecoder,
+    settings: CoalitionSpSettings,
     progress: EncounterProgress | None,
     catalog: ActivityCatalog,
 ) -> EncounterSpec:
     return EncounterSpec(
         command=EncounterCommand.COALITION_SP,
-        options=_coalition_options(decoder, catalog, path="$.tasks.coalition_sp"),
-        schedule=decoder.daily_schedule("schedule"),
+        options=_coalition_options(settings, catalog, path="$.tasks.coalition_sp"),
+        schedule=settings.schedule,
         run_limit=1,
         progress=progress,
     )
@@ -395,21 +335,34 @@ def _encounter_progress(context: TaskBuildContext) -> EncounterProgress | None:
     return progress
 
 
-type _EncounterSpecBuilder = Callable[[SettingsDecoder, EncounterProgress | None, ActivityCatalog], EncounterSpec]
+type _EncounterSettings = (
+    RaidDailySettings
+    | MaritimeEscortSettings
+    | RaidSettings
+    | HospitalSettings
+    | CoalitionSettings
+    | CoalitionSpSettings
+)
+type _EncounterSpecBuilder[SettingsT: _EncounterSettings] = Callable[
+    [SettingsT, EncounterProgress | None, ActivityCatalog],
+    EncounterSpec,
+]
 
 
-class _EncounterTaskFactory:
-    __slots__ = ("_builder", "_catalog", "_command", "_workflow")
+class _EncounterTaskFactory[SettingsT: _EncounterSettings]:
+    __slots__ = ("_builder", "_catalog", "_command", "_settings_type", "_workflow")
 
     def __init__(
         self,
         workflow: EncounterWorkflow,
         command: EncounterCommand,
-        builder: _EncounterSpecBuilder,
+        settings_type: type[SettingsT],
+        builder: _EncounterSpecBuilder[SettingsT],
         catalog: ActivityCatalog,
     ) -> None:
         self._workflow = workflow
         self._command = command
+        self._settings_type = settings_type
         self._builder = builder
         self._catalog = catalog
 
@@ -420,27 +373,30 @@ class _EncounterTaskFactory:
         if context.spec.command != self._command.value:
             message = f"encounter factory requires the {self._command.value} task definition"
             raise ValueError(message)
-        decoder = SettingsDecoder(context.settings, path=f"$.tasks.{self._command.value}")
-        spec = self._builder(decoder, _encounter_progress(context), self._catalog)
-        decoder.finish()
+        settings = require_task_settings(context, self._settings_type)
+        spec = self._builder(settings, _encounter_progress(context), self._catalog)
         return EncounterTask(self._workflow, spec)
 
 
-def _daemon_spec(decoder: SettingsDecoder) -> AssistSessionSpec:
-    return AssistSessionSpec(
-        command=AssistSessionCommand.DAEMON,
-        options=DaemonOptions(enter_map=decoder.boolean("enter_map")),
-    )
+class _AssistSessionTaskFactory:
+    __slots__ = ("_command", "_workflow")
 
+    def __init__(self, workflow: AssistSessionWorkflow, command: AssistSessionCommand) -> None:
+        self._workflow = workflow
+        self._command = command
 
-def _opsi_daemon_spec(decoder: SettingsDecoder) -> AssistSessionSpec:
-    return AssistSessionSpec(
-        command=AssistSessionCommand.OPSI_DAEMON,
-        options=OpsiDaemonOptions(
-            repair_ship=decoder.boolean("repair_ship"),
-            select_enemy=decoder.boolean("select_enemy"),
-        ),
-    )
+    def build(self, context: TaskBuildContext) -> AssistSessionTask:
+        if not isinstance(context, TaskBuildContext):
+            message = "context must be a TaskBuildContext"
+            raise TypeError(message)
+        if context.spec.command != self._command.value:
+            message = f"assist factory requires the {self._command.value} task definition"
+            raise ValueError(message)
+        spec = require_task_settings(context, AssistSessionSpec)
+        if spec.command is not self._command:
+            message = f"{self._command.value} settings command must be {self._command.value}"
+            raise ValueError(message)
+        return AssistSessionTask(self._workflow, spec)
 
 
 def build_activity_factories(dependencies: ActivityFactoryDependencies) -> Mapping[str, TaskFactory]:
@@ -451,43 +407,59 @@ def build_activity_factories(dependencies: ActivityFactoryDependencies) -> Mappi
     catalog = dependencies.catalog
     factories: dict[str, TaskFactory] = {
         "minigame": _MinigameTaskFactory(workflows.minigame),
-        "event_story": TypedTaskFactory(
-            lambda decoder: _event_story_spec(decoder, catalog),
-            lambda spec: ActivityTask(workflows.event_story, spec),
+        "event_story": ConfiguredTaskFactory(
+            EventStorySettings,
+            lambda settings: ActivityTask(workflows.event_story, _event_story_spec(settings, catalog)),
         ),
         "raid_daily": _EncounterTaskFactory(
             workflows.raid_daily,
             EncounterCommand.RAID_DAILY,
+            RaidDailySettings,
             _raid_daily_spec,
             catalog,
         ),
         "maritime_escort": _EncounterTaskFactory(
             workflows.maritime_escort,
             EncounterCommand.MARITIME_ESCORT,
+            MaritimeEscortSettings,
             _maritime_escort_spec,
             catalog,
         ),
-        "raid": _EncounterTaskFactory(workflows.raid, EncounterCommand.RAID, _raid_spec, catalog),
-        "hospital": _EncounterTaskFactory(workflows.hospital, EncounterCommand.HOSPITAL, _hospital_spec, catalog),
+        "raid": _EncounterTaskFactory(
+            workflows.raid,
+            EncounterCommand.RAID,
+            RaidSettings,
+            _raid_spec,
+            catalog,
+        ),
+        "hospital": _EncounterTaskFactory(
+            workflows.hospital,
+            EncounterCommand.HOSPITAL,
+            HospitalSettings,
+            _hospital_spec,
+            catalog,
+        ),
         "coalition": _EncounterTaskFactory(
             workflows.coalition,
             EncounterCommand.COALITION,
+            CoalitionSettings,
             _coalition_spec,
             catalog,
         ),
         "coalition_sp": _EncounterTaskFactory(
             workflows.coalition_sp,
             EncounterCommand.COALITION_SP,
+            CoalitionSpSettings,
             _coalition_sp_spec,
             catalog,
         ),
-        "daemon": TypedTaskFactory(
-            _daemon_spec,
-            lambda spec: AssistSessionTask(workflows.daemon, spec),
+        "daemon": _AssistSessionTaskFactory(
+            workflows.daemon,
+            AssistSessionCommand.DAEMON,
         ),
-        "opsi_daemon": TypedTaskFactory(
-            _opsi_daemon_spec,
-            lambda spec: AssistSessionTask(workflows.opsi_daemon, spec),
+        "opsi_daemon": _AssistSessionTaskFactory(
+            workflows.opsi_daemon,
+            AssistSessionCommand.OPSI_DAEMON,
         ),
     }
     return MappingProxyType(factories)

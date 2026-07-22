@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, time, timedelta
-from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -37,7 +36,7 @@ from module.gameplay.market import (
     GachaSettings,
 )
 from module.gameplay.market_factories import MarketWorkflows, build_market_factories
-from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskFactory, TaskStateDocument
+from module.runtime import TaskBuildContext, TaskFactory, TaskStateDocument
 from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
@@ -65,16 +64,7 @@ if TYPE_CHECKING:
     )
 
 _OBSERVED_AT = datetime(2026, 7, 15, 1, tzinfo=UTC)
-_DAILY_SCHEDULE: dict[str, FrozenJsonValue] = {
-    "timezone": "Asia/Hong_Kong",
-    "triggers": ("08:00",),
-}
 _DAILY_SCHEDULE_VALUE = DailySchedule("Asia/Hong_Kong", (time(8),))
-_SERVER_UPDATE = "2026-07-14T00:00:00+08:00"
-_SERVER_UPDATE_SCHEDULE: dict[str, FrozenJsonValue] = {
-    "timezone": "Asia/Hong_Kong",
-    "triggers": ("12:00",),
-}
 _SERVER_UPDATE_SCHEDULE_VALUE = DailySchedule("Asia/Hong_Kong", (time(12),))
 
 
@@ -131,12 +121,12 @@ def _encounter_factories(exercise: _RecordingPort[ExerciseReport] | None = None)
     return build_encounter_factories(workflows)
 
 
-def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
+def _context(command: str, settings: object) -> TaskBuildContext:
     return TaskBuildContext(
         spec=TASK_SPECS[command],
         settings_revision=2,
         content_revision="content-1",
-        settings=MappingProxyType(settings),
+        settings=settings,
         task_state=TaskStateDocument.empty(command),
     )
 
@@ -151,104 +141,68 @@ def _task_context(command: str) -> TaskContext:
     )
 
 
-def test_composite_factory_passes_decoded_dorm_request_to_workflow() -> None:
+def test_composite_factory_passes_typed_dorm_request_to_workflow() -> None:
     workflow = _RecordingPort(DormReport(_OBSERVED_AT, ships_in_dorm=2, furniture_checked=True))
-    task = _composite_factories(workflow)["dorm"].build(
-        _context(
-            "dorm",
-            {
-                "feed": {"filter": "Oil < 12000"},
-                "collect_enabled": False,
-                "furniture": {"buy_option": "all", "check_interval_seconds": 5_400},
-                "fallback_delay_seconds": {"lower_seconds": 601, "upper_seconds": 899},
-            },
-        )
-    )
-
-    task.run(_task_context("dorm"))
-
     settings = DormSettings(
         feed=DormFeedPlan("Oil < 12000"),
         collect_enabled=False,
         furniture=DormFurniturePlan(FurnitureBuyOption.ALL, timedelta(seconds=5_400)),
         fallback_delay=DelayRange(601, 899),
     )
+    task = _composite_factories(workflow)["dorm"].build(_context("dorm", settings))
+
+    task.run(_task_context("dorm"))
+
     assert workflow.received == [(DormRunRequest(settings, furniture_due=True),)]
 
 
-def test_market_factory_passes_decoded_gacha_settings_to_workflow() -> None:
+def test_market_factory_passes_typed_gacha_settings_to_workflow() -> None:
     workflow = _RecordingPort(GachaReport(submitted=True))
-    task = _market_factories(workflow)["gacha"].build(
-        _context(
-            "gacha",
-            {
-                "plan": {"pool": "event", "amount": 8, "use_ticket": False, "use_drill": True},
-                "schedule": _DAILY_SCHEDULE,
-            },
-        )
+    settings = GachaSettings(
+        GachaPlan(GachaPool.EVENT, amount=8, use_ticket=False, use_drill=True),
+        _DAILY_SCHEDULE_VALUE,
     )
+    task = _market_factories(workflow)["gacha"].build(_context("gacha", settings))
 
     task.run(_task_context("gacha"))
 
-    assert workflow.received == [
-        (
-            GachaSettings(
-                GachaPlan(GachaPool.EVENT, amount=8, use_ticket=False, use_drill=True),
-                _DAILY_SCHEDULE_VALUE,
-            ),
-        )
-    ]
+    assert workflow.received == [(settings,)]
 
 
-def test_encounter_factory_passes_decoded_exercise_settings_and_progress_to_workflow() -> None:
+def test_encounter_factory_passes_typed_exercise_settings_and_progress_to_workflow() -> None:
     workflow = _RecordingPort(ExerciseReport(_OBSERVED_AT, 0, 0, 1, 3))
-    task = _encounter_factories(workflow)["exercise"].build(
-        _context(
-            "exercise",
-            {
-                "schedule": _SERVER_UPDATE_SCHEDULE,
-                "failure_retry_seconds": {"lower_seconds": 401, "upper_seconds": 997},
-                "opponent_refresh_limit": 9,
-                "opponent_mode": "easiest_else_exp",
-                "opponent_trials": 4,
-                "strategy": "sun18",
-                "low_hp_threshold": 0.27,
-                "low_hp_confirm_wait_seconds": 1.75,
-            },
-        )
+    settings = ExerciseSettings(
+        schedule=_SERVER_UPDATE_SCHEDULE_VALUE,
+        failure_retry_delay=DelayRange(401, 997),
+        opponent_refresh_limit=9,
+        opponent_mode=ExerciseOpponentMode.EASIEST_ELSE_EXP,
+        opponent_trials=4,
+        strategy=ExerciseStrategy.SUN_18,
+        low_hp_threshold=0.27,
+        low_hp_confirm_wait_seconds=1.75,
     )
+    task = _encounter_factories(workflow)["exercise"].build(_context("exercise", settings))
 
     task.run(_task_context("exercise"))
 
     assert workflow.received == [
         (
-            ExerciseSettings(
-                schedule=_SERVER_UPDATE_SCHEDULE_VALUE,
-                failure_retry_delay=DelayRange(401, 997),
-                opponent_refresh_limit=9,
-                opponent_mode=ExerciseOpponentMode.EASIEST_ELSE_EXP,
-                opponent_trials=4,
-                strategy=ExerciseStrategy.SUN_18,
-                low_hp_threshold=0.27,
-                low_hp_confirm_wait_seconds=1.75,
-            ),
+            settings,
             ExerciseProgress(),
         )
     ]
 
 
-def test_encounter_factories_reject_legacy_absolute_deadlines() -> None:
-    settings: dict[str, FrozenJsonValue] = {"next_server_update_at": _SERVER_UPDATE}
-
-    with pytest.raises(SettingsDocumentError, match=r"missing required setting.*schedule"):
-        _encounter_factories()["daily"].build(_context("daily", settings))
+def test_encounter_factories_reject_wrong_settings_type() -> None:
+    with pytest.raises(TypeError, match="daily settings must be DailySettings"):
+        _encounter_factories()["daily"].build(_context("daily", object()))
 
 
-def test_nested_factory_settings_reject_unknown_fields() -> None:
-    settings: dict[str, FrozenJsonValue] = {
-        "plan": {"level_cap": "level120", "favourite_only": False, "obsolete": True},
-        "schedule": _DAILY_SCHEDULE,
-    }
+def test_market_factories_reject_wrong_settings_type() -> None:
+    settings = GachaSettings(
+        GachaPlan(GachaPool.EVENT, amount=8, use_ticket=False, use_drill=True),
+        _DAILY_SCHEDULE_VALUE,
+    )
 
-    with pytest.raises(SettingsDocumentError, match="unknown settings"):
+    with pytest.raises(TypeError, match="awaken settings must be AwakenSettings"):
         _market_factories()["awaken"].build(_context("awaken", settings))

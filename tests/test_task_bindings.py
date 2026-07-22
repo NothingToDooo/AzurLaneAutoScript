@@ -1,22 +1,32 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import cast
+from typing import cast, override
 
 import pytest
 
 from module.application import ExecutionMode, Succeeded, Task, TaskContext, TaskId, TaskResult
-from module.runtime import FrozenJsonValue, TaskBuildContext, TaskStateDocument, TaskStateEntry, bind_tasks
-from module.runtime.settings import freeze_task_settings
+from module.runtime import (
+    TaskBuildContext,
+    TaskStateDocument,
+    TaskStateEntry,
+    bind_tasks,
+    compile_task_settings,
+)
 from module.task_registry import ContentRevisionPolicy, TaskDomain, TaskSpec
-
 
 _NOW = datetime(2026, 7, 22, 8, tzinfo=UTC)
 
 
 class _Task(Task):
+    @override
     def run(self, context: TaskContext) -> TaskResult:
         del context
         return TaskResult(Succeeded())
+
+
+@dataclass(frozen=True, slots=True)
+class _Settings:
+    values: tuple[int, ...]
 
 
 @dataclass(slots=True)
@@ -37,13 +47,12 @@ def test_task_binding_owns_all_inputs_needed_to_build_fresh_task() -> None:
         domain=TaskDomain.MAINTENANCE,
         content_revision_policy=ContentRevisionPolicy.BUILTIN,
     )
-    settings, revisions = freeze_task_settings({"restart": {"nested": {"values": [1, 2]}}}, task_ids=("restart",))
+    settings = compile_task_settings({"restart": _Settings((1, 2))}, task_ids=("restart",))
     factory = _Factory()
     bindings = bind_tasks(
         specs={"restart": spec},
         factories={"restart": factory},
         settings=settings,
-        settings_revisions=revisions,
         content_revisions={"restart": "builtin-content-v1"},
     )
     binding = bindings[TaskId("restart")]
@@ -59,10 +68,9 @@ def test_task_binding_owns_all_inputs_needed_to_build_fresh_task() -> None:
     assert len(factory.contexts) == 2
     context = factory.contexts[0]
     assert context.spec is spec
-    assert context.settings_revision == revisions["restart"]
+    assert context.settings_revision == settings["restart"].revision
     assert context.content_revision == "builtin-content-v1"
-    nested = cast("dict[str, FrozenJsonValue]", context.settings["nested"])
-    assert nested["values"] == (1, 2)
+    assert context.settings == _Settings((1, 2))
     assert context.task_state.get("checkpoint") == state.get("checkpoint")
 
 

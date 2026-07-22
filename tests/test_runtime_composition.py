@@ -6,12 +6,10 @@ import pytest
 
 from module.application import ExecutionMode, Succeeded, Task, TaskContext, TaskId, TaskResult
 from module.runtime import (
+    CompiledTaskSettings,
     FactoryCoverageError,
     FrozenJsonValue,
-    FrozenTaskSettings,
     InvalidTaskFactoryError,
-    JsonValue,
-    SettingsDocumentError,
     TaskBinding,
     TaskBuildContext,
     TaskFactory,
@@ -19,9 +17,9 @@ from module.runtime import (
     TaskStateDocumentError,
     TaskStateEntry,
     bind_tasks,
+    compile_task_settings,
     validate_task_bindings,
 )
-from module.runtime.settings import freeze_task_settings
 from module.task_registry import ContentRevisionPolicy, TaskDomain, TaskSpec
 
 if TYPE_CHECKING:
@@ -54,6 +52,21 @@ class _InvalidFactory:
         return object()
 
 
+@dataclass(frozen=True, slots=True)
+class _NestedSettings:
+    values: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _RestartSettings:
+    nested: _NestedSettings
+
+
+@dataclass(frozen=True, slots=True)
+class _BenchmarkSettings:
+    scenes: tuple[str, ...]
+
+
 def _spec(command: str, mode: ExecutionMode, *, priority: int | None) -> TaskSpec:
     return TaskSpec(
         command=command,
@@ -72,32 +85,21 @@ def _specs() -> dict[str, TaskSpec]:
     }
 
 
-def _raw_settings(*, tasks: dict[str, JsonValue] | None = None) -> dict[str, JsonValue]:
-    if tasks is not None:
-        return tasks
-    return {
-        "restart": {"nested": {"values": [1, 2]}},
-        "benchmark": {"scenes": ["screenshot", "click"]},
-    }
-
-
-def _settings(
-    *,
-    tasks: dict[str, JsonValue] | None = None,
-) -> tuple[Mapping[str, FrozenTaskSettings], Mapping[str, int]]:
-    return freeze_task_settings(
-        _raw_settings(tasks=tasks),
+def _settings() -> Mapping[str, CompiledTaskSettings]:
+    return compile_task_settings(
+        {
+            "restart": _RestartSettings(_NestedSettings((1, 2))),
+            "benchmark": _BenchmarkSettings(("screenshot", "click")),
+        },
         task_ids=("restart", "benchmark"),
     )
 
 
 def _bindings(*, restart_factory: _Factory | None = None) -> Mapping[TaskId, TaskBinding]:
-    settings, revisions = _settings()
     return bind_tasks(
         specs=_specs(),
         factories={"restart": restart_factory or _Factory(), "benchmark": _Factory()},
-        settings=settings,
-        settings_revisions=revisions,
+        settings=_settings(),
         content_revisions={"restart": "content-restart", "benchmark": "content-benchmark"},
     )
 
@@ -110,16 +112,15 @@ def test_binding_builds_from_one_settings_revision_and_current_task_state() -> N
         {"checkpoint": TaskStateEntry(schema_version=2, payload={"step": 4}, updated_at=_NOW)},
     )
 
-    _settings_value, revisions = _settings()
+    settings = _settings()
     bindings[TaskId("restart")].build(task_state)
 
     assert len(factory.contexts) == 1
     context = factory.contexts[0]
     assert context.spec.command == "restart"
-    assert context.settings_revision == revisions["restart"]
+    assert context.settings_revision == settings["restart"].revision
     assert context.content_revision == "content-restart"
-    nested = cast("dict[str, FrozenJsonValue]", context.settings["nested"])
-    assert nested["values"] == (1, 2)
+    assert context.settings == _RestartSettings(_NestedSettings((1, 2)))
     assert context.task_state.get("checkpoint") == task_state.get("checkpoint")
 
 
@@ -131,21 +132,6 @@ def test_binding_validation_builds_with_empty_task_state() -> None:
 
     assert len(factory.contexts) == 1
     assert factory.contexts[0].task_state == TaskStateDocument.empty("restart")
-
-
-def test_compiled_task_settings_are_deeply_read_only_and_detached_from_input() -> None:
-    raw_settings = _raw_settings()
-    settings, _revisions = _settings(tasks=raw_settings)
-    restart = cast("dict[str, JsonValue]", raw_settings["restart"])
-    raw_nested = cast("dict[str, JsonValue]", restart["nested"])
-    cast("list[JsonValue]", raw_nested["values"]).append(3)
-
-    nested = cast("dict[str, FrozenJsonValue]", settings["restart"]["nested"])
-    assert nested["values"] == (1, 2)
-    with pytest.raises(TypeError):
-        cast("dict[str, object]", settings)["restart"] = {}
-    with pytest.raises(TypeError):
-        cast("dict[str, object]", settings["restart"])["new"] = True
 
 
 def test_task_state_document_is_deeply_read_only_and_detached_from_payload() -> None:
@@ -177,38 +163,13 @@ def test_task_state_document_rejects_invalid_entries_and_non_json_payloads() -> 
         )
 
 
-@pytest.mark.parametrize(
-    ("tasks", "match"),
-    [
-        ({"restart": {}}, "coverage mismatch"),
-        ({"restart": {}, "benchmark": {}, "removed": {}}, "coverage mismatch"),
-        ({"restart": cast("JsonValue", []), "benchmark": {}}, "must be an object"),
-    ],
-)
-def test_task_settings_reject_invalid_coverage_and_values(tasks: dict[str, JsonValue], match: str) -> None:
-    with pytest.raises(SettingsDocumentError, match=match):
-        _settings(tasks=tasks)
-
-
-def test_task_settings_revisions_change_only_with_their_task_settings() -> None:
-    _baseline_settings, baseline_revisions = _settings()
-    tasks = _raw_settings()
-    benchmark = cast("dict[str, JsonValue]", tasks["benchmark"])
-    benchmark["scenes"] = ["screenshot"]
-    _changed_settings, changed_revisions = _settings(tasks=tasks)
-
-    assert changed_revisions["restart"] == baseline_revisions["restart"]
-    assert changed_revisions["benchmark"] != baseline_revisions["benchmark"]
-
-
 def test_bind_tasks_requires_exact_factory_coverage_and_coherent_spec_keys() -> None:
-    settings, revisions = _settings()
+    settings = _settings()
     with pytest.raises(FactoryCoverageError, match="coverage mismatch"):
         bind_tasks(
             specs=_specs(),
             factories={"restart": _Factory()},
             settings=settings,
-            settings_revisions=revisions,
             content_revisions={"restart": "content:1", "benchmark": "content:1"},
         )
     with pytest.raises(FactoryCoverageError, match="keys must match"):
@@ -216,7 +177,6 @@ def test_bind_tasks_requires_exact_factory_coverage_and_coherent_spec_keys() -> 
             specs={"renamed": _spec("restart", ExecutionMode.SCHEDULED_JOB, priority=0)},
             factories={"renamed": _Factory()},
             settings={"renamed": settings["restart"]},
-            settings_revisions={"renamed": revisions["restart"]},
             content_revisions={"renamed": "content:1"},
         )
 
@@ -225,13 +185,12 @@ def test_bind_tasks_requires_exact_factory_coverage_and_coherent_spec_keys() -> 
             specs=_specs(),
             factories={"restart": _Factory(), "benchmark": _Factory()},
             settings=settings,
-            settings_revisions=revisions,
             content_revisions={"restart": "content:1"},
         )
 
 
 def test_binding_rejects_invalid_factory_result() -> None:
-    settings, revisions = _settings()
+    settings = _settings()
     bindings = bind_tasks(
         specs=_specs(),
         factories={
@@ -239,7 +198,6 @@ def test_binding_rejects_invalid_factory_result() -> None:
             "benchmark": _Factory(),
         },
         settings=settings,
-        settings_revisions=revisions,
         content_revisions={"restart": "content-restart", "benchmark": "content-benchmark"},
     )
     with pytest.raises(InvalidTaskFactoryError, match="must return a Task"):

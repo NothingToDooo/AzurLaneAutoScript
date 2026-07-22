@@ -2,20 +2,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from types import MappingProxyType
-from typing import cast, override
 
 import pytest
 
-from module.application import ExecutionMode, Succeeded, Task, TaskContext, TaskResult
 from module.runtime import (
     FrozenJsonValue,
     SettingsDecoder,
     SettingsDocumentError,
-    TaskBuildContext,
-    TaskStateDocument,
-    TypedTaskFactory,
 )
-from module.task_registry import ContentRevisionPolicy, TaskDomain, TaskSpec
 
 
 class _Mode(StrEnum):
@@ -36,32 +30,8 @@ class _Settings:
     nested_value: str
 
 
-class _Task(Task):
-    def __init__(self, settings: _Settings) -> None:
-        self.settings = settings
-
-    @override
-    def run(self, context: TaskContext) -> TaskResult:
-        del context
-        return TaskResult(Succeeded())
-
-
-def _context(settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
-    spec = TaskSpec(
-        command="restart",
-        config_scopes=(),
-        priority=0,
-        execution_mode=ExecutionMode.SCHEDULED_JOB,
-        domain=TaskDomain.MAINTENANCE,
-        content_revision_policy=ContentRevisionPolicy.BUILTIN,
-    )
-    return TaskBuildContext(
-        spec=spec,
-        settings_revision=3,
-        content_revision="content-1",
-        settings=MappingProxyType(settings),
-        task_state=TaskStateDocument.empty("restart"),
-    )
+def _decoder(settings: dict[str, FrozenJsonValue]) -> SettingsDecoder:
+    return SettingsDecoder(MappingProxyType(settings), path="$.tasks.restart")
 
 
 def _decode(decoder: SettingsDecoder) -> _Settings:
@@ -95,12 +65,13 @@ def _valid_settings() -> dict[str, FrozenJsonValue]:
     }
 
 
-def test_typed_factory_decodes_all_fields_and_normalizes_datetime() -> None:
-    factory = TypedTaskFactory(_decode, _Task)
+def test_decoder_decodes_all_fields_and_normalizes_datetime() -> None:
+    decoder = _decoder(_valid_settings())
 
-    task = cast("_Task", factory.build(_context(_valid_settings())))
+    settings = _decode(decoder)
+    decoder.finish()
 
-    assert task.settings == _Settings(
+    assert settings == _Settings(
         enabled=True,
         retries=2,
         threshold=0.75,
@@ -133,30 +104,23 @@ def test_decoder_rejects_invalid_typed_fields(field: str, value: FrozenJsonValue
     settings[field] = value
 
     with pytest.raises(SettingsDocumentError, match=match):
-        TypedTaskFactory(_decode, _Task).build(_context(settings))
+        _decode(_decoder(settings))
 
 
 def test_decoder_rejects_missing_unknown_and_double_consumption() -> None:
     missing = _valid_settings()
     del missing["name"]
     with pytest.raises(SettingsDocumentError, match="missing required setting"):
-        TypedTaskFactory(_decode, _Task).build(_context(missing))
+        _decode(_decoder(missing))
 
     unknown = _valid_settings()
     unknown["obsolete"] = True
+    unknown_decoder = _decoder(unknown)
+    _decode(unknown_decoder)
     with pytest.raises(SettingsDocumentError, match="unknown settings"):
-        TypedTaskFactory(_decode, _Task).build(_context(unknown))
+        unknown_decoder.finish()
 
     decoder = SettingsDecoder(MappingProxyType({"name": "value"}), path="$.task")
     assert decoder.string("name") == "value"
     with pytest.raises(RuntimeError, match="decoded more than once"):
         decoder.string("name")
-
-
-def test_typed_factory_rejects_invalid_task_builder_result() -> None:
-    def invalid_builder(settings: _Settings) -> Task:
-        del settings
-        return cast("Task", object())
-
-    with pytest.raises(TypeError, match="must return a Task"):
-        TypedTaskFactory(_decode, invalid_builder).build(_context(_valid_settings()))

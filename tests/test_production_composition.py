@@ -410,7 +410,10 @@ def test_personal_configuration_validation_reuses_task_factory_contracts_without
         lambda *_args, **_kwargs: pytest.fail("configuration validation must not write files"),
     )
 
-    with pytest.raises(ConfigurationCompileError, match=r"tasks\.tactical\.student\.minimum_level must be at least 1"):
+    with pytest.raises(
+        ConfigurationCompileError,
+        match=r"compiled task settings are invalid: minimum_level must be between 1 and 125",
+    ):
         validate_personal_configuration(document, project_root=Path())
 
 

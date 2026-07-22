@@ -24,7 +24,7 @@ from module.application import (
 )
 from module.runtime.factories import TaskBuildContext, bind_tasks
 from module.runtime.runner import CommandStatus, ResultObserver, RuntimeRunner
-from module.runtime.settings import freeze_task_settings
+from module.runtime.settings import compile_task_settings
 from module.runtime.task_state import TaskStateDocument
 from module.task_registry import ContentRevisionPolicy, TaskDomain, TaskSpec
 
@@ -62,6 +62,11 @@ class _Factory:
     def build(self, context: TaskBuildContext) -> _Task:
         del context
         return self.task
+
+
+@dataclass(frozen=True, slots=True)
+class _Settings:
+    command: str
 
 
 class _Repository:
@@ -127,15 +132,14 @@ def _runner(
     observer: ResultObserver | None = None,
 ) -> RuntimeRunner:
     spec_map = {spec.command: spec for spec in specs}
-    settings, settings_revisions = freeze_task_settings(
-        {spec.command: {} for spec in specs},
+    settings = compile_task_settings(
+        {spec.command: _Settings(spec.command) for spec in specs},
         task_ids=spec_map,
     )
     bindings = bind_tasks(
         specs=spec_map,
         factories={spec.command: _Factory(task) for spec, task in zip(specs, tasks, strict=True)},
         settings=settings,
-        settings_revisions=settings_revisions,
         content_revisions={spec.command: f"content-{spec.command}" for spec in specs},
     )
     return RuntimeRunner(
@@ -161,6 +165,7 @@ def test_direct_command_runs_once() -> None:
     assert outcome.runs_completed == 1
     assert len(task.contexts) == 1
     assert task.contexts[0].mode is ExecutionMode.DIRECT_COMMAND
+    assert task.contexts[0].metadata.settings_revision > 0
     assert task.contexts[0].metadata.content_revision == "content-benchmark"
 
 

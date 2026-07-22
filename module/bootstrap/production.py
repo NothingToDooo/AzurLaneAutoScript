@@ -475,7 +475,6 @@ class PersonalRuntimeBuilder:
             specs=specs,
             factories=selected_factories,
             settings=configuration.tasks,
-            settings_revisions=configuration.task_revisions,
             content_revisions=self._content_revisions(specs),
         )
         return configuration, bindings, repository, device.error_screenshots

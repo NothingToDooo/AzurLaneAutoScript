@@ -25,6 +25,7 @@ from module.application import (
 )
 from module.content.activity_catalog import CoalitionActivity, EventStoryActivity, RaidActivity
 from module.content.activity_profile import CoalitionFleetMode, CoalitionStageId, RaidMode
+from module.content.models import ContentId
 from module.gameplay.emotion import EmotionSettings
 from module.gameplay.validation import (
     validate_aware_datetime,
@@ -97,6 +98,34 @@ class ActivityDisposition(StrEnum):
 
 class MinigameKind(StrEnum):
     NEW_YEAR_CHALLENGE = "new_year_challenge"
+
+
+@dataclass(frozen=True, slots=True)
+class MinigameSettings:
+    schedule: DailySchedule
+    operation_limit: int
+    kind: MinigameKind
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.schedule, DailySchedule):
+            message = "schedule must be a DailySchedule"
+            raise TypeError(message)
+        validate_positive_integer(self.operation_limit, field_name="operation_limit")
+        if not isinstance(self.kind, MinigameKind):
+            message = "kind must be a MinigameKind"
+            raise TypeError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class EventStorySettings:
+    content_id: ContentId
+    skip_battle: bool
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.content_id, ContentId):
+            message = "content_id must be a ContentId"
+            raise TypeError(message)
+        validate_bool(value=self.skip_battle, field_name="skip_battle")
 
 
 @dataclass(frozen=True, slots=True)
@@ -568,6 +597,154 @@ class EncounterBalancerPolicy:
             raise TypeError(message)
         validate_non_negative_integer(self.coin_limit, field_name="coin_limit")
         validate_positive_duration(self.retry_delay, field_name="retry_delay")
+
+
+def _validate_activity_content_id(value: ContentId) -> None:
+    if not isinstance(value, ContentId):
+        message = "content_id must be a ContentId"
+        raise TypeError(message)
+
+
+def _validate_optional_run_limit(value: int | None) -> None:
+    if value is not None:
+        validate_positive_integer(value, field_name="run_limit")
+
+
+@dataclass(frozen=True, slots=True)
+class RaidDailySettings:
+    content_id: ContentId
+    stages: tuple[RaidMode, ...]
+    use_ticket: bool
+    collect_daily_mission: bool
+    policy: EncounterPolicy
+    schedule: DailySchedule
+
+    def __post_init__(self) -> None:
+        _validate_activity_content_id(self.content_id)
+        if not isinstance(self.stages, tuple) or not self.stages:
+            message = "stages must be a non-empty tuple"
+            raise TypeError(message)
+        if any(not isinstance(stage, RaidMode) for stage in self.stages):
+            message = "stages must contain RaidMode values"
+            raise TypeError(message)
+        if len(set(self.stages)) != len(self.stages):
+            message = "stages must not contain duplicates"
+            raise ValueError(message)
+        validate_bool(value=self.use_ticket, field_name="use_ticket")
+        validate_bool(value=self.collect_daily_mission, field_name="collect_daily_mission")
+        if not isinstance(self.policy, EncounterPolicy):
+            message = "policy must be an EncounterPolicy"
+            raise TypeError(message)
+        if not isinstance(self.schedule, DailySchedule):
+            message = "schedule must be a DailySchedule"
+            raise TypeError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class MaritimeEscortSettings:
+    policy: EncounterPolicy
+    schedule: DailySchedule
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.policy, EncounterPolicy):
+            message = "policy must be an EncounterPolicy"
+            raise TypeError(message)
+        if not isinstance(self.schedule, DailySchedule):
+            message = "schedule must be a DailySchedule"
+            raise TypeError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class RaidSettings:
+    content_id: ContentId
+    mode: RaidMode
+    use_ticket: bool
+    policy: EncounterPolicy
+    run_limit: int | None
+    balancer: EncounterBalancerPolicy | None
+
+    def __post_init__(self) -> None:
+        _validate_activity_content_id(self.content_id)
+        if not isinstance(self.mode, RaidMode):
+            message = "mode must be a RaidMode"
+            raise TypeError(message)
+        validate_bool(value=self.use_ticket, field_name="use_ticket")
+        if not isinstance(self.policy, EncounterPolicy):
+            message = "policy must be an EncounterPolicy"
+            raise TypeError(message)
+        _validate_optional_run_limit(self.run_limit)
+        if self.balancer is not None and not isinstance(self.balancer, EncounterBalancerPolicy):
+            message = "balancer must be an EncounterBalancerPolicy or None"
+            raise TypeError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class HospitalSettings:
+    use_recommended_fleet: bool
+    policy: EncounterPolicy
+    schedule: DailySchedule
+
+    def __post_init__(self) -> None:
+        validate_bool(value=self.use_recommended_fleet, field_name="use_recommended_fleet")
+        if not isinstance(self.policy, EncounterPolicy):
+            message = "policy must be an EncounterPolicy"
+            raise TypeError(message)
+        if not isinstance(self.schedule, DailySchedule):
+            message = "schedule must be a DailySchedule"
+            raise TypeError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class CoalitionSettings:
+    content_id: ContentId
+    stage: CoalitionStageId
+    fleet: CoalitionFleetMode
+    policy: EncounterPolicy
+    run_limit: int | None
+    balancer: EncounterBalancerPolicy | None
+
+    def __post_init__(self) -> None:
+        _validate_activity_content_id(self.content_id)
+        if not isinstance(self.stage, CoalitionStageId):
+            message = "stage must be a CoalitionStageId"
+            raise TypeError(message)
+        if not isinstance(self.fleet, CoalitionFleetMode):
+            message = "fleet must be a CoalitionFleetMode"
+            raise TypeError(message)
+        if not isinstance(self.policy, EncounterPolicy):
+            message = "policy must be an EncounterPolicy"
+            raise TypeError(message)
+        _validate_optional_run_limit(self.run_limit)
+        if self.balancer is not None and not isinstance(self.balancer, EncounterBalancerPolicy):
+            message = "balancer must be an EncounterBalancerPolicy or None"
+            raise TypeError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class CoalitionSpSettings:
+    content_id: ContentId
+    stage: CoalitionStageId
+    fleet: CoalitionFleetMode
+    policy: EncounterPolicy
+    schedule: DailySchedule
+
+    def __post_init__(self) -> None:
+        _validate_activity_content_id(self.content_id)
+        if not isinstance(self.stage, CoalitionStageId):
+            message = "stage must be a CoalitionStageId"
+            raise TypeError(message)
+        if self.stage.value != "sp":
+            message = "coalition_sp stage must be sp"
+            raise ValueError(message)
+        if self.fleet is not CoalitionFleetMode.MULTI:
+            message = "coalition_sp fleet must be multi"
+            raise ValueError(message)
+        if not isinstance(self.policy, EncounterPolicy):
+            message = "policy must be an EncounterPolicy"
+            raise TypeError(message)
+        if not isinstance(self.schedule, DailySchedule):
+            message = "schedule must be a DailySchedule"
+            raise TypeError(message)
 
 
 @dataclass(frozen=True, slots=True)

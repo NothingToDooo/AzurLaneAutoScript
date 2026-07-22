@@ -5,12 +5,14 @@ from typing import TYPE_CHECKING, Protocol
 
 from module.application import TaskId
 from module.runtime.errors import FactoryCoverageError, InvalidTaskFactoryError
+from module.runtime.settings import CompiledTaskSettings
 from module.runtime.task_state import TaskStateDocument
 from module.task_registry import TaskSpec
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from module.application import Task
-    from module.runtime.settings import FrozenTaskSettings
 
 
 class TaskFactory(Protocol):
@@ -32,7 +34,7 @@ class TaskBuildContext:
     spec: TaskSpec
     settings_revision: int
     content_revision: str
-    settings: FrozenTaskSettings
+    settings: object
     task_state: TaskStateDocument
 
     def __post_init__(self) -> None:
@@ -43,15 +45,55 @@ class TaskBuildContext:
             message = "settings_revision must be a positive integer"
             raise ValueError(message)
         _validate_revision(self.content_revision, field_name="content_revision")
-        if not isinstance(self.settings, Mapping):
-            message = "settings must be a mapping"
-            raise TypeError(message)
         if not isinstance(self.task_state, TaskStateDocument):
             message = "task_state must be a TaskStateDocument"
             raise TypeError(message)
         if self.task_state.namespace != self.spec.command:
             message = "task_state namespace must match spec command"
             raise ValueError(message)
+
+
+def require_task_settings[SettingsT](context: TaskBuildContext, expected_type: type[SettingsT]) -> SettingsT:
+    """取得 compiler 已验证的 typed settings，并在 composition 错配时立即失败。"""
+
+    if not isinstance(context, TaskBuildContext):
+        message = "context must be a TaskBuildContext"
+        raise TypeError(message)
+    if not isinstance(expected_type, type):
+        message = "expected_type must be a type"
+        raise TypeError(message)
+    if not isinstance(context.settings, expected_type):
+        message = f"{context.spec.command} settings must be {expected_type.__name__}"
+        raise TypeError(message)
+    return context.settings
+
+
+class ConfiguredTaskFactory[SettingsT]:
+    """把 typed settings 类型检查与一个已绑定 runtime ports 的 Task builder 组合起来。"""
+
+    __slots__ = ("_build_task", "_settings_type")
+
+    def __init__(
+        self,
+        settings_type: type[SettingsT],
+        build_task: Callable[[SettingsT], Task],
+    ) -> None:
+        if not isinstance(settings_type, type):
+            message = "settings_type must be a type"
+            raise TypeError(message)
+        if not callable(build_task):
+            message = "build_task must be callable"
+            raise TypeError(message)
+        self._settings_type = settings_type
+        self._build_task = build_task
+
+    def build(self, context: TaskBuildContext) -> Task:
+        settings = require_task_settings(context, self._settings_type)
+        task = self._build_task(settings)
+        if isinstance(task, type) or not callable(getattr(task, "run", None)):
+            message = "build_task must return a Task"
+            raise TypeError(message)
+        return task
 
 
 def _validate_revision(value: str, *, field_name: str) -> None:
@@ -104,9 +146,9 @@ class TaskBinding:
 
 
 @dataclass(frozen=True, slots=True)
-class _FrozenSettingsTaskBuilder:
+class _TypedSettingsTaskBuilder:
     factory: TaskFactory
-    settings: FrozenTaskSettings
+    settings: object
 
     def __call__(
         self,
@@ -130,8 +172,7 @@ def bind_tasks(
     *,
     specs: Mapping[str, TaskSpec],
     factories: Mapping[str, TaskFactory],
-    settings: Mapping[str, FrozenTaskSettings],
-    settings_revisions: Mapping[str, int],
+    settings: Mapping[str, CompiledTaskSettings],
     content_revisions: Mapping[str, str],
 ) -> Mapping[TaskId, TaskBinding]:
     """把静态 spec、运行依赖和已编译配置收敛成唯一 binding 表。"""
@@ -140,7 +181,6 @@ def bind_tasks(
         ("specs", specs),
         ("factories", factories),
         ("settings", settings),
-        ("settings_revisions", settings_revisions),
         ("content_revisions", content_revisions),
     ):
         if not isinstance(value, Mapping):
@@ -166,6 +206,13 @@ def bind_tasks(
         message = f"factories must implement build(): {invalid_factories}"
         raise TypeError(message)
 
+    settings_copy = dict(settings)
+    if any(
+        not isinstance(key, str) or not isinstance(value, CompiledTaskSettings) for key, value in settings_copy.items()
+    ):
+        message = "settings must map task id strings to CompiledTaskSettings values"
+        raise TypeError(message)
+
     required = set(spec_copy)
     for field_name, keys in (
         ("factory", set(factory_copy)),
@@ -176,23 +223,19 @@ def bind_tasks(
             unknown = sorted(keys - required)
             message = f"{field_name} coverage mismatch: missing={missing}, unknown={unknown}"
             raise FactoryCoverageError(message)
-    missing_settings = sorted(required - set(settings))
-    missing_revisions = sorted(required - set(settings_revisions))
-    if missing_settings or missing_revisions:
-        message = (
-            "task settings coverage mismatch: "
-            f"missing_settings={missing_settings}, missing_revisions={missing_revisions}"
-        )
+    missing_settings = sorted(required - set(settings_copy))
+    if missing_settings:
+        message = f"task settings coverage mismatch: missing={missing_settings}"
         raise FactoryCoverageError(message)
 
     bindings = {
         TaskId(task_id): TaskBinding(
             spec=spec,
-            settings_revision=settings_revisions[task_id],
+            settings_revision=settings_copy[task_id].revision,
             content_revision=content_revisions[task_id],
-            builder=_FrozenSettingsTaskBuilder(
+            builder=_TypedSettingsTaskBuilder(
                 factory=factory_copy[task_id],
-                settings=settings[task_id],
+                settings=settings_copy[task_id].settings,
             ),
         )
         for task_id, spec in spec_copy.items()

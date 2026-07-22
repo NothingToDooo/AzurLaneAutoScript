@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from module.maintenance.benchmark import BenchmarkScene, BenchmarkSettings, BenchmarkTask
+from module.maintenance.benchmark import BenchmarkSettings, BenchmarkTask
 from module.maintenance.game_manager import GameManagerSettings, GameManagerTask
 from module.maintenance.restart import RestartSettings, RestartTask
 from module.maintenance.uncensored import UncensoredSettings, UncensoredTask
-from module.runtime import SettingsDecoder, TypedTaskFactory
+from module.runtime import ConfiguredTaskFactory
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -48,36 +48,17 @@ class MaintenanceServices:
             _require_method(dependency, method, field_name=field_name)
 
 
-def _restart_settings(decoder: SettingsDecoder) -> RestartSettings:
-    return RestartSettings(schedule=decoder.daily_schedule("schedule"))
-
-
-def _game_manager_settings(decoder: SettingsDecoder) -> GameManagerSettings:
-    return GameManagerSettings(auto_restart=decoder.boolean("auto_restart"))
-
-
-def _uncensored_settings(decoder: SettingsDecoder) -> UncensoredSettings:
-    return UncensoredSettings(package_name=decoder.string("package_name"))
-
-
-def _benchmark_settings(decoder: SettingsDecoder) -> BenchmarkSettings:
-    return BenchmarkSettings(
-        scene=decoder.enum("scene", BenchmarkScene),
-        safe_stage=decoder.string("safe_stage"),
-    )
-
-
 def build_maintenance_factories(services: MaintenanceServices) -> Mapping[str, TaskFactory]:
     if not isinstance(services, MaintenanceServices):
         message = "services must be MaintenanceServices"
         raise TypeError(message)
     factories: dict[str, TaskFactory] = {
-        "restart": TypedTaskFactory(
-            _restart_settings,
+        "restart": ConfiguredTaskFactory(
+            RestartSettings,
             lambda settings: RestartTask(services.app, services.login, settings),
         ),
-        "azur_lane_uncensored": TypedTaskFactory(
-            _uncensored_settings,
+        "azur_lane_uncensored": ConfiguredTaskFactory(
+            UncensoredSettings,
             lambda settings: UncensoredTask(
                 services.uncensored_assets,
                 services.uncensored_installer,
@@ -86,12 +67,12 @@ def build_maintenance_factories(services: MaintenanceServices) -> Mapping[str, T
                 settings,
             ),
         ),
-        "game_manager": TypedTaskFactory(
-            _game_manager_settings,
+        "game_manager": ConfiguredTaskFactory(
+            GameManagerSettings,
             lambda settings: GameManagerTask(services.app, services.login, settings),
         ),
-        "benchmark": TypedTaskFactory(
-            _benchmark_settings,
+        "benchmark": ConfiguredTaskFactory(
+            BenchmarkSettings,
             lambda settings: BenchmarkTask(
                 services.benchmark_environment,
                 services.benchmark_engine,

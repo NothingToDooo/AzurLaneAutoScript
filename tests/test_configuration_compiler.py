@@ -1,15 +1,27 @@
 import json
+from dataclasses import FrozenInstanceError
+from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from module.bootstrap.configuration_compiler import (
+    CompiledConfiguration,
     ConfigurationCompileError,
     ConfigurationDocument,
     CurrentConfigurationSchema,
     WebConfigurationCompiler,
 )
+from module.content.models import ContentId, StageRef
+from module.gameplay.activity import CoalitionSpSettings, EventStorySettings
+from module.gameplay.campaign import CampaignJobSettings
+from module.gameplay.composite import FreebiesSettings, RewardSettings
+from module.gameplay.encounter import DailySettings, ExerciseSettings, HardSettings
+from module.gameplay.facility import CommissionSettings, ResearchSettings, TacticalSettings
+from module.gameplay.market import ShopFrequentSettings, ShopOnceSettings
+from module.gameplay.opsi import MeowfficerFarmingSettings
+from module.maintenance.uncensored import UncensoredSettings
 from module.notify.configuration import (
     DisabledNotificationConfig,
     NotificationConfigError,
@@ -20,7 +32,6 @@ from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from module.config.deep import MutableDeepData
-    from module.runtime.settings import JsonValue
 
 
 def _template() -> dict[str, object]:
@@ -28,6 +39,20 @@ def _template() -> dict[str, object]:
         "dict[str, object]",
         json.loads(Path("config/template.json").read_text(encoding="utf-8")),
     )
+
+
+def _task_settings[SettingsT](
+    compiled: CompiledConfiguration,
+    task_id: str,
+    expected_type: type[SettingsT],
+) -> SettingsT:
+    settings = compiled.tasks[task_id].settings
+    assert isinstance(settings, expected_type)
+    return settings
+
+
+def _task_revisions(compiled: CompiledConfiguration) -> dict[str, int]:
+    return {task_id: task.revision for task_id, task in compiled.tasks.items()}
 
 
 def test_current_schema_rejects_duplicate_json_fields(tmp_path: Path) -> None:
@@ -42,8 +67,8 @@ def test_template_compiles_to_exact_runtime_task_and_schedule_coverage() -> None
     compiled = WebConfigurationCompiler().compile(_template())
 
     assert set(compiled.tasks) == set(TASK_SPECS)
-    assert set(compiled.task_revisions) == set(TASK_SPECS)
-    assert all(revision > 0 for revision in compiled.task_revisions.values())
+    assert set(_task_revisions(compiled)) == set(TASK_SPECS)
+    assert all(task.revision > 0 for task in compiled.tasks.values())
     assert compiled.device_serial == "127.0.0.1:16384"
     assert compiled.notification == DisabledNotificationConfig()
 
@@ -108,7 +133,7 @@ def test_compiler_projects_explicit_smtp_fields_to_typed_notification_config() -
         port=465,
         transport=SmtpTransport.IMPLICIT_TLS,
     )
-    assert compiled.task_revisions == baseline.task_revisions
+    assert _task_revisions(compiled) == _task_revisions(baseline)
     assert credential in repr(compiled)
     assert credential not in repr(compiled.tasks)
 
@@ -142,10 +167,13 @@ def test_compiled_task_revision_changes_only_for_the_changed_task() -> None:
     campaign["Name"] = "12-3"
     changed = WebConfigurationCompiler().compile(document)
 
-    assert repeated.task_revisions == original.task_revisions
-    assert changed.task_revisions["main"] != original.task_revisions["main"]
-    assert {task_id: revision for task_id, revision in changed.task_revisions.items() if task_id != "main"} == {
-        task_id: revision for task_id, revision in original.task_revisions.items() if task_id != "main"
+    repeated_revisions = _task_revisions(repeated)
+    original_revisions = _task_revisions(original)
+    changed_revisions = _task_revisions(changed)
+    assert repeated_revisions == original_revisions
+    assert changed_revisions["main"] != original_revisions["main"]
+    assert {task_id: revision for task_id, revision in changed_revisions.items() if task_id != "main"} == {
+        task_id: revision for task_id, revision in original_revisions.items() if task_id != "main"
     }
 
 
@@ -168,7 +196,7 @@ def test_campaign_revision_ignores_runtime_emotion_ledger_updates(field_name: st
     changed = WebConfigurationCompiler().compile(document)
 
     assert changed.tasks["main"] == original.tasks["main"]
-    assert changed.task_revisions["main"] == original.task_revisions["main"]
+    assert changed.tasks["main"].revision == original.tasks["main"].revision
     changed_main = cast("dict[str, object]", changed.runtime_document["Main"])
     changed_emotion = cast("dict[str, object]", changed_main["Emotion"])
     if isinstance(value, str):
@@ -194,7 +222,7 @@ def test_campaign_revision_tracks_emotion_policy_updates(field_name: str, value:
 
     changed = WebConfigurationCompiler().compile(document)
 
-    assert changed.task_revisions["main"] != original.task_revisions["main"]
+    assert changed.tasks["main"].revision != original.tasks["main"].revision
 
 
 def test_opsi_explore_revision_ignores_runtime_last_zone() -> None:
@@ -207,7 +235,7 @@ def test_opsi_explore_revision_ignores_runtime_last_zone() -> None:
     changed = WebConfigurationCompiler().compile(document)
 
     assert changed.tasks["opsi_explore"] == original.tasks["opsi_explore"]
-    assert changed.task_revisions["opsi_explore"] == original.task_revisions["opsi_explore"]
+    assert changed.tasks["opsi_explore"].revision == original.tasks["opsi_explore"].revision
     changed_explore = cast("dict[str, object]", changed.runtime_document["OpsiExplore"])
     changed_settings = cast("dict[str, object]", changed_explore["OpsiExplore"])
     assert changed_settings["LastZone"] == 44
@@ -222,7 +250,7 @@ def test_opsi_explore_revision_tracks_user_policy() -> None:
 
     changed = WebConfigurationCompiler().compile(document)
 
-    assert changed.task_revisions["opsi_explore"] != original.task_revisions["opsi_explore"]
+    assert changed.tasks["opsi_explore"].revision != original.tasks["opsi_explore"].revision
 
 
 def test_compiled_settings_are_deeply_read_only_and_detached_from_source() -> None:
@@ -232,163 +260,138 @@ def test_compiled_settings_are_deeply_read_only_and_detached_from_source() -> No
     campaign_source = cast("dict[str, object]", main_source["Campaign"])
     campaign_source["Name"] = "12-3"
 
-    main = compiled.tasks["main"]
-    assert main["stage_ids"] == ("12-4",)
+    main = _task_settings(compiled, "main", CampaignJobSettings)
+    assert main.stage_refs == (StageRef("campaign_main", "12-4"),)
     with pytest.raises(TypeError):
         cast("dict[str, object]", compiled.tasks)["main"] = {}
-    with pytest.raises(TypeError):
-        cast("dict[str, object]", main)["stage_ids"] = ()
+    stage_refs_attribute = "stage_refs"
+    with pytest.raises(FrozenInstanceError):
+        setattr(main, stage_refs_attribute, ())
 
 
 def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
-    tasks = WebConfigurationCompiler().compile(_template()).tasks
+    compiled = WebConfigurationCompiler().compile(_template())
+    main = _task_settings(compiled, "main", CampaignJobSettings)
+    assert main.stage_refs == (StageRef("campaign_main", "12-4"),)
+    assert main.difficulty.value == "normal"
+    execution = main.execution
+    assert execution.automation.ambush_evade is True
+    assert execution.automation.use_2x_book is False
+    assert execution.automation.use_auto_search is True
+    assert execution.automation.use_clear_mode is True
+    assert execution.automation.use_fleet_lock is True
+    assert (
+        execution.fleets.fleet1,
+        execution.fleets.fleet1_mode.value,
+        execution.fleets.fleet1_step,
+        execution.fleets.fleet2,
+        execution.fleets.fleet2_mode.value,
+        execution.fleets.fleet2_step,
+        execution.fleets.order.value,
+    ) == (1, "combat_auto", 3, 2, "combat_auto", 2, "fleet1_mob_fleet2_boss")
+    assert (
+        execution.submarine.fleet,
+        execution.submarine.mode.value,
+        execution.submarine.auto_search_mode.value,
+        execution.submarine.distance_to_boss.value,
+    ) == (0, "do_not_use", "sub_standby", "2_grid_to_boss")
+    assert execution.emotion.mode.value == "calculate"
+    assert (
+        execution.emotion.fleet1.control.value,
+        execution.emotion.fleet1.recover.value,
+        execution.emotion.fleet1.oath,
+    ) == ("prevent_green_face", "not_in_dormitory", False)
+    assert execution.hp_control.hp_balance_weight == (1_000, 1_000, 1_000)
+    assert execution.hp_control.hp_balance_threshold == 0.2
+    assert execution.hp_control.repair_use_multi_threshold == 0.6
+    assert execution.enemy_priority.scale_balance_weight.value == "default_mode"
 
-    main = cast("dict[str, JsonValue]", tasks["main"])
-    assert main["pack_id"] == "campaign_main"
-    assert main["stage_ids"] == ("12-4",)
-    assert main["difficulty"] == "normal"
-    execution = cast("dict[str, JsonValue]", main["execution"])
-    assert execution["automation"] == {
-        "ambush_evade": True,
-        "use_2x_book": False,
-        "use_auto_search": True,
-        "use_clear_mode": True,
-        "use_fleet_lock": True,
-    }
-    assert execution["fleets"] == {
-        "fleet1": 1,
-        "fleet1_mode": "combat_auto",
-        "fleet1_step": 3,
-        "fleet2": 2,
-        "fleet2_mode": "combat_auto",
-        "fleet2_step": 2,
-        "order": "fleet1_mob_fleet2_boss",
-    }
-    assert execution["submarine"] == {
-        "fleet": 0,
-        "mode": "do_not_use",
-        "auto_search_mode": "sub_standby",
-        "distance_to_boss": "2_grid_to_boss",
-    }
-    emotion = cast("dict[str, JsonValue]", execution["emotion"])
-    assert emotion["mode"] == "calculate"
-    assert emotion["fleet1"] == {
-        "control": "prevent_green_face",
-        "recover": "not_in_dormitory",
-        "oath": False,
-    }
-    assert execution["hp_control"] == {
-        "use_hp_balance": False,
-        "use_emergency_repair": False,
-        "use_low_hp_retreat": False,
-        "hp_balance_threshold": 0.2,
-        "hp_balance_weight": (1_000, 1_000, 1_000),
-        "repair_use_single_threshold": 0.3,
-        "repair_use_multi_threshold": 0.6,
-        "low_hp_retreat_threshold": 0.3,
-    }
-    assert execution["enemy_priority"] == {"scale_balance_weight": "default_mode"}
-    assert "formation" not in cast("dict[str, JsonValue]", execution["fleets"])
-    event_a = cast("dict[str, JsonValue]", tasks["event_a"])
-    assert event_a["stage_ids"] == ("t1", "t2", "t3")
-    gems_execution = cast(
-        "dict[str, JsonValue]",
-        cast("dict[str, JsonValue]", tasks["gems_farming"])["execution"],
-    )
-    assert gems_execution["hp_control"] == execution["hp_control"]
-    assert gems_execution["enemy_priority"] == execution["enemy_priority"]
-    gems = cast("dict[str, JsonValue]", tasks["gems_farming"])
-    gems_policy = cast("dict[str, JsonValue]", gems["gems_farming"])
-    assert gems_policy["fallback"] == {"pack_id": "campaign_main", "stage_id": "2-4"}
-    assert gems_policy["flagship_change"] == "ship"
-    assert gems_policy["common_carrier"] == "any"
-    assert gems_policy["vanguard_change"] == "ship"
-    assert gems_policy["common_destroyer"] == "any"
-    assert "equipment_code_config" not in gems_policy
-    opsi = cast("dict[str, JsonValue]", tasks["opsi_meowfficer_farming"])
-    assert opsi["hazard_level"] == 5
-    event_story = cast("dict[str, JsonValue]", tasks["event_story"])
-    assert isinstance(event_story["event"], str)
-    assert event_story["skip_battle"] is True
-    assert cast("dict[str, JsonValue]", tasks["coalition_sp"])["fleet"] == "multi"
-    assert tasks["azur_lane_uncensored"] == {"package_name": "com.bilibili.azurlane"}
+    event_a = _task_settings(compiled, "event_a", CampaignJobSettings)
+    assert tuple(ref.stage_id for ref in event_a.stage_refs) == ("t1", "t2", "t3")
+    gems = _task_settings(compiled, "gems_farming", CampaignJobSettings)
+    assert gems.execution.hp_control == execution.hp_control
+    assert gems.execution.enemy_priority == execution.enemy_priority
+    assert gems.gems_farming is not None
+    assert gems.gems_farming.fallback_ref == StageRef("campaign_main", "2-4")
+    assert gems.gems_farming.flagship_change.value == "ship"
+    assert gems.gems_farming.common_carrier.value == "any"
+    assert gems.gems_farming.vanguard_change.value == "ship"
+    assert gems.gems_farming.common_destroyer.value == "any"
+
+    opsi = _task_settings(compiled, "opsi_meowfficer_farming", MeowfficerFarmingSettings)
+    assert opsi.hazard_level == 5
+    event_story = _task_settings(compiled, "event_story", EventStorySettings)
+    assert event_story.content_id == ContentId("event_20260625_cn")
+    assert event_story.skip_battle is True
+    coalition_sp = _task_settings(compiled, "coalition_sp", CoalitionSpSettings)
+    assert coalition_sp.fleet.value == "multi"
+    uncensored = _task_settings(compiled, "azur_lane_uncensored", UncensoredSettings)
+    assert uncensored.package_name == "com.bilibili.azurlane"
 
 
 def test_compiler_projects_encounter_facility_composite_and_market_settings() -> None:
-    tasks = WebConfigurationCompiler().compile(_template()).tasks
-    daily = cast("dict[str, JsonValue]", tasks["daily"])
-    assert daily["use_daily_skip"] is True
-    daily_missions = cast("dict[str, JsonValue]", daily["missions"])
-    assert daily_missions["escort"] == {"stage": "first", "fleet": 1}
-    assert daily_missions["supply_line_disruption"] == {"stage": "second", "fleet": None}
-    assert tasks["hard"] == {
-        "schedule": {"timezone": "Asia/Shanghai", "triggers": ("00:00",)},
-        "failure_retry_seconds": {"lower_seconds": 1_800, "upper_seconds": 1_800},
-        "resource_retry_seconds": 7_200,
-        "stage": "11-4",
-        "fleet": 1,
-    }
-    exercise = cast("dict[str, JsonValue]", tasks["exercise"])
-    assert exercise["opponent_mode"] == "max_exp"
-    assert exercise["opponent_trials"] == 1
-    assert exercise["strategy"] == "aggressive"
-    assert exercise["low_hp_threshold"] == 0.4
-    assert exercise["low_hp_confirm_wait_seconds"] == 0.1
+    compiled = WebConfigurationCompiler().compile(_template())
+    daily = _task_settings(compiled, "daily", DailySettings)
+    assert daily.use_daily_skip is True
+    assert (daily.missions.escort.stage.value, daily.missions.escort.fleet) == ("first", 1)
+    assert (
+        daily.missions.supply_line_disruption.stage.value,
+        daily.missions.supply_line_disruption.fleet,
+    ) == ("second", None)
 
-    research = cast("dict[str, JsonValue]", tasks["research"])
-    research_selection = cast("dict[str, JsonValue]", research["selection"])
-    assert research_selection | {"custom_filter": "<redacted>"} == {
-        "use_cube": "only_05_hour",
-        "use_coin": "always_use",
-        "use_part": "always_use",
-        "allow_delay": True,
-        "preset_filter": "series_9_blueprint_ta152",
-        "custom_filter": "<redacted>",
-    }
-    assert isinstance(research_selection["custom_filter"], str)
-    commission = cast("dict[str, JsonValue]", tasks["commission"])
-    assert cast("dict[str, JsonValue]", commission["selection"])["preset_filter"] == "cube"
-    tactical = cast("dict[str, JsonValue]", tasks["tactical"])
-    assert tactical["rapid_training_slot"] == "do_not_use"
-    assert tactical["experience_overflow"] == {
-        "enabled": True,
-        "t1_allow": 200,
-        "t2_allow": 200,
-        "t3_allow": 100,
-        "t4_allow": 100,
-    }
-    freebies = cast("dict[str, JsonValue]", tasks["freebies"])
-    assert freebies["mail"] == {
-        "claim_merit": True,
-        "claim_maintenance": False,
-        "claim_trade_license": False,
-        "delete_collected": True,
-    }
-    assert freebies["supply_pack"] == {"collect": True, "day_of_week": 0}
-    shop_frequent = cast("dict[str, JsonValue]", tasks["shop_frequent"])
-    assert cast("dict[str, JsonValue]", shop_frequent["plan"])["filter"] is not None
-    shop_once = cast("dict[str, JsonValue]", tasks["shop_once"])
-    guild_shop = cast(
-        "dict[str, JsonValue]",
-        cast("dict[str, JsonValue]", shop_once["plan"])["guild"],
-    )
-    assert guild_shop["box_t3"] == "ironblood"
-    assert guild_shop["pr3"] == "cheshire"
+    hard = _task_settings(compiled, "hard", HardSettings)
+    assert hard.schedule.timezone_name == "Asia/Shanghai"
+    assert hard.failure_retry_delay.lower_seconds == 1_800
+    assert hard.resource_retry_delay == timedelta(seconds=7_200)
+    assert (hard.stage, hard.fleet.value) == ("11-4", 1)
+    exercise = _task_settings(compiled, "exercise", ExerciseSettings)
+    assert exercise.opponent_mode.value == "max_exp"
+    assert exercise.opponent_trials == 1
+    assert exercise.strategy.value == "aggressive"
+    assert exercise.low_hp_threshold == 0.4
+    assert exercise.low_hp_confirm_wait_seconds == 0.1
+
+    research = _task_settings(compiled, "research", ResearchSettings)
+    assert research.selection.use_cube.value == "only_05_hour"
+    assert research.selection.use_coin.value == "always_use"
+    assert research.selection.allow_delay is True
+    assert research.selection.preset_filter == "series_9_blueprint_ta152"
+    assert isinstance(research.selection.custom_filter, str)
+    commission = _task_settings(compiled, "commission", CommissionSettings)
+    assert commission.selection.preset_filter.value == "cube"
+    tactical = _task_settings(compiled, "tactical", TacticalSettings)
+    assert tactical.rapid_training_slot.value == "do_not_use"
+    assert (
+        tactical.experience_overflow.enabled,
+        tactical.experience_overflow.t1_allow,
+        tactical.experience_overflow.t2_allow,
+        tactical.experience_overflow.t3_allow,
+        tactical.experience_overflow.t4_allow,
+    ) == (True, 200, 200, 100, 100)
+    freebies = _task_settings(compiled, "freebies", FreebiesSettings)
+    assert (
+        freebies.mail.claim_merit,
+        freebies.mail.claim_maintenance,
+        freebies.mail.claim_trade_license,
+        freebies.mail.delete_collected,
+    ) == (True, False, False, True)
+    assert (freebies.supply_pack.collect, freebies.supply_pack.day_of_week) == (True, 0)
+    shop_frequent = _task_settings(compiled, "shop_frequent", ShopFrequentSettings)
+    assert shop_frequent.plan.filter is not None
+    shop_once = _task_settings(compiled, "shop_once", ShopOnceSettings)
+    assert shop_once.plan.guild.box_t3 == "ironblood"
+    assert shop_once.plan.guild.pr3 == "cheshire"
 
 
 def test_compiler_preserves_scheduler_interval_bounds_in_canonical_seconds() -> None:
-    tasks = WebConfigurationCompiler().compile(_template()).tasks
+    compiled = WebConfigurationCompiler().compile(_template())
+    tactical = _task_settings(compiled, "tactical", TacticalSettings)
+    reward = _task_settings(compiled, "reward", RewardSettings)
 
-    tactical = cast("dict[str, JsonValue]", tasks["tactical"])
-    reward = cast("dict[str, JsonValue]", tasks["reward"])
-    assert tactical["failure_retry_seconds"] == {
-        "lower_seconds": 7_200,
-        "upper_seconds": 14_400,
-    }
-    assert reward["success_delay_seconds"] == {
-        "lower_seconds": 7_200,
-        "upper_seconds": 14_400,
-    }
+    assert tactical.failure_retry_delay.lower_seconds == 7_200
+    assert tactical.failure_retry_delay.upper_seconds == 14_400
+    assert reward.success_delay.lower_seconds == 7_200
+    assert reward.success_delay.upper_seconds == 14_400
 
 
 def test_compiler_accepts_single_interval_for_range_default() -> None:
@@ -397,13 +400,11 @@ def test_compiler_accepts_single_interval_for_range_default() -> None:
     scheduler = cast("dict[str, object]", tactical["Scheduler"])
     scheduler["FailureInterval"] = 120
 
-    tasks = WebConfigurationCompiler().compile(document).tasks
-    tactical_settings = cast("dict[str, JsonValue]", tasks["tactical"])
+    compiled = WebConfigurationCompiler().compile(document)
+    tactical_settings = _task_settings(compiled, "tactical", TacticalSettings)
 
-    assert tactical_settings["failure_retry_seconds"] == {
-        "lower_seconds": 7_200,
-        "upper_seconds": 7_200,
-    }
+    assert tactical_settings.failure_retry_delay.lower_seconds == 7_200
+    assert tactical_settings.failure_retry_delay.upper_seconds == 7_200
 
 
 def test_compiler_accepts_range_for_integer_interval_default() -> None:
@@ -412,13 +413,11 @@ def test_compiler_accepts_range_for_integer_interval_default() -> None:
     scheduler = cast("dict[str, object]", hard["Scheduler"])
     scheduler["FailureInterval"] = "120-240"
 
-    tasks = WebConfigurationCompiler().compile(document).tasks
-    hard_settings = cast("dict[str, JsonValue]", tasks["hard"])
+    compiled = WebConfigurationCompiler().compile(document)
+    hard_settings = _task_settings(compiled, "hard", HardSettings)
 
-    assert hard_settings["failure_retry_seconds"] == {
-        "lower_seconds": 7_200,
-        "upper_seconds": 14_400,
-    }
+    assert hard_settings.failure_retry_delay.lower_seconds == 7_200
+    assert hard_settings.failure_retry_delay.upper_seconds == 14_400
 
 
 @pytest.mark.parametrize(
@@ -495,10 +494,9 @@ def test_compiler_normalizes_integer_json_numbers_for_float_settings() -> None:
     compiled = WebConfigurationCompiler().compile(document)
     runtime_document = compiled.runtime_document
 
-    tasks = compiled.tasks
-    compiled_exercise = cast("dict[str, JsonValue]", tasks["exercise"])
-    assert compiled_exercise["low_hp_threshold"] == 0.0
-    assert type(compiled_exercise["low_hp_threshold"]) is float
+    compiled_exercise = _task_settings(compiled, "exercise", ExerciseSettings)
+    assert compiled_exercise.low_hp_threshold == 0.0
+    assert type(compiled_exercise.low_hp_threshold) is float
     runtime_exercise = cast("dict[str, object]", runtime_document["Exercise"])
     runtime_settings = cast("dict[str, object]", runtime_exercise["Exercise"])
     assert runtime_settings["LowHpThreshold"] == 0.0
@@ -564,15 +562,14 @@ def test_compiler_normalizes_disabled_shop_filters_to_null() -> None:
         settings = cast("dict[str, object]", task[group])
         settings["Filter"] = "  "
 
-    tasks = WebConfigurationCompiler().compile(document).tasks
-    frequent = cast("dict[str, JsonValue]", tasks["shop_frequent"])
-    assert cast("dict[str, JsonValue]", frequent["plan"])["filter"] is None
-    once = cast("dict[str, JsonValue]", tasks["shop_once"])
-    plan = cast("dict[str, JsonValue]", once["plan"])
-    assert cast("dict[str, JsonValue]", plan["merit"])["filter"] is None
-    assert cast("dict[str, JsonValue]", plan["guild"])["filter"] is None
-    assert cast("dict[str, JsonValue]", plan["core"])["filter"] is None
-    assert cast("dict[str, JsonValue]", plan["medal"])["filter"] is None
+    compiled = WebConfigurationCompiler().compile(document)
+    frequent = _task_settings(compiled, "shop_frequent", ShopFrequentSettings)
+    assert frequent.plan.filter is None
+    once = _task_settings(compiled, "shop_once", ShopOnceSettings)
+    assert once.plan.merit.filter is None
+    assert once.plan.guild.filter is None
+    assert once.plan.core.filter is None
+    assert once.plan.medal.filter is None
 
 
 @pytest.mark.parametrize(
