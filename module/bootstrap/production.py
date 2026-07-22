@@ -36,6 +36,8 @@ from module.bootstrap.configuration_compiler import (
     ConfigurationDocument,
     WebConfigurationCompiler,
 )
+from module.bootstrap.configured_activity_content import validate_configured_activity_content
+from module.bootstrap.configured_campaign_content import validate_configured_campaign_content
 from module.bootstrap.revisions import RevisionTree, SourceTreeRevisionSource
 from module.config.config import AzurLaneConfig, Function
 from module.config.deep import deep_set
@@ -66,7 +68,7 @@ from module.notify.configuration import DisabledNotificationConfig, Notification
 from module.notify.direct import send_notification
 from module.project_paths import PROJECT_ROOT
 from module.runtime.errors import RuntimeCompositionError
-from module.runtime.factories import TaskBinding, TaskFactory, bind_tasks, validate_task_bindings
+from module.runtime.factories import TaskBinding, TaskFactory, bind_tasks
 from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner
 from module.state.config_repository import ConfigRepositoryClock, ConfigStateRepository
 from module.task_registry import (
@@ -147,23 +149,17 @@ class PersonalRuntimeConfig(AzurLaneConfig):
         return True
 
 
-class _ConfigurationValidationConfig(PersonalRuntimeConfig):
-    """只读候选配置；若 composition 尝试写盘则立即失败。"""
-
-    @override
-    def save(self) -> bool:
-        if self.modified:
-            message = "configuration validation must not persist runtime changes"
-            raise RuntimeError(message)
-        return False
-
-
-class _ConfigurationValidationDevice(Device):
-    """只暴露 factory composition 需要的配置，不建立 ADB 或截图连接。"""
-
-    @override
-    def __init__(self, config: AzurLaneConfig) -> None:
-        self.config = config
+def _require_validation_content(
+    activities: ActivityCatalog | None,
+    sessions: HardCampaignSessionSource | None,
+) -> tuple[ActivityCatalog, CompiledCampaignSessionSource]:
+    if not isinstance(activities, ActivityCatalog):
+        message = "activity content loader did not return an ActivityCatalog"
+        raise RuntimeCompositionError(message)
+    if not isinstance(sessions, CompiledCampaignSessionSource):
+        message = "campaign content loader did not return a CompiledCampaignSessionSource"
+        raise RuntimeCompositionError(message)
+    return activities, sessions
 
 
 def validate_personal_configuration(
@@ -171,19 +167,22 @@ def validate_personal_configuration(
     *,
     project_root: Path | None = None,
 ) -> CompiledConfiguration:
-    """用真实内容和全部玩法 factory 校验候选配置，但不连接设备或写盘。"""
+    """纯编译候选配置，并确定性验证它实际引用的声明式内容。"""
 
     root = _require_project_root(
         PROJECT_ROOT if project_root is None else project_root,
     )
     try:
-        compiled, bindings, _repository, _screenshots = PersonalRuntimeBuilder(
+        compiled = WebConfigurationCompiler().compile(document)
+        loaded_activities, loaded_sessions = _load_personal_content(
             root,
-            "alas",
-            config_factory=_ConfigurationValidationConfig,
-            device_factory=_ConfigurationValidationDevice,
-        ).build(document, clock=SystemLoopClock())
-        validate_task_bindings(bindings)
+            needs_activity=True,
+            needs_campaign=True,
+            sessions_factory=_default_sessions,
+        )
+        activities, sessions = _require_validation_content(loaded_activities, loaded_sessions)
+        validate_configured_activity_content(compiled.tasks, activities)
+        validate_configured_campaign_content(compiled.tasks, sessions)
     except ConfigurationCompileError:
         raise
     except (
@@ -318,6 +317,43 @@ def _default_sessions(
     )
 
 
+def _load_personal_content(
+    project_root: Path,
+    *,
+    needs_activity: bool,
+    needs_campaign: bool,
+    sessions_factory: Callable[
+        [Path, ContentCatalog, CampaignRuntimeProfileRegistry],
+        HardCampaignSessionSource,
+    ],
+) -> tuple[ActivityCatalog | None, HardCampaignSessionSource | None]:
+    """只加载所需声明式内容；此边界不接触配置状态、设备或任务对象。"""
+
+    if not needs_activity and not needs_campaign:
+        return None, None
+
+    packs = load_event_manifests(project_root / "content" / "events")
+    content_catalog = ContentCatalog(packs)
+    if needs_campaign:
+        validate_mumu12_war_archives_profiles(content_catalog)
+    activities = None
+    if needs_activity:
+        activities = ActivityCatalog(content_catalog.packs)
+        validate_mumu12_activity_profiles(activities)
+    if not needs_campaign:
+        return activities, None
+
+    runtime_profiles = compile_campaign_runtime_profile_registry(
+        project_root / "content" / "campaign-runtime-profiles.json"
+    )
+    validate_mumu12_campaign_runtime_profiles(content_catalog.stages, runtime_profiles)
+    sessions = sessions_factory(project_root, content_catalog, runtime_profiles)
+    if not isinstance(sessions, HardCampaignSessionSource):
+        message = "sessions_factory must return a HardCampaignSessionSource"
+        raise TypeError(message)
+    return activities, sessions
+
+
 class SystemLoopClock:
     """为个人调度循环提供 UTC 时钟和可取消等待。"""
 
@@ -447,7 +483,12 @@ class PersonalRuntimeBuilder:
             raise ValueError(message)
 
         domains = self._selected_domains()
-        activities, sessions = self._prepare_content(domains)
+        activities, sessions = _load_personal_content(
+            self._project_root,
+            needs_activity=TaskDomain.ACTIVITY in domains,
+            needs_campaign=TaskDomain.CAMPAIGN in domains or TaskDomain.ENCOUNTER in domains,
+            sessions_factory=self._sessions_factory,
+        )
         device = self._device_factory(config)
         if not isinstance(device, Device):
             message = "device_factory must return a Device"
@@ -483,36 +524,6 @@ class PersonalRuntimeBuilder:
         if self._command == "alas":
             return tuple(TaskDomain)
         return (TASK_SPECS[self._command].domain,)
-
-    def _prepare_content(
-        self,
-        domains: tuple[TaskDomain, ...],
-    ) -> tuple[ActivityCatalog | None, HardCampaignSessionSource | None]:
-        needs_activity = TaskDomain.ACTIVITY in domains
-        needs_campaign = TaskDomain.CAMPAIGN in domains or TaskDomain.ENCOUNTER in domains
-        if not needs_activity and not needs_campaign:
-            return None, None
-
-        packs = load_event_manifests(self._project_root / "content" / "events")
-        content_catalog = ContentCatalog(packs)
-        if needs_campaign:
-            validate_mumu12_war_archives_profiles(content_catalog)
-        activities = None
-        if needs_activity:
-            activities = ActivityCatalog(content_catalog.packs)
-            validate_mumu12_activity_profiles(activities)
-        if not needs_campaign:
-            return activities, None
-
-        runtime_profiles = compile_campaign_runtime_profile_registry(
-            self._project_root / "content" / "campaign-runtime-profiles.json"
-        )
-        validate_mumu12_campaign_runtime_profiles(content_catalog.stages, runtime_profiles)
-        sessions = self._sessions_factory(self._project_root, content_catalog, runtime_profiles)
-        if not isinstance(sessions, HardCampaignSessionSource):
-            message = "sessions_factory must return a HardCampaignSessionSource"
-            raise TypeError(message)
-        return activities, sessions
 
     def _build_domain_factories(  # ruff:ignore[complex-structure, too-many-return-statements] - 直接分支比第二套领域注册表更清楚。
         self,

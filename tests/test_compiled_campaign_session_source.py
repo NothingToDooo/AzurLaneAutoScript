@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from module.content.campaign_policy import CampaignPolicy, StageProgressionRule
 from module.content.campaign_session import CampaignRunVariant
 from module.content.campaign_session_source import CompiledCampaignSessionSource
 from module.content.catalog import ContentCatalog
-from module.content.errors import ContentValidationError, UnknownStageError
+from module.content.errors import ContentCatalogError, ContentValidationError, UnknownStageError
 from module.content.manifest import load_default_event_manifests
 from module.content.models import EventPack, StageRef, StageSpec
 from module.content.stage_loader import StageSpecLoader
@@ -71,13 +72,26 @@ hard_mode: null
 """
 
 
-def _source_for_stage(tmp_path: Path, body: str) -> CompiledCampaignSessionSource:
+def _source_for_stage(
+    tmp_path: Path,
+    body: str,
+    *,
+    policy: CampaignPolicy | None = None,
+) -> CompiledCampaignSessionSource:
     content_root = tmp_path / "events"
     stage_path = content_root / "event_test" / "stages" / "t1.yaml"
     stage_path.parent.mkdir(parents=True)
     stage_path.write_text(body, encoding="utf-8", newline="\n")
     spec = StageSpec(StageRef("event_test", "t1"), "stages/t1.yaml")
-    catalog = ContentCatalog((EventPack("event_test", stages=(spec,)),))
+    catalog = ContentCatalog(
+        (
+            EventPack(
+                "event_test",
+                stages=(spec,),
+                policy=CampaignPolicy() if policy is None else policy,
+            ),
+        )
+    )
     return CompiledCampaignSessionSource(catalog, StageSpecLoader(content_root))
 
 
@@ -160,6 +174,78 @@ def test_content_source_selects_aliases_and_loop_stages_before_resolving_variant
             remaining_runs=0,
             preferred_ref=StageRef("event_20221124_cn", "a1"),
         )
+
+
+def test_validate_candidates_compiles_every_loop_candidate_without_random_choice() -> None:
+    loop_calls: list[tuple[str, ...]] = []
+
+    def tracked_loop_choice(stages: tuple[str, ...]) -> str:
+        loop_calls.append(stages)
+        return stages[-1]
+
+    source = CompiledCampaignSessionSource(
+        ContentCatalog(load_default_event_manifests()),
+        StageSpecLoader(),
+        loop_choice=tracked_loop_choice,
+    )
+    expected = tuple(StageRef("event_20221124_cn", f"th{index}") for index in range(1, 6))
+
+    assert source.validate_candidates(StageRef("event_20221124_cn", "th")) == expected
+    assert loop_calls == []
+    assert source.session_count == len(expected) * len(CampaignRunVariant)
+    for ref in expected:
+        for variant in CampaignRunVariant:
+            source.resolve(ref, variant)
+    assert source.session_count == len(expected) * len(CampaignRunVariant)
+
+
+def test_validate_candidates_returns_canonical_alias_and_compiles_both_variants(tmp_path: Path) -> None:
+    source = _source_for_stage(
+        tmp_path,
+        _minimal_stage(),
+        policy=CampaignPolicy(aliases=(("legacy", "t1"),)),
+    )
+
+    primary_refs = source.validate_candidates(StageRef("event_test", "legacy"))
+
+    assert primary_refs == (StageRef("event_test", "t1"),)
+    assert source.session_count == len(CampaignRunVariant)
+
+
+def test_validate_candidates_compiles_the_complete_progression_chain() -> None:
+    source = CompiledCampaignSessionSource(
+        ContentCatalog(load_default_event_manifests()),
+        StageSpecLoader(),
+    )
+    primary = StageRef("event_20221124_cn", "t1")
+    progression = tuple(StageRef("event_20221124_cn", stage_id) for stage_id in ("t1", "t2", "t3", "ts1", "t4", "t5"))
+
+    assert source.validate_candidates(primary) == (primary,)
+    assert source.session_count == len(progression) * len(CampaignRunVariant)
+    for ref in progression:
+        for variant in CampaignRunVariant:
+            source.resolve(ref, variant)
+    assert source.session_count == len(progression) * len(CampaignRunVariant)
+
+
+def test_validate_candidates_rejects_missing_loop_and_progression_references(tmp_path: Path) -> None:
+    loop_source = _source_for_stage(
+        tmp_path / "loop",
+        _minimal_stage(),
+        policy=CampaignPolicy(loops=(("all", ("t1", "missing")),)),
+    )
+    with pytest.raises(UnknownStageError, match="missing"):
+        loop_source.validate_candidates(StageRef("event_test", "all"))
+
+    progression_source = _source_for_stage(
+        tmp_path / "progression",
+        _minimal_stage(),
+        policy=CampaignPolicy(
+            progressions=(StageProgressionRule("t1", "missing"),),
+        ),
+    )
+    with pytest.raises(ContentCatalogError, match="progression target is not registered"):
+        progression_source.validate_candidates(StageRef("event_test", "t1"))
 
 
 def test_hard_stage_resolution_prefers_explicit_override_then_main_campaign() -> None:
