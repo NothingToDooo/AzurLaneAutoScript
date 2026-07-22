@@ -1,6 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Literal, overload, override
+from typing import TYPE_CHECKING, Literal, cast, overload, override
 
 import numpy as np
 import pytest
@@ -14,7 +14,7 @@ from module.device.connection import Connection
 from module.device.device import Device
 from module.device.minitouch_service import CommandBuilder, MinitouchController
 from module.device.mumu_instance import MuMuInstance
-from module.device.runtime import DeviceRuntime
+from module.device.runtime import DeviceRuntime, MumuRuntime
 from module.exception import EmulatorNotRunningError
 from module.map.map_grids import SelectedGrids
 
@@ -401,7 +401,7 @@ def test_runtime_releases_serial_services_in_explicit_order() -> None:
     mumu_runtime = _MumuRuntimeDouble(session, calls)
     runtime = DeviceRuntime(
         adb_session=session,
-        mumu_runtime=mumu_runtime,
+        mumu_runtime=cast("MumuRuntime", mumu_runtime),
         capture=_CaptureServiceDouble(mumu_runtime, calls),
         controller=_ControllerServiceDouble(session, calls),
         app_controller=_AppControllerServiceDouble(session),
@@ -421,7 +421,7 @@ def test_runtime_finishes_capture_and_mumu_cleanup_after_controller_error() -> N
 
     runtime = DeviceRuntime(
         adb_session=session,
-        mumu_runtime=mumu_runtime,
+        mumu_runtime=cast("MumuRuntime", mumu_runtime),
         capture=_CaptureServiceDouble(mumu_runtime, calls),
         controller=_ControllerServiceDouble(session, calls, release_error=error),
         app_controller=_AppControllerServiceDouble(session),
@@ -445,7 +445,7 @@ def test_runtime_preserves_every_serial_cleanup_failure_in_order() -> None:
     mumu_runtime = _MumuRuntimeDouble(session, calls, invalidate_error=invalidation_error)
     runtime = DeviceRuntime(
         adb_session=session,
-        mumu_runtime=mumu_runtime,
+        mumu_runtime=cast("MumuRuntime", mumu_runtime),
         capture=_CaptureServiceDouble(mumu_runtime, calls, release_error=capture_error),
         controller=_ControllerServiceDouble(session, calls, release_error=controller_error),
         app_controller=_AppControllerServiceDouble(session),
@@ -524,7 +524,7 @@ def test_runtime_rejects_mismatched_service_sessions() -> None:
     with pytest.raises(ValueError, match="same ADB session"):
         DeviceRuntime(
             adb_session=session,
-            mumu_runtime=mumu_runtime,
+            mumu_runtime=cast("MumuRuntime", mumu_runtime),
             capture=_CaptureServiceDouble(mumu_runtime),
             controller=_ControllerServiceDouble(session),
             app_controller=_AppControllerServiceDouble(session),

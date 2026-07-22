@@ -9,7 +9,7 @@ from module.base.timer import Timer
 from module.config.utils import get_server_next_update
 from module.device.connection import Connection
 from module.device.control import Control
-from module.device.runtime import DeviceRuntime
+from module.device.runtime import DeviceRuntime, MumuRuntime
 from module.device.screenshot import Screenshot
 from module.exception import (
     EmulatorNotRunningError,
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
     from module.base.type_alias import ImageArray
     from module.config.config import AzurLaneConfig
-    from module.device.contracts import AppControllerService, CaptureService, ControllerService, MumuRuntimeService
+    from module.device.contracts import AppControllerService, CaptureService, ControllerService
     from module.device.control import ButtonTarget
     from module.device.mumu_instance import MuMuInstance
 
@@ -81,7 +81,7 @@ class Device(Screenshot, Control, Connection):
         return self._runtime
 
     @property
-    def mumu_runtime(self) -> MumuRuntimeService:
+    def mumu_runtime(self) -> MumuRuntime:
         return self.runtime.mumu_runtime
 
     @property

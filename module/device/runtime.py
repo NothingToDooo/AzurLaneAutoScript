@@ -1,15 +1,19 @@
 import ctypes
+import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import psutil
 from adbutils.errors import AdbError
 
-from module.base.decorator import run_once
+from module.base.decorator import cached_property, del_cached_property, run_once
 from module.base.failure import raise_cleanup_errors
 from module.base.timer import Timer
-from module.device.mumu_runtime_base import MumuRuntimeBase
+from module.config.deep import deep_get
+from module.device.mumu_instance import MuMuInstance, resolve_mumu_instance
+from module.device.service_retry import session_retry
 from module.device.services import AppController, MinitouchController, NemuIpcCapture
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -21,9 +25,7 @@ if TYPE_CHECKING:
         CaptureService,
         ControllerService,
         DeviceSession,
-        MumuRuntimeService,
     )
-    from module.device.mumu_instance import MuMuInstance
 
 
 def get_focused_window() -> int:
@@ -51,8 +53,127 @@ def flash_window(hwnd: int, *, flash: bool = True) -> None:
     ctypes.windll.user32.FlashWindow(hwnd, flash)
 
 
-class MumuRuntime(MumuRuntimeBase):
+class MumuRuntime:
     """依赖同一 ADB session 的 MuMu 实例与生命周期服务。"""
+
+    _serial_bound_cached_properties = (
+        "nemud_app_keep_alive",
+        "nemud_player_version",
+        "is_mumu_over_version_400",
+        "is_mumu_over_version_356",
+    )
+
+    def __init__(self, session: DeviceSession) -> None:
+        self.session = session
+
+    @property
+    def serial(self) -> str:
+        return self.session.serial
+
+    @property
+    def is_mumu_family(self) -> bool:
+        return self.session.is_mumu_family
+
+    @property
+    def is_mumu12_family(self) -> bool:
+        return self.session.is_mumu12_family
+
+    def invalidate_serial(self) -> None:
+        """清除由旧 live serial 派生的 MuMu 运行时缓存。"""
+        for name in self._serial_bound_cached_properties:
+            del_cached_property(self, name)
+
+    @cached_property
+    def emulator_instance(self) -> MuMuInstance:
+        config = self.session.config
+        return resolve_mumu_instance(config.Emulator_MuMuPath, config.Emulator_Serial)
+
+    def check_after_connected(self) -> None:
+        self.check_mumu_app_keep_alive()
+
+    @cached_property
+    @session_retry
+    def nemud_app_keep_alive(self) -> str:
+        value = self.session.adb_getprop("nemud.app_keep_alive")
+        logger.attr("nemud.app_keep_alive", value)
+        return value
+
+    @cached_property
+    @session_retry
+    def nemud_player_version(self) -> str:
+        value = self.session.adb_getprop("nemud.player_version")
+        logger.attr("nemud.player_version", value)
+        return value
+
+    def check_mumu_app_keep_alive(self) -> bool:
+        if not self.is_mumu_family:
+            return False
+        if self.is_mumu_over_version_400:
+            return self.check_mumu_app_keep_alive_400()
+
+        value = self.nemud_app_keep_alive
+        if value == "":
+            return True
+        if value == "false":
+            return True
+        if value == "true":
+            logger.critical('请在MuMu模拟器设置内关闭 "后台挂机时保活运行"')
+            raise HumanTakeoverRequiredError
+        logger.warning(f"Invalid nemud.app_keep_alive value: {value}")
+        return False
+
+    def check_mumu_app_keep_alive_400(self) -> bool:
+        file = self.emulator_instance.config_path("customer_config.json")
+        try:
+            content = json.loads(file.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            logger.warning(f"Failed to check check_mumu_app_keep_alive, file {file} not exists")
+            return False
+
+        value = deep_get(content, keys="customer.app_keptlive", default=None)
+        logger.attr("customer.app_keptlive", value)
+        if str(value).lower() == "true":
+            logger.critical('Please turn off "Keep alive in the background" in the settings or MuMuPlayer')
+            logger.critical('请在MuMu模拟器设置内关闭 "后台挂机时保活运行"')
+            raise HumanTakeoverRequiredError
+        return True
+
+    @cached_property
+    def is_mumu_over_version_400(self) -> bool:
+        if not self.is_mumu_family:
+            return False
+        return self.nemud_player_version == ""
+
+    @cached_property
+    def is_mumu_over_version_356(self) -> bool:
+        if not self.is_mumu_family:
+            return False
+        if self.is_mumu_over_version_400:
+            return True
+        return self.nemud_app_keep_alive != ""
+
+    def diagnose_adb_connect_refused(self) -> None:
+        self.check_mumu_bridge_network()
+
+    def check_mumu_bridge_network(self) -> bool:
+        """False 表示配置文件不存在，无法执行检查。"""
+        if not self.is_mumu12_family:
+            return True
+
+        file = self.emulator_instance.config_path("customer_config.json")
+        try:
+            content = json.loads(file.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            logger.warning(f"Failed to check check_mumu_bridge_network, file {file} not exists")
+            return False
+
+        value = deep_get(content, keys="customer.network_bridge_opened", default=None)
+        logger.attr("customer.network_bridge_opened", value)
+        if str(value).lower() == "true":
+            logger.critical('Please turn off "Network Bridging" in the settings of MuMuPlayer')
+            logger.critical("请在MuMU模拟器设置中关闭 网络桥接")
+            raise HumanTakeoverRequiredError
+        return True
 
     @classmethod
     def execute(cls, command: Sequence[str]) -> psutil.Popen:
@@ -242,7 +363,7 @@ class DeviceRuntime:
     """Device 背后的显式服务所有权图。"""
 
     adb_session: DeviceSession
-    mumu_runtime: MumuRuntimeService
+    mumu_runtime: MumuRuntime
     capture: CaptureService
     controller: ControllerService
     app_controller: AppControllerService

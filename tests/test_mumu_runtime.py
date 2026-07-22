@@ -6,7 +6,7 @@ import pytest
 from adbutils import AdbClient
 
 from module.device.mumu_instance import MuMuInstance
-from module.device.mumu_runtime_base import MumuRuntimeBase
+from module.device.runtime import MumuRuntime
 from module.exception import HumanTakeoverRequiredError
 from module.map.map_grids import SelectedGrids
 
@@ -131,10 +131,6 @@ class _Session:
         return [self.package]
 
 
-class _Runtime(MumuRuntimeBase):
-    session: _Session
-
-
 def _instance(tmp_path: Path, *, instance_id: int = 0, name: str = "MuMuPlayer-15.0-0") -> MuMuInstance:
     executable = tmp_path / "MuMu Player 12" / "nx_main" / "MuMuNxMain.exe"
     return MuMuInstance(
@@ -151,13 +147,13 @@ def _make_runtime(
     app_keep_alive: str = "",
     player_version: str = "3.8.27.2950",
     instance: MuMuInstance | None = None,
-) -> _Runtime:
+) -> MumuRuntime:
     session = _Session(serial)
     session.props = {
         "nemud.app_keep_alive": app_keep_alive,
         "nemud.player_version": player_version,
     }
-    runtime = _Runtime(session)
+    runtime = MumuRuntime(session)
     if instance is not None:
         runtime.__dict__["emulator_instance"] = instance
     return runtime
@@ -174,7 +170,7 @@ def test_emulator_instance_uses_configured_serial_identity_after_live_port_shift
         configured_serial="127.0.0.1:16416",
         mumu_path=executable.as_posix(),
     )
-    runtime = _Runtime(session)
+    runtime = MumuRuntime(session)
 
     instance = runtime.emulator_instance
 

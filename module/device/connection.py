@@ -17,8 +17,6 @@ class Connection(MumuTcpConnection):
 
     def __init__(self, config: AzurLaneConfig) -> None:
         super().__init__(config)
-        self.detect_device()
-
         self.adb_connect()
         logger.attr("AdbDevice", self.adb)
 
@@ -59,8 +57,6 @@ class Connection(MumuTcpConnection):
         if len(self.list_device()) == 0:
             self.adb_restart()
             self.adb_connect()
-            self.detect_device()
         else:
             self.adb_disconnect()
             self.adb_connect()
-            self.detect_device()
