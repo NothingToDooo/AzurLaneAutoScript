@@ -11,7 +11,7 @@ from module.device.platform.emulator_base import (
     remove_duplicated_path,
 )
 from module.device.service_retry import session_retry
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 
@@ -98,7 +98,7 @@ class MumuRuntimeBase:
         if value == "true":
             # https://mumu.163.com/help/20230802/35047_1102450.html
             logger.critical('请在MuMu模拟器设置内关闭 "后台挂机时保活运行"')
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         logger.warning(f"Invalid nemud.app_keep_alive value: {value}")
         return False
 
@@ -121,7 +121,7 @@ class MumuRuntimeBase:
             # https://mumu.163.com/help/20230802/35047_1102450.html
             logger.critical('Please turn off "Keep alive in the background" in the settings or MuMuPlayer')
             logger.critical('请在MuMu模拟器设置内关闭 "后台挂机时保活运行"')
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         return True
 
     @cached_property
@@ -164,7 +164,7 @@ class MumuRuntimeBase:
         if str(value).lower() == "true":
             logger.critical('Please turn off "Network Bridging" in the settings of MuMuPlayer')
             logger.critical("请在MuMU模拟器设置中关闭 网络桥接")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         return True
 
     @staticmethod

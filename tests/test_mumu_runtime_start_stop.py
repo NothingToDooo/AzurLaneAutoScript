@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from module.device.platform.emulator_windows import EmulatorInstance
-from module.device.runtime import EmulatorUnknown, MumuRuntime
+from module.device.runtime import MumuRuntime, UnknownEmulatorError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -79,9 +79,9 @@ def test_legacy_emulator_instance_cannot_start_or_stop(tmp_path: Path) -> None:
     runtime = object.__new__(_Runtime)
     instance = _legacy_instance(tmp_path)
 
-    with pytest.raises(EmulatorUnknown):
+    with pytest.raises(UnknownEmulatorError):
         runtime.start_instance(instance)
-    with pytest.raises(EmulatorUnknown):
+    with pytest.raises(UnknownEmulatorError):
         runtime.stop_instance(instance)
 
 
@@ -96,7 +96,7 @@ def test_mumu12_instance_without_numeric_id_never_executes_manager_command(
     runtime = object.__new__(_Runtime)
     instance = _mumu12_instance(tmp_path, name="unexpected-name")
 
-    with pytest.raises(EmulatorUnknown, match="Cannot get MuMu instance index"):
+    with pytest.raises(UnknownEmulatorError, match="Cannot get MuMu instance index"):
         getattr(runtime, method_name)(instance)
 
     assert commands == []

@@ -19,6 +19,11 @@ from module.content.battle_policy import (
 from module.content.campaign_session import CampaignRunVariant, CampaignSession
 from module.content.errors import ContentValidationError
 from module.content.manifest import load_default_event_manifests
+from module.content.mechanic_rules import (
+    EncounterExpectation,
+    FleetClearSelectedTarget,
+    FleetRole,
+)
 from module.content.models import StageRef, StageSpec
 from module.content.stage_definition import (
     CellId,
@@ -76,7 +81,7 @@ def _write_stage(root: Path, body: str) -> tuple[StageSpecLoader, StageSpec]:
 def _minimal_stage(**replacements: str) -> str:
     body = inspect.cleandoc(
         """
-        schema_version: 4
+        schema_version: 6
         map:
           name: T1
           shape: A1
@@ -105,7 +110,6 @@ def _minimal_stage(**replacements: str) -> str:
           fleet_coordination: []
           pickups: []
           map_interactions: []
-          map_mutations: []
           moving_enemies:
             turns: []
             wait_until_clear: false
@@ -119,8 +123,6 @@ def _minimal_stage(**replacements: str) -> str:
             bouncing_enemy_routes: []
           enemy_movement: []
           procedures: []
-          preset_routes: []
-          fixed_target_sequences: []
         programs: []
         boss_approaches: []
         hard_mode: null
@@ -367,6 +369,90 @@ def test_loader_wraps_yaml_parse_errors_at_the_root(tmp_path: Path) -> None:
     assert isinstance(caught.value.__cause__, yaml.YAMLError)
 
 
+def test_loader_rejects_the_removed_stage_schema_without_a_compatibility_path(tmp_path: Path) -> None:
+    loader, spec = _write_stage(tmp_path / "events", _minimal_stage().replace("schema_version: 6", "schema_version: 5"))
+
+    with pytest.raises(ContentValidationError, match=r"schema_version: must be 6"):
+        loader.load(spec)
+
+
+def test_loader_decodes_the_complete_normal_enemy_spawn_candidate_mask(tmp_path: Path) -> None:
+    body = _minimal_stage(
+        shape="B1",
+        map_data="-- --",
+        weight_data="50 50",
+    ).replace(
+        "  camera_data_spawn_point: [A1]",
+        "  camera_data_spawn_point: [A1]\n  normal_enemy_spawn_candidates: [A1, B1]",
+    )
+    loader, spec = _write_stage(tmp_path / "candidate-mask", body)
+
+    definition = loader.load(spec)
+
+    assert definition.map.normal_enemy_spawn_candidates == (CellId(0, 0), CellId(1, 0))
+
+
+@pytest.mark.parametrize(
+    ("candidate_yaml", "message"),
+    [
+        ("[A1, A1]", "duplicate cells"),
+        ("[A1, B1]", r"normal_enemy_spawn_candidates\[1\].*outside shape"),
+        (
+            "\n  - phase: map_init\n    patches: []",
+            r"normal_enemy_spawn_candidates\[0\].*must be a non-empty string",
+        ),
+    ],
+)
+def test_loader_rejects_invalid_or_removed_enemy_candidate_mask_shapes(
+    tmp_path: Path,
+    candidate_yaml: str,
+    message: str,
+) -> None:
+    body = _minimal_stage().replace(
+        "  camera_data_spawn_point: [A1]",
+        f"  camera_data_spawn_point: [A1]\n  normal_enemy_spawn_candidates: {candidate_yaml}",
+    )
+    loader, spec = _write_stage(tmp_path / "invalid-candidate-mask", body)
+
+    with pytest.raises(ContentValidationError, match=message):
+        loader.load(spec)
+
+
+def test_loader_rejects_the_removed_map_mutations_field(tmp_path: Path) -> None:
+    body = _minimal_stage().replace(
+        "  map_interactions: []",
+        "  map_interactions: []\n  map_mutations: []",
+    )
+    loader, spec = _write_stage(tmp_path / "removed-map-mutations", body)
+
+    with pytest.raises(ContentValidationError, match=r"mechanics.*map_mutations"):
+        loader.load(spec)
+
+
+def test_loader_decodes_ordered_fleet_target_selection(tmp_path: Path) -> None:
+    body = _minimal_stage().replace(
+        "  fleet_coordination: []",
+        """  fleet_coordination:
+  - tag: clear_selected_target
+    battle: 0
+    fleet: fleet_1
+    candidates: [A1]
+    expected: siren""",
+    )
+    loader, spec = _write_stage(tmp_path / "events", body)
+
+    definition = loader.load(spec)
+
+    assert definition.mechanics.fleet_coordination.actions == (
+        FleetClearSelectedTarget(
+            0,
+            (CellId(0, 0),),
+            FleetRole.FLEET_1,
+            EncounterExpectation.SIREN,
+        ),
+    )
+
+
 def test_loader_rejects_non_mapping_yaml_at_the_root(tmp_path: Path) -> None:
     content_root = tmp_path / "events"
     loader, spec = _write_stage(content_root, "- not\n- a mapping")
@@ -397,37 +483,18 @@ def test_loader_rejects_unknown_mechanic_tags_and_removed_extension_field(tmp_pa
         loader.load(spec)
 
 
-def test_loader_compiles_advanced_mechanics_directly_from_the_stage(tmp_path: Path) -> None:
+def test_loader_compiles_mechanics_directly_from_the_stage(tmp_path: Path) -> None:
     body = _minimal_stage(
         shape="B1",
         map_data="-- MB",
         weight_data="50 50",
     )
-    body = (
-        body.replace(
-            "  enemy_movement: []",
-            "  enemy_movement:\n  - battle: 0\n    source: A1\n    target: B1",
-        )
-        .replace(
-            "  procedures: []",
-            "  procedures:\n  - battle: 0\n    operations: [check_accessibility]",
-        )
-        .replace(
-            "  preset_routes: []",
-            "  preset_routes:\n"
-            "  - start_column: 0\n"
-            "    battles:\n"
-            "    - battle: 0\n"
-            "      steps:\n"
-            "      - fleet: fleet_1\n"
-            "        delta_x: 1\n"
-            "        delta_y: 0\n"
-            "        clear_enemy: false",
-        )
-        .replace(
-            "  fixed_target_sequences: []",
-            "  fixed_target_sequences:\n  - battles: [0]\n    targets: [B1]\n    fleet: active",
-        )
+    body = body.replace(
+        "  enemy_movement: []",
+        "  enemy_movement:\n  - battle: 0\n    source: A1\n    target: B1",
+    ).replace(
+        "  procedures: []",
+        "  procedures:\n  - battle: 0\n    operations: [check_accessibility]",
     )
     loader, spec = _write_stage(tmp_path / "advanced", body)
 
@@ -435,8 +502,6 @@ def test_loader_compiles_advanced_mechanics_directly_from_the_stage(tmp_path: Pa
 
     assert mechanics.enemy_movement.moves[0].target == CellId(1, 0)
     assert mechanics.procedures[0].battle == 0
-    assert mechanics.preset_routes[0].battles[0].battle == 0
-    assert mechanics.fixed_target_sequences[0].targets == (CellId(1, 0),)
 
 
 def test_loader_requires_the_exact_unified_mechanics_shape(tmp_path: Path) -> None:
@@ -505,7 +570,7 @@ def test_native_loader_requires_explicit_boss_strategy_and_rejects_non_boss_step
 
 def test_loader_preserves_distinct_loop_portal_and_land_based_data(tmp_path: Path) -> None:
     body = """
-        schema_version: 4
+        schema_version: 6
         map:
           name: T1
           shape: B2
@@ -552,7 +617,6 @@ def test_loader_preserves_distinct_loop_portal_and_land_based_data(tmp_path: Pat
           fleet_coordination: []
           pickups: []
           map_interactions: []
-          map_mutations: []
           moving_enemies:
             turns: []
             wait_until_clear: false
@@ -566,8 +630,6 @@ def test_loader_preserves_distinct_loop_portal_and_land_based_data(tmp_path: Pat
             bouncing_enemy_routes: []
           enemy_movement: []
           procedures: []
-          preset_routes: []
-          fixed_target_sequences: []
         programs: []
         boss_approaches: []
         hard_mode: null

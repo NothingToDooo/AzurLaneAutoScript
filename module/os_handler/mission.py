@@ -14,11 +14,6 @@ from module.os.globe_operation import GlobeOperation
 from module.os.globe_zone import Zone, ZoneManager
 from module.os_handler import assets as os_assets
 
-
-class MissionAtCurrentZone(Exception):
-    pass
-
-
 type MissionCheckoutResult = Literal[
     False,
     "pinned_at_archive_zone",

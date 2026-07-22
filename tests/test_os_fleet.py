@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, ClassVar, Literal, TypeVar, override
+from typing import TYPE_CHECKING, ClassVar, Literal, TypeVar, cast, override
 
 import numpy as np
 import pytest
@@ -6,7 +6,7 @@ import pytest
 from module.base.button import Button
 from module.map.map_grids import SelectedGrids
 from module.os import fleet as fleet_module
-from module.os.fleet import BossFleet, OSFleet
+from module.os.fleet import BossFleet, OSFleet, OSFleetMovementUi
 from module.os.radar import Radar, RadarGrid
 from module.os_combat import assets as os_combat_assets
 from module.ui.assets import BACK_ARROW
@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
     from module.base.timer import Timer
     from module.base.type_alias import ImageArray
+    from module.map.map_observer import CampaignMapObserver
+    from module.map.type_alias import FleetLocation, GridLocation
 
 
 def button_key(button: object) -> str:
@@ -72,6 +74,45 @@ class _Radar(Radar):
         else:
             matched = False
         return SelectedGrids([_RadarGrid()] if matched else [])
+
+
+class _ArrivalMap:
+    def __init__(self, calls: list[tuple[object, ...]]) -> None:
+        self._calls = calls
+
+    def show(self) -> None:
+        self._calls.append(("map_show",))
+
+
+class _Navigation:
+    def __init__(self) -> None:
+        self.current_location: GridLocation = (9, 9)
+        self.seed_calls: list[tuple[FleetLocation, FleetLocation]] = []
+
+    def seed_surface(self, *, fleet_1: FleetLocation, fleet_2: FleetLocation = ()) -> None:
+        self.seed_calls.append((fleet_1, fleet_2))
+        if len(fleet_1) == 2:
+            self.current_location = fleet_1
+
+
+class _ArrivalRuntime:
+    def __init__(self, *, ash_attack: bool) -> None:
+        self.calls: list[tuple[object, ...]] = []
+        self.map = _ArrivalMap(self.calls)
+        self.camera: GridLocation = (0, 0)
+        self.navigation = _Navigation()
+        self.ash_attack = ash_attack
+        self._map_observer = cast("CampaignMapObserver", object())
+
+    def predict_radar(self) -> None:
+        self.calls.append(("predict_radar",))
+
+    def handle_ash_beacon_attack(self) -> bool:
+        self.calls.append(("handle_ash_beacon_attack",))
+        return self.ash_attack
+
+    def update(self) -> None:
+        self.calls.append(("update", self.camera))
 
 
 class _Fleet(OSFleet):
@@ -211,6 +252,96 @@ def _patch_timer(monkeypatch: pytest.MonkeyPatch) -> None:
     _Timer.reached_results = {}
     _Timer.reset_count = 0
     monkeypatch.setattr(fleet_module, "Timer", _Timer)
+
+
+@pytest.mark.parametrize(
+    ("ash_attack", "expected"),
+    [
+        (
+            False,
+            [
+                ("predict_radar",),
+                ("map_show",),
+                ("handle_ash_beacon_attack",),
+            ],
+        ),
+        (
+            True,
+            [
+                ("predict_radar",),
+                ("map_show",),
+                ("handle_ash_beacon_attack",),
+                ("update", (3, 4)),
+            ],
+        ),
+    ],
+)
+def test_os_movement_ui_preserves_after_arrival_order(
+    *,
+    ash_attack: bool,
+    expected: list[tuple[object, ...]],
+) -> None:
+    runtime = _ArrivalRuntime(ash_attack=ash_attack)
+
+    movement = OSFleet._build_navigation_movement_ui(cast("OSFleet", runtime))  # ruff:ignore[private-member-access]
+    movement.navigation_after_arrival((3, 4))
+
+    assert isinstance(movement, OSFleetMovementUi)
+    assert runtime.calls == expected
+    assert runtime.camera == ((3, 4) if ash_attack else (0, 0))
+
+
+def test_os_find_current_fleet_seeds_navigation_from_camera() -> None:
+    runtime = _ArrivalRuntime(ash_attack=False)
+    runtime.camera = (4, 6)
+
+    location = OSFleet.find_current_fleet(cast("OSFleet", runtime))
+
+    assert runtime.navigation.seed_calls == [((4, 6), ())]
+    assert location == (4, 6)
+
+
+def test_os_navigation_uses_the_wider_walk_sight() -> None:
+    runtime = cast("OSFleet", _ArrivalRuntime(ash_attack=False))
+
+    sight = OSFleet._navigation_walk_sight(runtime)  # ruff:ignore[private-member-access]
+
+    assert sight == (-4, -1, 3, 2)
+
+
+@pytest.mark.parametrize(("detected", "expected"), [(4, 4), (0, 1)])
+def test_os_hp_fleet_index_uses_the_visible_selector(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    detected: int,
+    expected: int,
+) -> None:
+    fleet = _Fleet()
+    monkeypatch.setattr(fleet.fleet_selector, "get", lambda: detected)
+
+    fleet_index = OSFleet._active_hp_fleet_index(fleet)  # ruff:ignore[private-member-access]
+
+    assert fleet_index == expected
+
+
+def test_walk_stable_combat_uses_the_visible_os_fleet(monkeypatch: pytest.MonkeyPatch) -> None:
+    fleet = _Fleet()
+    combat_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(fleet.fleet_selector, "get", lambda: 3)
+    monkeypatch.setattr(fleet, "combat_appear", lambda: True)
+    monkeypatch.setattr(fleet, "combat", lambda **kwargs: combat_calls.append(kwargs))
+    context = fleet_module._WalkStableContext(  # ruff:ignore[private-member-access]
+        confirm_timer=cast("Timer", _Timer()),
+        stuck_timer=cast("Timer", _Timer()),
+        walk_out_of_step=False,
+    )
+
+    handled = OSFleet._handle_walk_stable_combat(fleet, context)  # ruff:ignore[private-member-access]
+
+    assert handled is True
+    assert combat_calls[0]["fleet_index"] == 3
+    assert context.result == {"event"}
+    assert _Timer.reset_count == 2
 
 
 def test_boss_leave_finishes_when_boss_is_found_on_radar() -> None:

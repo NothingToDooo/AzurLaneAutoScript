@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from module.exception import RequestHumanTakeover, ScriptError
+from module.exception import HumanTakeoverRequiredError, ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.os.map import OSMap
@@ -54,7 +54,7 @@ class OpsiMeowfficerFarming(OSMap):
             return self.name_to_zone(self.config.OpsiMeowfficerFarming_TargetZone)
         except ScriptError as e:
             logger.warning(f"wrong zone_id input:{self.config.OpsiMeowfficerFarming_TargetZone}")
-            raise RequestHumanTakeover(WRONG_ZONE_INPUT_MESSAGE) from e
+            raise HumanTakeoverRequiredError(WRONG_ZONE_INPUT_MESSAGE) from e
 
     def _run_meowfficer_farming_zone(self, zone: Zone, *, refresh: bool) -> None:
         logger.hr(f"OS meowfficer farming, zone_id={zone.zone_id}", level=1)

@@ -6,6 +6,7 @@ from module.daemon.daemon import AzurLaneDaemon
 from module.daemon.os_daemon import AzurLaneDaemon as OpsiDaemon
 from module.daemon.os_daemon import ContinuousCombat
 from module.exception import CampaignEnd
+from module.handler.mystery_item import MysteryItemOutcome
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -111,7 +112,10 @@ def test_handle_daemon_map_operation_sleeps_after_ambush_evade() -> None:
     daemon = SimpleNamespace(
         appear_then_click=lambda *_args, **_kwargs: True,
         device=SimpleNamespace(sleep=sleep_calls.append),
-        handle_mystery_items=lambda: False,
+        handle_mystery_items=lambda: MysteryItemOutcome(
+            handled=False,
+            counts_toward_mystery=False,
+        ),
     )
 
     assert AzurLaneDaemon.handle_daemon_map_operation(_as_daemon(daemon)) is True

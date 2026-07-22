@@ -23,7 +23,7 @@ def _assign_attribute(target: object, name: str, value: object) -> None:
 
 
 def _minimal_stage(*, step_tag: str = "clear_boss", extra_config: str = "") -> str:
-    return f"""schema_version: 4
+    return f"""schema_version: 6
 map:
   name: T1
   shape: A1
@@ -52,7 +52,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     wait_until_clear: false
@@ -66,8 +65,6 @@ mechanics:
     bouncing_enemy_routes: []
   enemy_movement: []
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
 programs: []
 boss_approaches: []
 hard_mode: null

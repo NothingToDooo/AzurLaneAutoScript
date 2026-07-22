@@ -1,8 +1,10 @@
 from module.campaign.campaign_status import CampaignStatus
 from module.logger import logger
 from module.ui.assets import CAMPAIGN_MENU_NO_EVENT
-from module.ui.page import page_campaign_menu, page_coalition, page_event, page_sp
+from module.ui.page import page_campaign_menu, page_coalition, page_sp
 from module.war_archives.assets import WAR_ARCHIVES_CAMPAIGN_CHECK
+
+from .event_destination import STANDARD_EVENT_DESTINATION
 
 
 class EventCampaignNavigation(CampaignStatus):
@@ -14,18 +16,7 @@ class EventCampaignNavigation(CampaignStatus):
         return available
 
     def ui_goto_event(self) -> bool:
-        if self.ui_get_current_page() == page_event:
-            if self.appear(WAR_ARCHIVES_CAMPAIGN_CHECK, offset=(20, 20)):
-                logger.info("At war archives")
-                self.ui_goto_main()
-            else:
-                logger.info("Already at page_event")
-                return True
-        self.ui_goto(page_campaign_menu)
-        if not self.is_event_entrance_available():
-            return False
-        self.ui_goto(page_event)
-        return True
+        return STANDARD_EVENT_DESTINATION.open(self)
 
     def ui_goto_sp(self) -> bool:
         if self.ui_get_current_page() == page_sp:

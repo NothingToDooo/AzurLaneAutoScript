@@ -1,11 +1,10 @@
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from module.adapters import campaign_runtime_war_archives as war_archives
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
 )
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -20,6 +19,8 @@ from module.content.war_archives_profile import WarArchivesDefinition, WarArchiv
 
 if TYPE_CHECKING:
     import pytest
+
+    from module.campaign.campaign_engine import CampaignEngine
 
 
 class _Button:
@@ -95,19 +96,6 @@ def _manager() -> CampaignRuntimeProfileManager:
         RuntimeExecutorKind.WAR_ARCHIVES_NAVIGATION,
         implementation,
         {
-            "operations": [
-                "_advance_archives_scroll",
-                "_archives_loading_complete",
-                "_discard_archives_scroll_record",
-                "_ensure_archives_search_page",
-                "_get_archives_entrance",
-                "_search_archives_entrance",
-                "_wait_archives_loaded",
-                "ui_goto_archives_campaign",
-                "ui_goto_event",
-                "ui_goto_sp",
-            ],
-            "state": ["first_run"],
             "max_search_attempts": 20,
             "page_fraction": 0.66,
             "match_threshold": 0.85,
@@ -136,20 +124,21 @@ def test_war_archives_catalog_enters_once_then_reuses_active_map(monkeypatch: py
     monkeypatch.setattr(war_archives, "_ARCHIVES_SWITCH", switch)
     manager = _manager()
     runtime = _Runtime()
+    instance = manager.executor_instance(RuntimeExecutorKind.WAR_ARCHIVES_NAVIGATION)
+    assert isinstance(instance, war_archives.WarArchivesCatalogExecutor)
+    campaign_runtime = cast("CampaignEngine", runtime)
 
-    first = manager.war_archives_navigation.invoke(
-        RuntimeOperation.UI_GOTO_EVENT,
-        runtime,
-        lambda: False,
-    )
-    second = manager.war_archives_navigation.invoke(
-        RuntimeOperation.UI_GOTO_EVENT,
-        runtime,
-        lambda: False,
-    )
+    first = instance.open_event(campaign_runtime)
+    second = instance.open_event(campaign_runtime)
 
     assert first is True
     assert second is True
     assert runtime.ensure_calls == 1
     assert runtime.clicks == [button]
     assert switch.modes == ["ex"]
+
+    manager.reset()
+    assert instance.open_event(campaign_runtime) is True
+    assert runtime.ensure_calls == 2
+    assert runtime.clicks == [button, button]
+    assert switch.modes == ["ex", "ex"]

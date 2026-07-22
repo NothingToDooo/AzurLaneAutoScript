@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Literal, override
 
 from module.base.timer import Timer
 from module.config.utils import get_os_reset_remain
-from module.exception import CampaignEnd, GameTooManyClickError, MapWalkError, RequestHumanTakeover
+from module.exception import CampaignEnd, GameTooManyClickError, HumanTakeoverRequiredError, MapWalkError
 from module.handler.login import LoginHandler
 from module.logger import logger
 from module.map.map import Map
@@ -42,7 +42,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     def os_init(self) -> None:
         """调用大世界功能前完成页面定位、区域状态刷新和当前区域清理，结束于区域地图。"""
         logger.hr("OS init", level=1)
-        self.config.override(Submarine_Fleet=1, Submarine_Mode="every_combat", STORY_ALLOW_SKIP=False)
+        self.config.apply_runtime_overlay(Submarine_Fleet=1, Submarine_Mode="every_combat", STORY_ALLOW_SKIP=False)
         self._os_init_ensure_page()
         self._os_init_prepare_current_zone()
         self._os_init_clear_current_zone()
@@ -266,7 +266,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 logger.info("No EMP debuff on current fleet")
                 return trial > 0
 
-            current = self.get_fleet_current_index()
+            current = self._active_hp_fleet_index()
             logger.hr(f"Solve EMP debuff on fleet {current}")
             self.globe_goto(self.zone_nearest_azur_port(self.zone))
 
@@ -367,8 +367,8 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     def os_auto_search_daemon(self) -> int:
         """从关闭的自动搜索选项开始推进搜索，并返回完成战斗数。
 
-        搜索结束抛出 CampaignEnd；没有自动搜索选项时抛出 RequestHumanTakeover。地图清空后仍在关闭选项页并等待信息栏，
-        获得奖励时结束于 AUTO_SEARCH_REWARD。
+        搜索结束抛出 CampaignEnd；没有自动搜索选项时抛出 HumanTakeoverRequiredError。
+        地图清空后仍在关闭选项页并等待信息栏，获得奖励时结束于 AUTO_SEARCH_REWARD。
         """
         logger.hr("OS auto search", level=2)
         self.on_auto_search_battle_count_reset()
@@ -416,7 +416,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         logger.critical("Unable to use auto search in current zone")
         logger.critical("Please finish the story mode of OpSi to unlock auto search before using any OpSi functions")
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     def _os_auto_search_fleet_died_confirmed(self, *, success: bool, died_timer: Timer) -> bool:
         if not self.is_in_map():
@@ -715,7 +715,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if rescan_mode == "full":
             logger.hr("Map rescan full", level=2)
             self.map_init(map_=None)
-            queue = self.map.camera_data
+            queue = self.map.layout.camera_data
             while len(queue) > 0:
                 logger.hr(f"Map rescan {queue[0]}")
                 queue = queue.sort_by_camera_distance(self.camera)

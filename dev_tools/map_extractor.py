@@ -713,7 +713,6 @@ class MapData:
             "fleet_coordination": [],
             "pickups": [],
             "map_interactions": [],
-            "map_mutations": [],
             "moving_enemies": {
                 "turns": sorted(self.MOVABLE_ENEMY_TURN) if self.MAP_HAS_MOVABLE_ENEMY else [],
                 "wait_until_clear": False,
@@ -722,8 +721,6 @@ class MapData:
             },
             "enemy_movement": [],
             "procedures": [],
-            "preset_routes": [],
-            "fixed_target_sequences": [],
             "map_structures": {
                 "walls": [],
                 "maze_groups": [],
@@ -735,7 +732,7 @@ class MapData:
 
     def stage_document(self) -> dict[str, StageValue]:
         return {
-            "schema_version": 4,
+            "schema_version": 6,
             "map": self._stage_map_document(),
             "config": self._stage_config_document(),
             "enemy_filter": ENEMY_FILTER,

@@ -5,7 +5,7 @@ from adbutils.errors import AdbError
 
 from module.device import minitouch_service as minitouch_module
 from module.device.minitouch_service import MinitouchController, MinitouchNotInstalledError, MinitouchOccupiedError
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -130,8 +130,9 @@ class _Session:
     def adb_reconnect(self) -> None:
         self.calls.append("adb_reconnect")
 
-    def adb_start_server(self) -> None:
+    def adb_start_server(self) -> int:
         self.calls.append("adb_start_server")
+        return 0
 
 
 class _Minitouch:
@@ -241,7 +242,7 @@ def test_minitouch_retry_stops_on_unhandled_adb_error(monkeypatch: pytest.Monkey
         message = "boom"
         raise AdbError(message)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         always_boom(device)
 
     assert device.calls == ["run"]
@@ -258,7 +259,7 @@ def test_minitouch_retry_hands_over_when_minitouch_missing(monkeypatch: pytest.M
         message = "missing"
         raise MinitouchNotInstalledError(message)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         always_missing(device)
 
     assert device.calls == ["run"]

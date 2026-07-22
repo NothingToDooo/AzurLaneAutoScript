@@ -3,7 +3,7 @@ import pytest
 from module.config.server import CN_PACKAGE
 from module.device import app_package as app_package_module
 from module.device.app_package import AppPackage
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 
 
 class _Logger:
@@ -53,7 +53,7 @@ def test_ensure_package_installed_rejects_missing_cn_package(monkeypatch: pytest
     monkeypatch.setattr(app_package_module, "logger", logger)
     connection = _PackageDevice(["com.example.other"])
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         connection.ensure_package_installed()
 
     assert logger.criticals == [

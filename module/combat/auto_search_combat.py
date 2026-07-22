@@ -1,3 +1,5 @@
+from typing import Protocol
+
 from module.base.timer import Timer
 from module.campaign.campaign_status import CampaignStatus
 from module.combat.assets import (
@@ -24,12 +26,23 @@ AUTO_SEARCH_COMBAT_END_CHECKS = (
 )
 
 
+class _AutoSearchNavigation(Protocol):
+    @property
+    def current_index(self) -> int: ...
+
+    @property
+    def shown_index(self) -> int: ...
+
+    def observe_active(self) -> bool: ...
+
+
 class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
     _auto_search_in_stage_timer = Timer(3, count=6)
     _auto_search_status_confirm = False
     AUTO_SEARCH_COMBAT_END_DEFAULT = False
     auto_search_oil_limit_triggered = False
     auto_search_coin_limit_triggered = False
+    navigation: _AutoSearchNavigation
 
     def _handle_auto_search_menu_missing(self) -> bool:
         """处理 Boss 战后不显示自律寻敌菜单的游戏 bug；关卡页停留超时即视为寻敌结束。"""
@@ -64,16 +77,16 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
 
     def auto_search_watch_fleet(self, *, checked: bool = False) -> bool:
         """监控舰队索引和等级；checked 为 True 时跳过本轮重复记录。"""
-        prev = self.fleet_current_index
-        self.get_fleet_show_index()
-        self.get_fleet_current_index()
-        if self.fleet_current_index == prev:
+        changed = self.navigation.observe_active()
+        if not changed:
             if not checked:
-                logger.info(f"Fleet: {self.fleet_show_index}, fleet_current_index: {self.fleet_current_index}")
+                logger.info(
+                    f"Fleet: {self.navigation.shown_index}, fleet_current_index: {self.navigation.current_index}"
+                )
                 checked = True
                 self.lv_get(after_battle=True)
         else:
-            logger.info(f"Fleet: {self.fleet_show_index}, fleet_current_index: {self.fleet_current_index}")
+            logger.info(f"Fleet: {self.navigation.shown_index}, fleet_current_index: {self.navigation.current_index}")
             checked = True
             self.lv_get(after_battle=False)
 
@@ -341,7 +354,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         ):
             if handler():
                 return True, exp_info
-        if self.handle_exp_info():
+        if self._combat_result_ui.handle_experience_result(self):
             return True, True
         return False, exp_info
 

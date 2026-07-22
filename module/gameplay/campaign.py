@@ -807,7 +807,7 @@ class CampaignStopReason(StrEnum):
     GEMS_LEVEL_REPLACEMENT_FAILED = "gems_level_replacement_failed"
     GEMS_EMOTION_REPLACEMENT_FAILED = "gems_emotion_replacement_failed"
     GEMS_HARD_PREPARATION_FAILED = "gems_hard_preparation_failed"
-    CHECKPOINT_UNAVAILABLE = "checkpoint_unavailable"
+    CHECKPOINT_RESET = "checkpoint_reset"
     CANCELLED = "cancelled"  # AbortRequested 的 runtime 清理语义，不作为正常 workflow report。
     FAILED = "failed"
     BLOCKED = "blocked"
@@ -952,6 +952,7 @@ class CampaignTask(Task):
             CampaignStopReason.GEMS_EVENT_FALLBACK,
             CampaignStopReason.GEMS_FLEET_REPLACED,
             CampaignStopReason.STAGE_INCREASE,
+            CampaignStopReason.CHECKPOINT_RESET,
         ):
             checkpoint = self._progress_after_report(context, report, progress)
             result = self._checkpoint_result(context, report, checkpoint, report.stop_reason)
@@ -1015,6 +1016,7 @@ class CampaignTask(Task):
         ):
             _invalid("campaign workflow cannot switch stage while resuming a checkpoint")
         session.validate_state(report.session_state)
+        self._validate_checkpoint_reset(report, progress, session)
         pending_replacement = None if progress is None else progress.pending_gems_replacement
         units = self._report_units(
             report,
@@ -1039,6 +1041,23 @@ class CampaignTask(Task):
         self._validate_job_specific_stop(report)
 
     @staticmethod
+    def _validate_checkpoint_reset(
+        report: CampaignRunReport,
+        progress: CampaignProgress | None,
+        session: CampaignSession,
+    ) -> None:
+        if report.stop_reason is not CampaignStopReason.CHECKPOINT_RESET:
+            return
+        if progress is None:
+            _invalid("checkpoint reset requires existing campaign progress")
+        if report.session_state != session.initial_state():
+            _invalid("checkpoint reset must report the initial session state")
+        if report.runs_completed != 0:
+            _invalid("checkpoint reset must not complete a map run")
+        if report.next_stage_ref is not None or report.gems_replacement is not None:
+            _invalid("checkpoint reset cannot transition stage or replace a gems fleet")
+
+    @staticmethod
     def _report_units(
         report: CampaignRunReport,
         session: CampaignSession,
@@ -1046,6 +1065,8 @@ class CampaignTask(Task):
         *,
         switched_to_gems_fallback: bool,
     ) -> int:
+        if report.stop_reason is CampaignStopReason.CHECKPOINT_RESET:
+            return 0
         replacement = report.gems_replacement
         pending_replacement = None if progress is None else progress.pending_gems_replacement
         if pending_replacement is not None and replacement != pending_replacement:
@@ -1076,6 +1097,8 @@ class CampaignTask(Task):
             _invalid("gems event fallback must switch at a battle-free map boundary")
         if report.stop_reason is CampaignStopReason.STAGE_INCREASE and units != 0:
             _invalid("stage increase must switch at a battle-free map boundary")
+        if report.stop_reason is CampaignStopReason.CHECKPOINT_RESET and units != 0:
+            _invalid("checkpoint reset must not confirm a battle unit")
         replacement_failures = (
             CampaignStopReason.GEMS_LEVEL_REPLACEMENT_FAILED,
             CampaignStopReason.GEMS_EMOTION_REPLACEMENT_FAILED,
@@ -1241,6 +1264,10 @@ class CampaignTask(Task):
         session = self._job.session_for(report.stage_ref, report.session_state.variant)
         if session is None:
             _invalid("campaign report stage and variant do not belong to the campaign job")
+        if report.stop_reason is CampaignStopReason.CHECKPOINT_RESET:
+            if previous is None:
+                _invalid("checkpoint reset requires existing campaign progress")
+            return replace(previous, session_state=session.initial_state())
         if report.next_stage_ref is not None:
             next_session = self._job.session_for(report.next_stage_ref, CampaignRunVariant.NORMAL)
             if next_session is None:
@@ -1296,6 +1323,8 @@ class CampaignTask(Task):
             message = "campaign program action completed at a safe point"
         elif reason is CampaignStopReason.GEMS_FLEET_REPLACED:
             message = "gems farming fleet replacement completed at a map boundary"
+        elif reason is CampaignStopReason.CHECKPOINT_RESET:
+            message = "campaign checkpoint was reset to a fresh map boundary"
         else:
             message = _IN_PROGRESS_REASON
         return TaskResult(
@@ -1348,7 +1377,6 @@ class CampaignTask(Task):
             CampaignStopReason.GEMS_LEVEL_REPLACEMENT_FAILED: self._gems_replacement_result,
             CampaignStopReason.GEMS_EMOTION_REPLACEMENT_FAILED: self._gems_replacement_result,
             CampaignStopReason.GEMS_HARD_PREPARATION_FAILED: self._gems_replacement_result,
-            CampaignStopReason.CHECKPOINT_UNAVAILABLE: self._checkpoint_unavailable_result,
             CampaignStopReason.FAILED: self._failure_result,
             CampaignStopReason.BLOCKED: self._blocked_result,
         }
@@ -1361,13 +1389,6 @@ class CampaignTask(Task):
         return TaskResult(
             outcome=Succeeded(),
             effects=(RescheduleSelf(self._job.schedule.next_after(report.observed_at)),),
-        )
-
-    @staticmethod
-    def _checkpoint_unavailable_result(report: CampaignRunReport) -> TaskResult:
-        return TaskResult(
-            outcome=Deferred("campaign client session no longer matches its checkpoint"),
-            effects=(RescheduleSelf(report.observed_at),),
         )
 
     def _disable_self_result(self, report: CampaignRunReport | None) -> TaskResult:

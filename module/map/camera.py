@@ -1,5 +1,4 @@
 import copy
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -13,7 +12,9 @@ from module.handler.assets import AUTO_SEARCH_MENU_CONTINUE, GAME_TIPS, GET_MISS
 from module.logger import logger
 from module.map.assets import MAP_PREPARATION
 from module.map.map_base import CampaignMap, location2node
+from module.map.map_observer import InSightRequest
 from module.map.map_operation import MapOperation
+from module.map.map_swipe import STANDARD_MAP_SWIPE_SERVICE, MapSwipeRequest, MapSwipeService
 from module.map.utils import location_ensure, random_direction
 from module.map_detection.grid import Grid
 from module.map_detection.utils import area2corner, trapezoid2area
@@ -30,7 +31,8 @@ if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
     from module.base.type_alias import Area, NumericArray, Point
     from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import GridLocation, GridMode
+    from module.map.map_spawn_gap import MapSpawnGapPredictor
+    from module.map.type_alias import GridLocation
     from module.map_detection.grid_info import GridInfo
 
 type RecoveryOverlay = tuple[Button, MatchOffset, Button, str]
@@ -51,17 +53,6 @@ IMAGE_IN_MAP_PREPARATION_MESSAGE = "Image is in MAP_PREPARATION"
 IMAGE_IN_AUTO_SEARCH_MENU_MESSAGE = "Image is in auto search menu"
 
 
-@dataclass(slots=True)
-class FullScanOptions:
-    queue: SelectedGrids[GridInfo] | None = None
-    must_scan: SelectedGrids[GridInfo] | None = None
-    battle_count: int = 0
-    mystery_count: int = 0
-    siren_count: int = 0
-    carrier_count: int = 0
-    mode: GridMode = "normal"
-
-
 class Camera(MapOperation):
     view: View
     map: CampaignMap
@@ -69,8 +60,10 @@ class Camera(MapOperation):
     grid_class = Grid
     _prev_view: View | None = None
     _prev_swipe: Point | None = None
+    _map_swipe_service: MapSwipeService = STANDARD_MAP_SWIPE_SERVICE
+    map_spawn_gap_predictor: MapSpawnGapPredictor
 
-    def _map_swipe(self, vector: Point, box: Area = (123, 159, 1175, 628)) -> bool:
+    def _standard_map_swipe(self, vector: Point, *, box: Area) -> bool:
         """按浮点格子向量在 box 坐标区域内滑动，返回相机是否移动。"""
         vector = np.array(vector)
         name = "MAP_SWIPE_" + "_".join([str(round(x)) for x in vector])
@@ -92,6 +85,12 @@ class Camera(MapOperation):
             self.update(wait_swipe=True)
             return True
         return False
+
+    def _map_swipe(self, vector: Point, box: Area | None = None) -> bool:
+        return self._map_swipe_service.swipe(
+            self,
+            MapSwipeRequest(vector=vector, explicit_box=box),
+        )
 
     def map_swipe(self, vector: Point) -> bool:
         """按整数相对格子向量滑动；调用前必须已更新视图。"""
@@ -359,11 +358,11 @@ class Camera(MapOperation):
         if self.view.left_edge:
             x = 0 + self.view.center_loca[0]
         elif self.view.right_edge:
-            x = self.map.shape[0] - self.view.shape[0] + self.view.center_loca[0]
+            x = self.map.layout.shape[0] - self.view.shape[0] + self.view.center_loca[0]
         else:
             x = self.camera[0]
         if self.view.upper_edge:
-            y = self.map.shape[1] - self.view.shape[1] + self.view.center_loca[1]
+            y = self.map.layout.shape[1] - self.view.shape[1] + self.view.center_loca[1]
         elif self.view.lower_edge:
             y = 0 + self.view.center_loca[1]
         else:
@@ -482,56 +481,18 @@ class Camera(MapOperation):
             if not has_swiped:
                 break
 
-    def full_scan(self, options: FullScanOptions | None = None) -> None:
-        """按扫描队列、必扫格子、计数快照和模式扫描整张地图。"""
-        if options is None:
-            options = FullScanOptions()
-        logger.info(f"Full scan start, mode={options.mode}")
-        self.map.reset_fleet()
-
-        queue = options.queue or self.map.camera_data
-        if options.must_scan:
-            queue = queue.add(options.must_scan)
-
-        while len(queue) > 0:
-            if self.map.missing_is_none(
-                options.battle_count,
-                options.mystery_count,
-                options.siren_count,
-                options.carrier_count,
-                options.mode,
-            ):
-                if options.must_scan and queue.count != queue.delete(options.must_scan).count:
-                    logger.info("Continue scanning.")
-                else:
-                    logger.info("All spawn found, Early stopped.")
-                    break
-
-            queue = queue.sort_by_camera_distance(self.camera)
-            self.focus_to(queue[0])
-            self.focus_to_grid_center(0.25)
-            success = self.map.update(grids=self.view, camera=self.camera, mode=options.mode)
-            if not success:
-                self.ensure_edge_insight(skip_first_update=False)
-                continue
-
-            queue = queue[1:]
-
-        self.map.missing_predict(
-            options.battle_count,
-            options.mystery_count,
-            options.siren_count,
-            options.carrier_count,
-            options.mode,
-        )
-        self.map.show()
-
     def in_sight(self, location: GridInfo | str | Point, sight: tuple[int, int, int, int] | None = None) -> None:
         """确保格子位于相机视野矩形内；sight 形如 (-3, -1, 3, 2)。"""
-        location = location_ensure(location)
+        self._map_observer.viewport.in_sight(
+            self,
+            InSightRequest(location=location_ensure(location), sight=sight),
+        )
+
+    def _standard_in_sight(self, request: InSightRequest) -> None:
+        """执行未被 profile 规则处理的标准视野算法。"""
+        location = request.location
         logger.info(f"In sight: {location2node(location)}")
-        if sight is None:
-            sight = self.map.camera_sight
+        sight = self.map.layout.camera_sight if request.sight is None else request.sight
 
         diff = np.array(location) - self.camera
         if diff[1] > sight[3]:
@@ -585,15 +546,15 @@ class Camera(MapOperation):
         logger.info("Full scan find boss.")
         self.map.reset_fleet()
 
-        queue = self.map.select(may_boss=True)
+        queue = self.map.layout.select(may_boss=True)
         while len(queue) > 0:
             queue = queue.sort_by_camera_distance(self.camera)
             self.in_sight(queue[0])
             self.predict()
             queue = queue[1:]
 
-            boss = self.map.select(is_boss=True)
-            boss = boss.add(self.map.select(may_boss=True, is_enemy=True))
+            boss = self.map.layout.select(is_boss=True)
+            boss = boss.add(self.map.layout.select(may_boss=True, is_enemy=True))
             if boss:
                 logger.info(f"Boss found: {boss}")
                 self.map.show()
@@ -626,8 +587,8 @@ class Camera(MapOperation):
             return result
 
         whitelist = (
-            self.map.select(is_land=True)
-            .add(self.map.select(is_current_fleet=True))
+            self.map.layout.select(is_land=True)
+            .add(self.map.layout.select(is_current_fleet=True))
             .sort_by_camera_distance(self.camera)
         )
         blacklist = (

@@ -1,5 +1,13 @@
 from typing import TYPE_CHECKING
 
+from module.adapters.campaign_clear_mode_config import build_campaign_clear_mode_config_service
+from module.adapters.campaign_event_ui import build_campaign_event_ui_services
+from module.adapters.campaign_map_initialization import build_campaign_map_initialization_service
+from module.adapters.campaign_map_observer import build_campaign_map_observer
+from module.adapters.campaign_map_swipe import build_campaign_map_swipe_service
+from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
+from module.adapters.campaign_program_capabilities import build_campaign_program_capability_reader
+from module.adapters.campaign_runtime_hard import build_campaign_clear_mode_behavior
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
@@ -8,9 +16,10 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
 )
+from module.adapters.campaign_strategy_set import build_campaign_strategy_set_service
 from module.content.errors import ContentValidationError
 from module.content.models import StageSpec
-from module.content.runtime_profile import CampaignRuntimeProfileRegistry
+from module.content.runtime_profile import CampaignRuntimeProfileRegistry, RuntimeExecutorKind
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -48,19 +57,24 @@ def _validate_executor_contracts(
     bound_contracts = set()
     for profile in profiles.profiles.values():
         try:
-            CampaignRuntimeProfileManager(profile, executors)
+            manager = CampaignRuntimeProfileManager(profile, executors)
+            build_campaign_clear_mode_behavior(manager.executor_instances(RuntimeExecutorKind.HARD_MODE))
+            build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
+            build_campaign_map_observer(
+                manager.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
+                map_clear_percentage_multiplier=manager.map_clear_percentage_multiplier,
+            )
+            build_campaign_map_swipe_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
+            build_campaign_mystery_item_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
+            build_campaign_strategy_set_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
+            build_campaign_program_capability_reader(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
+            build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())
+            build_campaign_clear_mode_config_service(manager.executor_instances_in_profile_order())
         except CampaignRuntimeProfileError as error:
             message = f"runtime profile {profile.profile_id.value} is not executable: {error}"
             raise ContentValidationError(message) from error
         for extension in profile.extensions:
-            for binding in extension.executors:
-                if not binding.options:
-                    message = (
-                        "runtime executor binding has no explicit options contract: "
-                        f"{binding.implementation_id.value}/{binding.kind.value}"
-                    )
-                    raise ContentValidationError(message)
-                bound_contracts.add((binding.implementation_id, binding.kind))
+            bound_contracts.update((binding.implementation_id, binding.kind) for binding in extension.executors)
 
     declared_contracts = {
         (implementation_id, kind)

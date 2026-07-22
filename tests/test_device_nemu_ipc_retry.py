@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from module.device import nemu_ipc_service as nemu_ipc_module
-from module.device.method.pool import JobTimeout
-from module.device.nemu_ipc_service import NemuIpcError, NemuIpcImpl, NemuIpcIncompatible
-from module.exception import RequestHumanTakeover
+from module.device.method.pool import JobTimeoutError
+from module.device.nemu_ipc_service import NemuIpcCompatibilityError, NemuIpcError, NemuIpcImpl
+from module.exception import HumanTakeoverRequiredError
 
 if TYPE_CHECKING:
     from module.base.type_alias import ImageArray
@@ -28,16 +28,6 @@ class _Logger:
         self.criticals.append(message)
 
 
-class _NemuIpc:
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-        self.run_count = 0
-        self.timeouts: list[float] = []
-
-    def reconnect(self) -> None:
-        self.calls.append("reconnect")
-
-
 def _patch_retry_runtime(monkeypatch: pytest.MonkeyPatch) -> _Logger:
     logger = _Logger()
     monkeypatch.setattr(nemu_ipc_module, "logger", logger)
@@ -45,45 +35,45 @@ def _patch_retry_runtime(monkeypatch: pytest.MonkeyPatch) -> _Logger:
     return logger
 
 
-def _run_retry(monkeypatch: pytest.MonkeyPatch, error: Exception) -> tuple[str, _NemuIpc, _Logger]:
+def _connect_retry_device(monkeypatch: pytest.MonkeyPatch, error: Exception) -> tuple[NemuIpcImpl, list[str], _Logger]:
     logger = _patch_retry_runtime(monkeypatch)
-    device = _NemuIpc()
+    device = object.__new__(NemuIpcImpl)
+    calls: list[str] = []
+    attempts = 0
 
-    @nemu_ipc_module.retry
-    def flaky(target: _NemuIpc) -> str:
-        target.calls.append("run")
-        target.run_count += 1
-        if target.run_count == 1:
+    def connect(*, on_thread: bool = True) -> None:
+        nonlocal attempts
+        calls.append(f"connect:{on_thread}")
+        attempts += 1
+        if attempts == 1:
             raise error
-        return "ok"
 
-    return flaky(device), device, logger
+    def reconnect() -> None:
+        calls.append("reconnect")
+
+    monkeypatch.setattr(device, "connect", connect)
+    monkeypatch.setattr(device, "reconnect", reconnect)
+    return device, calls, logger
 
 
 def test_nemu_ipc_retry_recovers_ipc_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    result, device, logger = _run_retry(monkeypatch, NemuIpcError("lost"))
+    device, calls, logger = _connect_retry_device(monkeypatch, NemuIpcError("lost"))
 
-    assert result == "ok"
+    device.connect_with_retry(on_thread=False)
+
     assert logger.errors == ["lost"]
-    assert device.calls == ["run", "reconnect", "run"]
+    assert calls == ["connect:False", "reconnect", "connect:False"]
 
 
 def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch: pytest.MonkeyPatch) -> None:
-    logger = _patch_retry_runtime(monkeypatch)
-    device = _NemuIpc()
+    device, calls, logger = _connect_retry_device(monkeypatch, NemuIpcCompatibilityError("old"))
 
-    @nemu_ipc_module.retry
-    def always_incompatible(target: _NemuIpc) -> None:
-        target.calls.append("run")
-        message = "old"
-        raise NemuIpcIncompatible(message)
+    with pytest.raises(HumanTakeoverRequiredError):
+        device.connect_with_retry(on_thread=False)
 
-    with pytest.raises(RequestHumanTakeover):
-        always_incompatible(device)
-
-    assert device.calls == ["run"]
+    assert calls == ["connect:False"]
     assert logger.errors == ["old"]
-    assert logger.criticals == ["Retry always_incompatible() failed"]
+    assert logger.criticals == ["Retry connect_with_retry() failed"]
 
 
 def test_nemu_ipc_timeout_stops_without_reusing_the_connection(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -94,11 +84,11 @@ def test_nemu_ipc_timeout_stops_without_reusing_the_connection(monkeypatch: pyte
 
     def screenshot_once(_device: NemuIpcImpl, timeout: float) -> ImageArray:
         timeouts.append(timeout)
-        raise JobTimeout
+        raise JobTimeoutError
 
     monkeypatch.setattr(NemuIpcImpl, "_screenshot_once", screenshot_once)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         device.screenshot()
 
     assert timeouts == [0.5]
@@ -112,7 +102,7 @@ def test_native_timeout_poison_prevents_later_calls(monkeypatch: pytest.MonkeyPa
     class _TimedOutJob:
         @staticmethod
         def get_or_timeout(_timeout: float) -> None:
-            raise JobTimeout
+            raise JobTimeoutError
 
     class _Pool:
         def __init__(self) -> None:
@@ -127,9 +117,9 @@ def test_native_timeout_poison_prevents_later_calls(monkeypatch: pytest.MonkeyPa
     device = object.__new__(NemuIpcImpl)
     device._timed_out = False  # ruff:ignore[private-member-access] - 构造不加载本机 DLL 的最小 NemuIpc 实例。
 
-    with pytest.raises(JobTimeout):
+    with pytest.raises(JobTimeoutError):
         device.run_func(lambda: 0)
-    with pytest.raises(RequestHumanTakeover, match="can no longer be used"):
+    with pytest.raises(HumanTakeoverRequiredError, match="can no longer be used"):
         device.run_func(lambda: 0, on_thread=False)
 
     assert pool.calls == 1
@@ -147,16 +137,18 @@ def test_poisoned_disconnect_drops_handle_without_native_call() -> None:
 
 
 def test_nemu_ipc_retry_retries_native_errors_without_reconnect(monkeypatch: pytest.MonkeyPatch) -> None:
-    result, device, logger = _run_retry(monkeypatch, OSError("native"))
+    device, calls, logger = _connect_retry_device(monkeypatch, OSError("native"))
 
-    assert result == "ok"
+    device.connect_with_retry(on_thread=False)
+
     assert logger.errors == ["native"]
-    assert device.calls == ["run", "run"]
+    assert calls == ["connect:False", "connect:False"]
 
 
 def test_nemu_ipc_retry_retries_argument_errors_without_reconnect(monkeypatch: pytest.MonkeyPatch) -> None:
-    result, device, logger = _run_retry(monkeypatch, ctypes.ArgumentError("bad argument"))
+    device, calls, logger = _connect_retry_device(monkeypatch, ctypes.ArgumentError("bad argument"))
 
-    assert result == "ok"
+    device.connect_with_retry(on_thread=False)
+
     assert logger.errors == ["bad argument"]
-    assert device.calls == ["run", "run"]
+    assert calls == ["connect:False", "connect:False"]

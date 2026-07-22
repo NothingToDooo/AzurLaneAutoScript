@@ -11,7 +11,7 @@ from module.eventstory.profile import (
     EventStorySpecialEntryProbe,
 )
 from module.eventstory.ui import EventStoryMode, EventStoryUiCapability
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.handler.login import LoginHandler
 from module.logger import logger
 from module.ui.page import page_event, page_sp
@@ -171,7 +171,7 @@ class EventStory(EventStoryUiCapability, Combat, LoginHandler):
             if self._handle_profile_popup():
                 continue
         message = "event story did not reach a safe point within 300 seconds"
-        raise RequestHumanTakeover(message)
+        raise HumanTakeoverRequiredError(message)
 
     def get_event_story_state(self) -> EventStoryState:
         """返回 finish、story、story_alchemist 或 unknown。"""

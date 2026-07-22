@@ -5,7 +5,7 @@ from module.base.button import Button
 from module.base.decorator import run_once
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_SHIP
-from module.exception import GameNotRunningError, GamePageUnknownError, RequestHumanTakeover
+from module.exception import GameNotRunningError, GamePageUnknownError, HumanTakeoverRequiredError
 from module.exercise.assets import EXERCISE_PREPARATION
 from module.handler.assets import (
     AUTO_SEARCH_MENU_EXIT,
@@ -469,7 +469,7 @@ class UI(InfoHandler):
             logger.critical(
                 "Possible reason #2: Your fleets haven't satisfied the level restrictions in operation siren"
             )
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         if self.appear_then_click(RESET_TICKET_POPUP, offset=(30, 30), interval=3):
             return True
         if self.appear_then_click(RESET_FLEET_PREPARATION, offset=(30, 30), interval=3):

@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: 15-3
   shape: J8
@@ -109,7 +109,6 @@ mechanics:
     target: A1
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
@@ -121,8 +120,6 @@ mechanics:
     source: B3
     target: B4
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

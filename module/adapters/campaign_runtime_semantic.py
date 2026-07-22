@@ -5,32 +5,38 @@ from module.combat.assets import ALCHEMIST_MATERIAL_CONFIRM
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
 from module.ui.page import page_campaign, page_event
 
+from .campaign_clear_mode_config import (
+    CampaignClearModeConfigContributor,
+    CampaignClearModeConfigRuntime,
+)
+from .campaign_event_ui import (
+    CampaignEventCombatResultContributor,
+    CampaignEventUiContributor,
+    CampaignEventUiExecutor,
+    CampaignMapTransitionContributor,
+)
+from .campaign_map_initialization import (
+    CampaignMapInitializationContributor,
+    CampaignMapInitializationRuntime,
+)
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
 )
 
 if TYPE_CHECKING:
+    from module.combat.combat_result_ui import CombatResultRuntime
     from module.config.config import AzurLaneConfig
     from module.config.config_generated import ConfigOverrides
+
+    from .campaign_event_ui import EventCombatResultNext
 
 
 class _SemanticRuntimeHost(Protocol):
     config: AzurLaneConfig
-    battle_count: int
-    event_animation_end: object
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
 
     def ui_page_appear(self, page: object) -> bool: ...
 
@@ -98,23 +104,8 @@ def _number_option(
     return float(cast("int | float", value))
 
 
-def _require_operations(
-    options: Mapping[str, RuntimeTuningValue],
-    expected: frozenset[str],
-) -> None:
-    value = options["operations"]
-    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
-        message = "runtime semantic executor operations must contain strings"
-        raise CampaignRuntimeProfileError(message)
-    actual = frozenset(cast("tuple[str, ...]", value))
-    if actual != expected:
-        message = f"runtime semantic operations mismatch: expected={sorted(expected)}, actual={sorted(actual)}"
-        raise CampaignRuntimeProfileError(message)
-
-
 def _build_exp_info_page_guard(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = _required_options(context, RuntimeExecutorKind.EVENT_UI)
-    _require_operations(options, frozenset({"handle_exp_info"}))
     blocked_page = _string_option(options, "blocked_page")
     if blocked_page == "campaign":
         page = page_campaign
@@ -124,25 +115,27 @@ def _build_exp_info_page_guard(context: RuntimeExecutorBuildContext) -> RuntimeE
         message = f"unsupported EXP-info blocked page: {blocked_page}"
         raise CampaignRuntimeProfileError(message)
 
-    def handle_exp_info(runtime: object) -> object:
+    def handle_experience_result(
+        runtime: CombatResultRuntime,
+        next_handler: EventCombatResultNext,
+    ) -> bool:
         host = _host(runtime)
         if host.ui_page_appear(page):
             return False
-        return host.runtime_super(RuntimeOperation.HANDLE_EXP_INFO)
+        return next_handler(runtime)
 
-    return RuntimeExecutorInstance(
+    return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
-        methods={
-            RuntimeExecutorKind.EVENT_UI: {
-                RuntimeOperation.HANDLE_EXP_INFO: handle_exp_info,
-            }
-        },
+        CampaignEventUiContributor(
+            combat_result=CampaignEventCombatResultContributor(
+                handle_experience_result=handle_experience_result,
+            )
+        ),
     )
 
 
 def _build_exp_info_click_guard(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = _required_options(context, RuntimeExecutorKind.EVENT_UI)
-    _require_operations(options, frozenset({"handle_exp_info"}))
     asset = _string_option(options, "asset")
     if asset != "ALCHEMIST_MATERIAL_CONFIRM":
         message = f"unsupported EXP-info confirmation asset: {asset}"
@@ -150,7 +143,10 @@ def _build_exp_info_click_guard(context: RuntimeExecutorBuildContext) -> Runtime
     offset = _offset_option(options, "offset")
     interval = _number_option(options, "interval")
 
-    def handle_exp_info(runtime: object) -> object:
+    def handle_experience_result(
+        runtime: CombatResultRuntime,
+        next_handler: EventCombatResultNext,
+    ) -> bool:
         host = _host(runtime)
         if host.appear_then_click(
             ALCHEMIST_MATERIAL_CONFIRM,
@@ -158,105 +154,94 @@ def _build_exp_info_click_guard(context: RuntimeExecutorBuildContext) -> Runtime
             interval=interval,
         ):
             return False
-        return host.runtime_super(RuntimeOperation.HANDLE_EXP_INFO)
+        return next_handler(runtime)
 
-    return RuntimeExecutorInstance(
+    return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
-        methods={
-            RuntimeExecutorKind.EVENT_UI: {
-                RuntimeOperation.HANDLE_EXP_INFO: handle_exp_info,
-            }
-        },
+        CampaignEventUiContributor(
+            combat_result=CampaignEventCombatResultContributor(
+                handle_experience_result=handle_experience_result,
+            )
+        ),
     )
+
+
+class CampaignClearModeConfigOverlayExecutor(RuntimeExecutorInstance):
+    __slots__ = ("_clear_mode_config_contributor",)
+
+    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
+        options = _required_options(context, RuntimeExecutorKind.ENGINE_EXTENSION)
+        condition = _string_option(options, "condition")
+        if condition not in {"always", "handled"}:
+            message = f"unsupported clear-mode overlay condition: {condition}"
+            raise CampaignRuntimeProfileError(message)
+        raw_overrides = options["overrides"]
+        if not isinstance(raw_overrides, Mapping):
+            message = "clear-mode overlay overrides must be an object"
+            raise CampaignRuntimeProfileError(message)
+        overrides = dict(cast("Mapping[str, object]", raw_overrides))
+
+        def apply(runtime: CampaignClearModeConfigRuntime, *, handled: bool) -> None:
+            if condition == "always" or handled:
+                runtime.config.apply_runtime_overlay(**cast("ConfigOverrides", overrides))
+
+        self._clear_mode_config_contributor = CampaignClearModeConfigContributor(apply)
+        super().__init__({RuntimeExecutorKind.ENGINE_EXTENSION})
+
+    @property
+    def clear_mode_config_contributor(self) -> CampaignClearModeConfigContributor:
+        return self._clear_mode_config_contributor
 
 
 def _build_clear_mode_config_overlay(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = _required_options(context, RuntimeExecutorKind.ENGINE_EXTENSION)
-    _require_operations(options, frozenset({"handle_clear_mode_config_cover"}))
-    condition = _string_option(options, "condition")
-    if condition not in {"always", "handled"}:
-        message = f"unsupported clear-mode overlay condition: {condition}"
-        raise CampaignRuntimeProfileError(message)
-    raw_overrides = options["overrides"]
-    if not isinstance(raw_overrides, Mapping):
-        message = "clear-mode overlay overrides must be an object"
-        raise CampaignRuntimeProfileError(message)
-    overrides = dict(cast("Mapping[str, object]", raw_overrides))
-
-    def handle_clear_mode_config_cover(runtime: object) -> object:
-        host = _host(runtime)
-        handled = host.runtime_super(RuntimeOperation.HANDLE_CLEAR_MODE_CONFIG_COVER)
-        if type(handled) is not bool:
-            message = "clear-mode config cover must return a boolean"
-            raise CampaignRuntimeProfileError(message)
-        if condition == "always" or handled:
-            host.config.apply_runtime_overlay(**cast("ConfigOverrides", overrides))
-        return handled
-
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.ENGINE_EXTENSION},
-        methods={
-            RuntimeExecutorKind.ENGINE_EXTENSION: {
-                RuntimeOperation.HANDLE_CLEAR_MODE_CONFIG_COVER: handle_clear_mode_config_cover,
-            }
-        },
-    )
+    return CampaignClearModeConfigOverlayExecutor(context)
 
 
 def _build_event_animation_expected_end(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = _required_options(context, RuntimeExecutorKind.ENGINE_EXTENSION)
-    _require_operations(options, frozenset({"_expected_end"}))
+    options = _required_options(context, RuntimeExecutorKind.EVENT_UI)
     battle = _integer_option(options, "event_animation_end_battle")
     if battle < 0:
         message = "event-animation end battle must be non-negative"
         raise CampaignRuntimeProfileError(message)
 
-    def expected_end(runtime: object, expected: object) -> object:
-        host = _host(runtime)
-        if host.battle_count == battle:
-            return host.event_animation_end
-        return host.runtime_super(RuntimeOperation.EXPECTED_END, expected)
-
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.ENGINE_EXTENSION},
-        methods={
-            RuntimeExecutorKind.ENGINE_EXTENSION: {
-                RuntimeOperation.EXPECTED_END: expected_end,
-            }
-        },
+    return CampaignEventUiExecutor(
+        {RuntimeExecutorKind.EVENT_UI},
+        CampaignEventUiContributor(
+            map_transition=CampaignMapTransitionContributor(
+                event_animation_end_battle=battle,
+            ),
+        ),
     )
 
 
-def _build_runtime_config_overlay(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = _required_options(context, RuntimeExecutorKind.ENGINE_EXTENSION)
-    _require_operations(options, frozenset({"map_data_init"}))
-    phase = _string_option(options, "phase")
-    if phase != "map_init":
-        message = f"unsupported runtime config overlay phase: {phase}"
-        raise CampaignRuntimeProfileError(message)
-    raw_overrides = options["overrides"]
-    if not isinstance(raw_overrides, Mapping):
-        message = "runtime config overlay overrides must be an object"
-        raise CampaignRuntimeProfileError(message)
-    overrides = dict(cast("Mapping[str, object]", raw_overrides))
-    if overrides != {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"}:
-        message = f"unsupported runtime config overlay: {overrides!r}"
-        raise CampaignRuntimeProfileError(message)
+class DefaultEnemyScaleBalanceExecutor(RuntimeExecutorInstance):
+    """在地图控制初始化前恢复活动图的默认敌人权重。"""
 
-    def map_data_init(runtime: object, map_: object) -> object:
-        host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.MAP_DATA_INIT, map_)
-        host.config.apply_runtime_overlay(**cast("ConfigOverrides", overrides))
-        return result
+    __slots__ = ("_map_initialization_contributor",)
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.ENGINE_EXTENSION},
-        methods={
-            RuntimeExecutorKind.ENGINE_EXTENSION: {
-                RuntimeOperation.MAP_DATA_INIT: map_data_init,
-            }
-        },
-    )
+    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
+        _ = context.options(RuntimeExecutorKind.ENGINE_EXTENSION)
+        self._map_initialization_contributor = CampaignMapInitializationContributor(
+            pre_control=self._apply_default_enemy_scale_balance,
+        )
+        super().__init__({RuntimeExecutorKind.ENGINE_EXTENSION})
+
+    @staticmethod
+    def _apply_default_enemy_scale_balance(runtime: CampaignMapInitializationRuntime) -> None:
+        _host(runtime).config.apply_runtime_overlay(
+            **cast(
+                "ConfigOverrides",
+                {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"},
+            )
+        )
+
+    @property
+    def map_initialization_contributor(self) -> CampaignMapInitializationContributor:
+        return self._map_initialization_contributor
+
+
+def _build_default_enemy_scale_balance(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+    return DefaultEnemyScaleBalanceExecutor(context)
 
 
 def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescriptor, ...]:
@@ -267,7 +252,7 @@ def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("event_ui/exp_info_page_guard"),
             {
                 RuntimeExecutorKind.EVENT_UI: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "blocked_page"}),
+                    required=frozenset({"blocked_page"}),
                 )
             },
             _build_exp_info_page_guard,
@@ -276,7 +261,7 @@ def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("event_ui/exp_info_click_guard"),
             {
                 RuntimeExecutorKind.EVENT_UI: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "asset", "interval", "offset"}),
+                    required=frozenset({"asset", "interval", "offset"}),
                 )
             },
             _build_exp_info_click_guard,
@@ -285,27 +270,23 @@ def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("engine/clear_mode_config_overlay"),
             {
                 RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "condition", "overrides"}),
+                    required=frozenset({"condition", "overrides"}),
                 )
             },
             _build_clear_mode_config_overlay,
         ),
         RuntimeExecutorFactoryDescriptor(
-            RuntimeImplementationId("engine/event_animation_expected_end"),
+            RuntimeImplementationId("event_ui/event_animation_expected_end"),
             {
-                RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "event_animation_end_battle"}),
+                RuntimeExecutorKind.EVENT_UI: RuntimeExecutorOptionsSchema(
+                    required=frozenset({"event_animation_end_battle"}),
                 )
             },
             _build_event_animation_expected_end,
         ),
         RuntimeExecutorFactoryDescriptor(
-            RuntimeImplementationId("engine/runtime_config_overlay"),
-            {
-                RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "overrides", "phase"}),
-                )
-            },
-            _build_runtime_config_overlay,
+            RuntimeImplementationId("engine/default_enemy_scale_balance"),
+            {RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema()},
+            _build_default_enemy_scale_balance,
         ),
     )

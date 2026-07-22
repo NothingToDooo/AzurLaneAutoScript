@@ -1,51 +1,88 @@
 import re
 from dataclasses import dataclass, replace
 from functools import partial
-from typing import TYPE_CHECKING, Final, Literal, Self, Unpack, cast
+from typing import TYPE_CHECKING, Final, Protocol, cast
 
+from module.adapters.campaign_auto_search_mumu12 import (
+    Mumu12AutoSearchRuntime,
+    Mumu12CampaignAutoSearchExecutor,
+    Mumu12CommittedAutoSearchUnit,
+)
+from module.adapters.campaign_clear_mode_config import (
+    CampaignClearModeConfigService,
+    build_campaign_clear_mode_config_service,
+)
+from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
+from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
+from module.adapters.campaign_hard_attempt_mumu12 import Mumu12CampaignHardAttemptOwner
 from module.adapters.campaign_live import (
     CampaignMapRuntime,
     CommittedCampaignUnit,
     build_existing_campaign_map_workflow,
 )
-from module.adapters.campaign_program_mumu12 import Mumu12CampaignBattleProgramExecutor
+from module.adapters.campaign_map_data_mumu12 import apply_normal_enemy_candidate_mask
+from module.adapters.campaign_map_initialization import (
+    CampaignMapInitializationService,
+    build_campaign_map_initialization_service,
+)
+from module.adapters.campaign_map_observer import build_campaign_map_observer
+from module.adapters.campaign_map_session_mumu12 import (
+    Mumu12CampaignMapSessionOwner,
+)
+from module.adapters.campaign_map_swipe import build_campaign_map_swipe_service
+from module.adapters.campaign_mystery_item import build_campaign_mystery_item_service
+from module.adapters.campaign_program_capabilities import (
+    CampaignProgramCapabilityReader,
+    build_campaign_program_capability_reader,
+)
+from module.adapters.campaign_program_mumu12 import (
+    Mumu12CampaignBattleProgramExecutor,
+    Mumu12CommittedBattleProgramUnit,
+    build_mumu12_battle_program_port,
+    read_mumu12_battle_program_mode,
+)
+from module.adapters.campaign_runtime_hard import (
+    CampaignClearModeExecutor,
+    build_campaign_clear_mode_behavior,
+)
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
-    RuntimeSessionContext,
-    RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
 )
+from module.adapters.campaign_runtime_session import RuntimeProfileLease
+from module.adapters.campaign_stage_navigator import build_campaign_stage_navigator
+from module.adapters.campaign_strategy_set import build_campaign_strategy_set_service
+from module.adapters.campaign_submarine import CampaignSubmarineServices, build_campaign_submarine_services
 from module.adapters.gems_mumu12 import (
-    GemsHardPreparationFailed,
+    GemsHardPreparationError,
+    GemsHardRetryFleetPreparationService,
     Mumu12GemsFleetReplacementExecutor,
     Mumu12GemsRuntimeBehavior,
 )
 from module.adapters.mumu12 import CancellationAwareMumu12Device, emotion_runtime_overlay
-from module.application import SafeUnitCancellation
+from module.application import AbortRequested, SafeUnitCancellation
 from module.base.decorator import cached_property
-from module.base.failure import preserve_cleanup_failure, raise_cleanup_errors
+from module.base.failure import preserve_cleanup_failure
 from module.base.utils import location2node
 from module.campaign.campaign_engine import CampaignEngine
 from module.combat.emotion import Emotion
 from module.config.config import AzurLaneConfig, name_to_function
 from module.content.battle_policy import BattleFlag
 from module.content.campaign_session import (
-    BattleTarget,
     CampaignRunVariant,
     CampaignSession,
     CampaignSessionState,
     CampaignSessionStatus,
 )
-from module.content.mechanic_rules import MapMutationPhase, MapMutationVariant, MapStructureRules
 from module.content.runtime_profile import (
     CampaignRuntimeExtensionId,
     CampaignRuntimeProfile,
     CampaignRuntimeProfileId,
+    RuntimeExecutorKind,
 )
 from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
 from module.content.stage_definition import CampaignStageDefinition, RunVariant
@@ -56,7 +93,7 @@ from module.content.stage_rules import (
     StageEntrancePreset,
 )
 from module.device.device import Device
-from module.exception import CampaignEnd, HardNotSatisfied, ScriptEnd
+from module.exception import MapAchievementReached
 from module.gameplay.campaign import (
     CampaignDifficulty,
     CampaignExecutionSettings,
@@ -69,7 +106,7 @@ from module.gameplay.campaign import (
 )
 from module.gameplay.campaign_factories import CampaignFactoryDependencies, HardCampaignSessionSource
 from module.gameplay.campaign_live import (
-    CampaignCheckpointUnavailable,
+    CampaignCheckpointReset,
     CampaignGemsReplacementFailed,
     CampaignGuardEvidence,
     CampaignGuardPhase,
@@ -77,36 +114,34 @@ from module.gameplay.campaign_live import (
     CampaignMapAchievementReached,
 )
 from module.gameplay.encounter import HardBattleOutcome, HardSettings
-from module.handler.assets import AUTO_SEARCH_MAP_OPTION_ON
 from module.hard import assets as hard_assets
 from module.map.map_base import CampaignMap
+from module.map.map_layout import CampaignMapLayout
+from module.map_detection.grid_info import GridInfo
 from module.ocr.ocr import Digit, DigitCounter
 from module.task_registry import command_to_config_name
 from module.ui.assets import CAMPAIGN_MENU_NO_EVENT
 from module.ui.page import page_campaign_menu
+from module.ui.ui import UI
 from module.war_archives.assets import OCR_DATA_KEY_CAMPAIGN, WAR_ARCHIVES_CAMPAIGN_CHECK
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from types import TracebackType
 
+    from module.adapters.battle_program_read_mumu12 import RuntimeProgramState
     from module.application import CancellationSource
     from module.base.button import Button
-    from module.base.template import Template
-    from module.base.type_alias import Area, ImageArray, Point
-    from module.campaign.campaign_ocr import StageMatchOptions, StageMatchSettings
     from module.combat.combat import CombatEnd
     from module.config.config_generated import ConfigOverrides
+    from module.content.battle_program import BattleProgramMode
     from module.content.cell import CellId
+    from module.content.mechanic_rules import MapStructureRules
     from module.content.models import StageRef
     from module.content.stage_rules import MapCalibration, StageNavigation
     from module.gameplay.campaign_factories import CampaignSessionSource
-    from module.map.camera import FullScanOptions
-    from module.map.fleet import FleetLocation
-    from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import GridLocation, GridMode
+    from module.map.map_fleet_preparation import FleetPreparationService
+    from module.map.type_alias import GridLocation
     from module.map_detection.grid import Grid
-    from module.map_detection.grid_info import GridInfo
 
 
 _CHAPTER_SWITCH_FIELDS = {
@@ -150,41 +185,21 @@ class _ActivatedMap:
     state: CampaignSessionState
 
 
-class _RuntimeActivationOwner:
-    """activation 成功转交前，保证局部 runtime 不会成为 orphan。"""
+@dataclass(frozen=True, slots=True)
+class _PreparedRuntimeOwnership:
+    job: CampaignJobSpec
+    session: CampaignSession
+    at_boundary: bool = False
+    entrance: Button | None = None
 
-    __slots__ = ("_cleanup", "_owned")
 
-    def __init__(self, cleanup: Callable[[], None]) -> None:
-        self._cleanup = cleanup
-        self._owned = True
+@dataclass(frozen=True, slots=True)
+class _ActiveRuntimeOwnership:
+    session: CampaignSession
+    checkpoint: CampaignSessionState
 
-    def __enter__(self) -> Self:
-        return self
 
-    def transfer(self) -> None:
-        """runtime 已发布给 provider 或已完整释放。"""
-
-        self._owned = False
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        error: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> Literal[False]:
-        del exc_type, traceback
-        if not self._owned:
-            return False
-        if error is None:
-            self._cleanup()
-        else:
-            preserve_cleanup_failure(
-                error,
-                self._cleanup,
-                message="campaign activation and runtime cleanup both failed",
-            )
-        return False
+type _RuntimeOwnership = _PreparedRuntimeOwnership | _ActiveRuntimeOwnership
 
 
 def _variant_text(variant: RunVariant, attribute: str) -> str:
@@ -214,9 +229,9 @@ def _spawn_data(variant: RunVariant) -> list[dict[str, int]]:
 
 @dataclass(frozen=True, slots=True)
 class _CompiledMapStructures:
-    """旧地图对象所需的结构数据；后续可按 normal/loop 分别编译。"""
+    """地图运行时所需的结构数据；后续可按 normal/loop 分别编译。"""
 
-    wall_data: str
+    walls: tuple[tuple[GridLocation, GridLocation], ...]
     maze_data: tuple[tuple[str, ...], ...]
     fortress_data: tuple[tuple[str, ...], tuple[str, ...]]
     bouncing_enemy_data: tuple[tuple[str, ...], ...]
@@ -227,31 +242,14 @@ def _node(cell: object) -> str:
     return location2node((typed.x, typed.y))
 
 
-def _compile_wall_data(structures: MapStructureRules, *, columns: int, rows: int) -> str:
-    if not structures.walls:
-        return ""
-    width = columns * 4 - 3
-    canvas = [[" "] * width for _ in range(rows * 2 - 1)]
-    for wall in structures.walls:
-        source = wall.source
-        target = wall.target
-        if source.y == target.y:
-            left = min(source.x, target.x)
-            canvas[source.y * 2][left * 4 + 2] = "|"
-        else:
-            top = min(source.y, target.y)
-            canvas[top * 2 + 1][source.x * 4] = "-"
-    return "\n".join(f"    {''.join(line)}, " for line in canvas)
+def _location(cell: object) -> GridLocation:
+    typed = cast("CellId", cell)
+    return typed.x, typed.y
 
 
-def _compile_map_structures(
-    structures: MapStructureRules,
-    *,
-    columns: int,
-    rows: int,
-) -> _CompiledMapStructures:
+def _compile_map_structures(structures: MapStructureRules) -> _CompiledMapStructures:
     return _CompiledMapStructures(
-        wall_data=_compile_wall_data(structures, columns=columns, rows=rows),
+        walls=tuple((_location(wall.source), _location(wall.target)) for wall in structures.walls),
         maze_data=tuple(tuple(_node(cell) for cell in group) for group in structures.maze_groups),
         fortress_data=(
             tuple(_node(cell) for cell in structures.fortress_enemy_cells),
@@ -261,44 +259,51 @@ def _compile_map_structures(
     )
 
 
-def _install_map_structures(compiled: CampaignMap, structures: _CompiledMapStructures) -> None:
-    compiled.wall_data = structures.wall_data
+def _install_map_structures(
+    compiled: CampaignMap,
+    structures: _CompiledMapStructures,
+    *,
+    portals: tuple[tuple[GridLocation, GridLocation], ...],
+) -> None:
+    compiled.topology.configure(walls=structures.walls, portals=portals)
     compiled.maze_data = structures.maze_data
     compiled.fortress_data = structures.fortress_data
     compiled.bouncing_enemy_data = structures.bouncing_enemy_data
 
 
-def compile_campaign_map(definition: CampaignStageDefinition) -> CampaignMap:
+def compile_campaign_map(
+    definition: CampaignStageDefinition,
+    *,
+    grid_class: type[GridInfo] = GridInfo,
+) -> CampaignMap:
     """把不可变关卡定义编译为旧地图引擎唯一需要的运行对象。"""
 
     if not isinstance(definition, CampaignStageDefinition):
         message = "campaign map compiler requires a CampaignStageDefinition"
         raise TypeError(message)
     source = definition.map
-    compiled = CampaignMap(source.name)
-    compiled.shape = location2node((source.shape.columns - 1, source.shape.rows - 1))
-    compiled.map_covered = [location2node((cell.x, cell.y)) for cell in source.map_covered]
+    compiled = CampaignMap(source.name, layout=CampaignMapLayout(grid_class=grid_class))
+    compiled.layout.initialize(location2node((source.shape.columns - 1, source.shape.rows - 1)))
+    compiled.layout.set_manual_coverage([location2node((cell.x, cell.y)) for cell in source.map_covered])
     compiled.map_data = _variant_text(source.normal, "token")
     compiled.map_data_loop = _variant_text(source.loop, "token")
-    compiled.weight_data = _variant_text(source.normal, "weight")
-    compiled.camera_data = [location2node((cell.x, cell.y)) for cell in source.camera_data]
-    compiled.camera_data_spawn_point = [location2node((cell.x, cell.y)) for cell in source.camera_data_spawn_point]
-    compiled.portal_data = [
-        (
-            location2node((portal.source.x, portal.source.y)),
-            location2node((portal.target.x, portal.target.y)),
-        )
-        for portal in source.portals
-    ]
+    compiled.layout.apply_weights(_variant_text(source.normal, "weight"))
+    compiled.layout.set_camera_data([location2node((cell.x, cell.y)) for cell in source.camera_data])
+    compiled.layout.set_camera_data_spawn_point(
+        [location2node((cell.x, cell.y)) for cell in source.camera_data_spawn_point]
+    )
     compiled.land_based_data = [
         (location2node((unit.cell_id.x, unit.cell_id.y)), unit.direction.value) for unit in source.land_based
     ]
     _install_map_structures(
         compiled,
-        _compile_map_structures(
-            definition.mechanics.map_structures,
-            columns=source.shape.columns,
-            rows=source.shape.rows,
+        _compile_map_structures(definition.mechanics.map_structures),
+        portals=tuple(
+            (
+                (portal.source.x, portal.source.y),
+                (portal.target.x, portal.target.y),
+            )
+            for portal in source.portals
         ),
     )
     compiled.spawn_data = _spawn_data(source.normal)
@@ -460,16 +465,20 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     """固定运行类型；关卡差异只来自已编译 definition，不生成 Campaign 子类。"""
 
     definition: CampaignStageDefinition
-    session_state: CampaignSessionState | None
     session_variant: CampaignRunVariant
-    fleet_destination: object | None
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
+    _event_ui_services: CampaignEventUiServices
+    _clear_mode_config_service: CampaignClearModeConfigService
+    _hard_behavior: CampaignClearModeExecutor | None
+    _map_initialization_service: CampaignMapInitializationService
+    _configured_boss_fleet: int
+    _profile_fleet_preparation_service: FleetPreparationService
+    _program_capabilities: CampaignProgramCapabilityReader
+    _submarine_services: CampaignSubmarineServices
     _runtime_profile: CampaignRuntimeProfileManager
-    _runtime_profile_available: bool
-    _runtime_profile_session_active: bool
+    _runtime_profile_lease: RuntimeProfileLease
     grid_class: type[Grid]
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD: float
-    MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD: float
     MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD: float
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD: float
 
@@ -488,269 +497,99 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             definition.runtime_profile,
             _RUNTIME_EXECUTOR_REGISTRY,
         )
-        self.MAP = compile_campaign_map(definition)
-        self._runtime_profile.install_map_grid(self.MAP)
+        self._hard_behavior = build_campaign_clear_mode_behavior(
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.HARD_MODE)
+        )
+        self.MAP = compile_campaign_map(
+            definition,
+            grid_class=self._runtime_profile.map_grid_class or GridInfo,
+        )
         camera_grid_class = self._runtime_profile.camera_grid_class
         if camera_grid_class is not None:
             self.grid_class = camera_grid_class
         self._runtime_profile.apply_config(config)
-        self.ENEMY_FILTER = definition.enemy_filter
-        self.session_state = None
-        self.session_variant = CampaignRunVariant.NORMAL
-        self.fleet_destination = None
-        self._gems_behavior = None
-        self._runtime_profile_available = True
-        self._runtime_profile_session_active = False
-        super().__init__(config=config, device=device)
-        self._runtime_profile.apply_runtime_tunings(self)
-        self._runtime_profile.bind(self, self.MAP)
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        return self._runtime_profile.invoke_super(operation, self, *args, **kwargs)
-
-    @staticmethod
-    def _missing_runtime_base(
-        operation: RuntimeOperation,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        del args, kwargs
-        message = f"runtime operation has no fixed base implementation: {operation.value}"
-        raise CampaignRuntimeProfileError(message)
-
-    def _expected_end(self, expected: str) -> CombatEnd | None:
-        result = self._runtime_profile.hard.invoke(
-            RuntimeOperation.EXPECTED_END,
-            self,
-            lambda value: self._runtime_profile.engine.invoke(
-                RuntimeOperation.EXPECTED_END,
-                self,
-                lambda inner: CampaignEngine._expected_end(self, inner),  # ruff:ignore[private-member-access] - 固定调用引擎基线。
-                value,
-            ),
-            expected,
+        self._clear_mode_config_service = build_campaign_clear_mode_config_service(
+            self._runtime_profile.executor_instances_in_profile_order()
         )
-        return cast("CombatEnd | None", result)
+        profile_boss_fleet = self._runtime_profile.configured_boss_fleet
+        self._configured_boss_fleet = config.fleet_boss if profile_boss_fleet is None else profile_boss_fleet.index
+        self.ENEMY_FILTER = definition.enemy_filter
+        self.session_variant = CampaignRunVariant.NORMAL
+        self._gems_behavior = None
+        super().__init__(config=config, device=device)
+        self._runtime_profile.apply_runtime_thresholds(self)
+        self._runtime_profile.bind(self, self.MAP)
+        if self._hard_behavior is not None:
+            self._hard_behavior.apply_runtime_config(self)
+        self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
+        self._map_initialization_service = build_campaign_map_initialization_service(
+            self._runtime_profile.executor_instances_in_profile_order()
+        )
+        mechanic_instances = self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
+        self._profile_fleet_preparation_service = build_campaign_fleet_preparation_service(mechanic_instances)
+        self._fleet_preparation_service = self._profile_fleet_preparation_service
+        self._submarine_services = build_campaign_submarine_services(mechanic_instances)
+        self._strategy_set_service = build_campaign_strategy_set_service(mechanic_instances)
+        self._program_capabilities = build_campaign_program_capability_reader(mechanic_instances)
+        self._map_observer = build_campaign_map_observer(
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_OBSERVATION),
+            map_clear_percentage_multiplier=self._runtime_profile.map_clear_percentage_multiplier,
+        )
+        self._map_swipe_service = build_campaign_map_swipe_service(mechanic_instances)
+        self._mystery_item_service = build_campaign_mystery_item_service(mechanic_instances)
+        self._event_ui_services = build_campaign_event_ui_services(
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
+        )
+        self._combat_result_ui = self._event_ui_services.combat_result
+        self._map_transition_ui = self._event_ui_services.map_transition
+        self.stage_navigator = build_campaign_stage_navigator(
+            self,
+            self._runtime_profile,
+            self._event_ui_services,
+        )
+
+    @property
+    def configured_boss_fleet(self) -> int:
+        return self._configured_boss_fleet
+
+    def _map_transition_expected_end(self, expected: str) -> CombatEnd | None:
+        transition_override = self._map_transition_ui.combat_end_override(self)
+        if transition_override is not None:
+            return transition_override
+        return CampaignEngine.navigation_expected_end(self, expected)
+
+    def navigation_expected_end(self, expected: str) -> CombatEnd | None:
+        behavior = self._hard_behavior
+        if behavior is not None:
+            return behavior.expected_end(expected)
+        return self._map_transition_expected_end(expected)
 
     def handle_clear_mode_config_cover(self) -> bool:
-        result = self._runtime_profile.engine.invoke(
-            RuntimeOperation.HANDLE_CLEAR_MODE_CONFIG_COVER,
-            self,
-            lambda: CampaignEngine.handle_clear_mode_config_cover(self),
-        )
-        return bool(result)
+        handled = CampaignEngine.handle_clear_mode_config_cover(self)
+        self._clear_mode_config_service.apply(self, handled=handled)
+        return handled
 
-    def _declarative_map_data_init(self, map_: CampaignMap | None) -> None:
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         CampaignEngine.map_data_init(self, map_)
         moving = self.definition.mechanics.moving_enemies
         for cell in moving.initial_enemy_cells:
             self.map[(cell.x, cell.y)].is_enemy = True
         for cell in moving.initial_siren_cells:
             self.map[(cell.x, cell.y)].is_siren = True
-        self._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)
-
-    def map_data_init(self, map_: CampaignMap | None) -> None:
-        self._runtime_profile.engine.invoke(
-            RuntimeOperation.MAP_DATA_INIT,
-            self,
-            lambda value: self._runtime_profile.mechanic.invoke(
-                RuntimeOperation.MAP_DATA_INIT,
-                self,
-                self._declarative_map_data_init,
-                value,
-            ),
-            map_,
+        apply_normal_enemy_candidate_mask(
+            self.map,
+            self.definition.map.normal_enemy_spawn_candidates,
+            self.session_variant,
         )
 
     def clear_boss(self) -> bool:
-        result = self._runtime_profile.hard.invoke(
-            RuntimeOperation.CLEAR_BOSS,
-            self,
-            lambda: self._runtime_profile.mechanic.invoke(
-                RuntimeOperation.CLEAR_BOSS,
-                self,
-                lambda: CampaignEngine.clear_boss(self),
-            ),
-        )
-        return bool(result)
-
-    def equipment_take_off_when_finished(self) -> bool:
-        result = self._runtime_profile.hard.invoke(
-            RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
-            self,
-            partial(
-                self._missing_runtime_base,
-                RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
-            ),
-        )
-        return bool(result)
-
-    def _map_swipe(
-        self,
-        vector: Point,
-        box: Area = (123, 159, 1175, 628),
-    ) -> bool:
-        result = self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.MAP_SWIPE,
-            self,
-            lambda value, *, box: CampaignEngine._map_swipe(  # ruff:ignore[private-member-access] - 固定调用引擎基线。
-                self,
-                value,
-                box=box,
-            ),
-            vector,
-            box=box,
-        )
-        return bool(result)
-
-    def fleet_preparation(self) -> bool:
-        result = self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.FLEET_PREPARATION,
-            self,
-            self._base_fleet_preparation,
-        )
-        return bool(result)
-
-    def handle_mystery_items(self, button: object = None) -> bool:
-        result = self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.HANDLE_MYSTERY_ITEMS,
-            self,
-            lambda *, button=None: CampaignEngine.handle_mystery_items(self, button=button),
-            button=button,
-        )
-        return bool(result)
+        behavior = self._hard_behavior
+        if behavior is not None:
+            return behavior.clear_boss(self)
+        return CampaignEngine.clear_boss(self)
 
     def handle_submarine_support_popup(self) -> bool:
-        result = self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.HANDLE_SUBMARINE_SUPPORT_POPUP,
-            self,
-            CampaignEngine.handle_submarine_support_popup,
-        )
-        return bool(result)
-
-    def map_init(self, map_: CampaignMap | None) -> None:
-        self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.MAP_INIT,
-            self,
-            lambda value: CampaignEngine.map_init(self, value),
-            map_,
-        )
-
-    def strategy_set_execute(
-        self,
-        formation: Literal["line_ahead", "double_line", "diamond"] | None = None,
-        *,
-        sub_view: bool | None = None,
-        sub_hunt: bool | None = None,
-    ) -> None:
-        self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.STRATEGY_SET_EXECUTE,
-            self,
-            lambda value=None, *, sub_view=None, sub_hunt=None: CampaignEngine.strategy_set_execute(
-                self,
-                formation=value,
-                sub_view=sub_view,
-                sub_hunt=sub_hunt,
-            ),
-            formation,
-            sub_view=sub_view,
-            sub_hunt=sub_hunt,
-        )
-
-    def catch_camera_repositioning(self) -> bool:
-        result = self._runtime_profile.observation.invoke(
-            RuntimeOperation.CATCH_CAMERA_REPOSITIONING,
-            self,
-            lambda: CampaignEngine.catch_camera_repositioning(self),
-        )
-        return bool(result)
-
-    def enemy_searching_appear(self) -> bool:
-        result = self._runtime_profile.observation.invoke(
-            RuntimeOperation.ENEMY_SEARCHING_APPEAR,
-            self,
-            lambda: CampaignEngine.enemy_searching_appear(self),
-        )
-        return bool(result)
-
-    def find_current_fleet(self) -> FleetLocation:
-        result = self._runtime_profile.observation.invoke(
-            RuntimeOperation.FIND_CURRENT_FLEET,
-            self,
-            lambda: CampaignEngine.find_current_fleet(self),
-        )
-        return cast("FleetLocation", result)
-
-    def full_scan(
-        self,
-        options: FullScanOptions | None = None,
-        queue: SelectedGrids[GridInfo] | None = None,
-        must_scan: SelectedGrids[GridInfo] | None = None,
-        mode: GridMode = "normal",
-    ) -> None:
-        self._runtime_profile.observation.invoke(
-            RuntimeOperation.FULL_SCAN,
-            self,
-            lambda options=None, queue=None, must_scan=None, mode="normal": CampaignEngine.full_scan(
-                self,
-                options=options,
-                queue=queue,
-                must_scan=must_scan,
-                mode=mode,
-            ),
-            options,
-            queue,
-            must_scan,
-            mode,
-        )
-
-    def full_scan_movable(self, *, enemy_cleared: bool = True) -> None:
-        self._runtime_profile.observation.invoke(
-            RuntimeOperation.FULL_SCAN_MOVABLE,
-            self,
-            lambda *, enemy_cleared=True: CampaignEngine.full_scan_movable(
-                self,
-                enemy_cleared=enemy_cleared,
-            ),
-            enemy_cleared=enemy_cleared,
-        )
-
-    def get_map_clear_percentage(self) -> float:
-        result = self._runtime_profile.observation.invoke(
-            RuntimeOperation.GET_MAP_CLEAR_PERCENTAGE,
-            self,
-            lambda: CampaignEngine.get_map_clear_percentage(self),
-        )
-        if not isinstance(result, int | float):
-            message = "map clear percentage executor must return a number"
-            raise CampaignRuntimeProfileError(message)
-        return float(result) * self._runtime_profile.map_clear_percentage_multiplier
-
-    def in_sight(
-        self,
-        location: GridInfo | str | Point,
-        sight: tuple[int, int, int, int] | None = None,
-    ) -> None:
-        self._runtime_profile.observation.invoke(
-            RuntimeOperation.IN_SIGHT,
-            self,
-            lambda value, sight=None: CampaignEngine.in_sight(self, value, sight=sight),
-            location,
-            sight=sight,
-        )
-
-    def map_get_info(self) -> None:
-        self._runtime_profile.observation.invoke(
-            RuntimeOperation.MAP_GET_INFO,
-            self,
-            lambda: CampaignEngine.map_get_info(self),
-        )
+        return self._submarine_services.popup.handle(self)
 
     def handle_boss_appear_refocus(self, preset: GridLocation | None = None) -> None:
         selected = self._runtime_profile.boss_appear_refocus_preset if preset is None else preset
@@ -763,401 +602,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
                 CampaignEngine.combat_status(self, expected_end=expected_end)
             return
         CampaignEngine.combat_status(self, expected_end=expected_end)
-
-    def ensure_no_stage_entrance(self, *, skip_first_screenshot: bool = True) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.ENSURE_NO_STAGE_ENTRANCE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.ENSURE_NO_STAGE_ENTRANCE),
-            skip_first_screenshot=skip_first_screenshot,
-        )
-        return bool(result)
-
-    def event_20230817_story(self, *, skip_first_screenshot: bool = True) -> None:
-        self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.EVENT_20230817_STORY,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.EVENT_20230817_STORY),
-            skip_first_screenshot=skip_first_screenshot,
-        )
-
-    def event_animation_end(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.EVENT_ANIMATION_END,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.EVENT_ANIMATION_END),
-        )
-        return bool(result)
-
-    def get_story_button(self) -> object | None:
-        return self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.GET_STORY_BUTTON,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.GET_STORY_BUTTON),
-        )
-
-    def get_story_entrance(self) -> object | None:
-        return self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.GET_STORY_ENTRANCE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.GET_STORY_ENTRANCE),
-        )
-
-    def handle_campaign_ui_additional(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_CAMPAIGN_UI_ADDITIONAL,
-            self,
-            lambda: CampaignEngine.handle_campaign_ui_additional(self),
-        )
-        return bool(result)
-
-    def handle_chapter_additional(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_CHAPTER_ADDITIONAL,
-            self,
-            CampaignEngine.handle_chapter_additional,
-        )
-        return bool(result)
-
-    def handle_exp_info(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_EXP_INFO,
-            self,
-            lambda: CampaignEngine.handle_exp_info(self),
-        )
-        return bool(result)
-
-    def handle_get_chapter_additional(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_GET_CHAPTER_ADDITIONAL,
-            self,
-            lambda: CampaignEngine.handle_get_chapter_additional(self),
-        )
-        return bool(result)
-
-    def handle_in_stage(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_IN_STAGE,
-            self,
-            lambda: CampaignEngine.handle_in_stage(self),
-        )
-        return bool(result)
-
-    def handle_story_entrance(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_STORY_ENTRANCE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.HANDLE_STORY_ENTRANCE),
-        )
-        return bool(result)
-
-    def is_event_animation(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.IS_EVENT_ANIMATION,
-            self,
-            CampaignEngine.is_event_animation,
-        )
-        return bool(result)
-
-    def is_stage_page_has_entrance(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.IS_STAGE_PAGE_HAS_ENTRANCE,
-            self,
-            lambda: CampaignEngine.is_stage_page_has_entrance(self),
-        )
-        return bool(result)
-
-    def ui_goto_event(self) -> bool:
-        result = self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.UI_GOTO_EVENT,
-            self,
-            lambda: self._runtime_profile.event_ui.invoke(
-                RuntimeOperation.UI_GOTO_EVENT,
-                self,
-                lambda: CampaignEngine.ui_goto_event(self),
-            ),
-        )
-        return bool(result)
-
-    def ui_goto_sp(self) -> bool:
-        result = self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.UI_GOTO_SP,
-            self,
-            lambda: CampaignEngine.ui_goto_sp(self),
-        )
-        return bool(result)
-
-    def _campaign_ball_get(self) -> object:
-        return self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_BALL_GET,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.CAMPAIGN_BALL_GET),
-        )
-
-    def _campaign_ball_set(self, status: object) -> None:
-        self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_BALL_SET,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.CAMPAIGN_BALL_SET),
-            status,
-        )
-
-    def _campaign_ball_status(self, *args: object) -> object:
-        return self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_BALL_STATUS,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.CAMPAIGN_BALL_STATUS),
-            *args,
-        )
-
-    def _campaign_ensure_ball_mode(self, chapter: str) -> None:
-        self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_ENSURE_BALL_MODE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.CAMPAIGN_ENSURE_BALL_MODE),
-            chapter,
-        )
-
-    def campaign_ensure_mode(self, mode: str = "normal") -> None:
-        self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_ENSURE_MODE,
-            self,
-            lambda value="normal": CampaignEngine.campaign_ensure_mode(self, value),
-            mode,
-        )
-
-    def campaign_get_chapter_index(self, name: str | int) -> int:
-        result = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_GET_CHAPTER_INDEX,
-            self,
-            CampaignEngine.campaign_get_chapter_index,
-            name,
-        )
-        if type(result) is not int:
-            message = "campaign chapter index executor must return an integer"
-            raise CampaignRuntimeProfileError(message)
-        return result
-
-    def campaign_get_entrance(self, name: str) -> Button:
-        result = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_GET_ENTRANCE,
-            self,
-            lambda value: CampaignEngine.campaign_get_entrance(self, value),
-            name,
-        )
-        return cast("Button", result)
-
-    def campaign_match_multi(
-        self,
-        template: Template,
-        image: ImageArray,
-        stage_image: ImageArray | None = None,
-        options: StageMatchOptions | None = None,
-        **settings: Unpack[StageMatchSettings],
-    ) -> list[Button]:
-        result = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_MATCH_MULTI,
-            self,
-            lambda template, image, stage_image=None, options=None, **settings: CampaignEngine.campaign_match_multi(
-                self,
-                template,
-                image,
-                stage_image=stage_image,
-                options=options,
-                **settings,
-            ),
-            template,
-            image,
-            stage_image=stage_image,
-            options=options,
-            **settings,
-        )
-        if not isinstance(result, list):
-            message = "campaign match executor must return a list"
-            raise CampaignRuntimeProfileError(message)
-        return cast("list[Button]", result)
-
-    def campaign_ocr_result_process(self, result: str) -> str:
-        normalized = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_OCR_RESULT_PROCESS,
-            self,
-            CampaignEngine.campaign_ocr_result_process,
-            result,
-        )
-        if not isinstance(normalized, str):
-            message = "campaign OCR executor must return a string"
-            raise CampaignRuntimeProfileError(message)
-        return normalized
-
-    def campaign_separate_name(self, name: str) -> tuple[str, str]:
-        separated = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_SEPARATE_NAME,
-            self,
-            CampaignEngine.campaign_separate_name,
-            name,
-        )
-        if (
-            not isinstance(separated, tuple)
-            or len(separated) != 2
-            or any(not isinstance(value, str) for value in separated)
-        ):
-            message = "campaign name executor must return two strings"
-            raise CampaignRuntimeProfileError(message)
-        return cast("tuple[str, str]", separated)
-
-    def campaign_set_chapter(self, name: str, mode: str = "normal") -> None:
-        self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_SET_CHAPTER,
-            self,
-            lambda value, mode="normal": CampaignEngine.campaign_set_chapter(self, value, mode),
-            name,
-            mode,
-        )
-
-    def campaign_set_chapter_20241219(
-        self,
-        chapter: str,
-        stage: str,
-        mode: str = "combat",
-    ) -> bool:
-        result = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_SET_CHAPTER_20241219,
-            self,
-            lambda chapter, stage, mode="combat": CampaignEngine.campaign_set_chapter_20241219(
-                self,
-                chapter,
-                stage,
-                mode,
-            ),
-            chapter,
-            stage,
-            mode,
-        )
-        return bool(result)
-
-    def campaign_set_chapter_ball(self, chapter: str, stage: str) -> bool:
-        result = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_SET_CHAPTER_BALL,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.CAMPAIGN_SET_CHAPTER_BALL),
-            chapter,
-            stage,
-        )
-        return bool(result)
-
-    def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
-        result = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_SET_CHAPTER_EVENT,
-            self,
-            lambda chapter, mode="normal": CampaignEngine.campaign_set_chapter_event(
-                self,
-                chapter,
-                mode,
-            ),
-            chapter,
-            mode,
-        )
-        return bool(result)
-
-    def campaign_set_chapter_main(self, chapter: str, mode: str = "normal") -> bool:
-        result = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_SET_CHAPTER_MAIN,
-            self,
-            lambda chapter, mode="normal": CampaignEngine.campaign_set_chapter_main(
-                self,
-                chapter,
-                mode,
-            ),
-            chapter,
-            mode,
-        )
-        return bool(result)
-
-    def campaign_set_chapter_sp(self, chapter: str, mode: str = "normal") -> bool:
-        result = self._runtime_profile.navigation.invoke(
-            RuntimeOperation.CAMPAIGN_SET_CHAPTER_SP,
-            self,
-            lambda chapter, mode="normal": CampaignEngine.campaign_set_chapter_sp(
-                self,
-                chapter,
-                mode,
-            ),
-            chapter,
-            mode,
-        )
-        return bool(result)
-
-    def _advance_archives_scroll(self) -> bool:
-        result = self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.ADVANCE_ARCHIVES_SCROLL,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.ADVANCE_ARCHIVES_SCROLL),
-        )
-        return bool(result)
-
-    def _archives_loading_complete(self) -> bool:
-        result = self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.ARCHIVES_LOADING_COMPLETE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.ARCHIVES_LOADING_COMPLETE),
-        )
-        return bool(result)
-
-    def _discard_archives_scroll_record(self) -> None:
-        self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.DISCARD_ARCHIVES_SCROLL_RECORD,
-            self,
-            partial(
-                self._missing_runtime_base,
-                RuntimeOperation.DISCARD_ARCHIVES_SCROLL_RECORD,
-            ),
-        )
-
-    def _ensure_archives_search_page(self) -> bool:
-        result = self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.ENSURE_ARCHIVES_SEARCH_PAGE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.ENSURE_ARCHIVES_SEARCH_PAGE),
-        )
-        return bool(result)
-
-    def _get_archives_entrance(self, name: str) -> object | None:
-        return self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.GET_ARCHIVES_ENTRANCE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.GET_ARCHIVES_ENTRANCE),
-            name,
-        )
-
-    def _search_archives_entrance(
-        self,
-        name: str,
-        *,
-        skip_first_screenshot: bool = True,
-    ) -> object | None:
-        return self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.SEARCH_ARCHIVES_ENTRANCE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.SEARCH_ARCHIVES_ENTRANCE),
-            name,
-            skip_first_screenshot=skip_first_screenshot,
-        )
-
-    def _wait_archives_loaded(self) -> None:
-        self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.WAIT_ARCHIVES_LOADED,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.WAIT_ARCHIVES_LOADED),
-        )
-
-    def ui_goto_archives_campaign(self, mode: str = "ex") -> bool:
-        result = self._runtime_profile.war_archives_navigation.invoke(
-            RuntimeOperation.UI_GOTO_ARCHIVES_CAMPAIGN,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.UI_GOTO_ARCHIVES_CAMPAIGN),
-            mode,
-        )
-        return bool(result)
 
     def configure_gems_behavior(self, behavior: Mumu12GemsRuntimeBehavior) -> None:
         if not isinstance(behavior, Mumu12GemsRuntimeBehavior):
@@ -1173,6 +617,10 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             if "emotion" in self.__dict__:
                 self.__dict__["emotion"] = behavior.emotion
         self._gems_behavior = behavior
+        self._fleet_preparation_service = GemsHardRetryFleetPreparationService(
+            self._profile_fleet_preparation_service,
+            behavior.prepare_hard_fleet,
+        )
 
     @cached_property
     def emotion(self) -> Emotion:
@@ -1189,20 +637,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             return super().handle_combat_low_emotion()
         return behavior.handle_low_emotion(self)
 
-    def _base_fleet_preparation(self) -> bool:
-        try:
-            return CampaignEngine.fleet_preparation(self)
-        except HardNotSatisfied:
-            behavior = self._gems_behavior
-            if behavior is None:
-                raise
-            behavior.prepare_hard_fleet(self)
-            try:
-                return CampaignEngine.fleet_preparation(self)
-            except HardNotSatisfied as retry_error:
-                message = "hard fleet still does not satisfy its constraints after replacement"
-                raise GemsHardPreparationFailed(message) from retry_error
-
     def read_battle_flag(self, flag: BattleFlag) -> bool:
         """只暴露 StagePolicy 条件需要的稳定事实；关卡局部状态由 BattleProgram 持有。"""
 
@@ -1216,138 +650,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         message = f"unsupported battle flag: {flag!r}"
         raise CampaignRuntimeEvidenceError(message)
 
-    def _apply_map_patches(self, phase: MapMutationPhase, battle: int | None = None) -> None:
-        for patch in self.definition.mechanics.map_mutations.patches:
-            if patch.phase is not phase or patch.battle != battle:
-                continue
-            if patch.variant is MapMutationVariant.NORMAL and self.session_variant is not CampaignRunVariant.NORMAL:
-                continue
-            if patch.variant is MapMutationVariant.LOOP and self.session_variant is not CampaignRunVariant.LOOP:
-                continue
-            grid = self.map[(patch.cell.x, patch.cell.y)]
-            setattr(grid, patch.attribute.value, patch.value)
-
-    def _begin_runtime_session(
-        self,
-        variant: CampaignRunVariant,
-        battle_index: int,
-        entry_kind: RuntimeSessionEntryKind,
-        state: CampaignSessionState | None = None,
-    ) -> None:
-        if not isinstance(variant, CampaignRunVariant):
-            message = "campaign runtime variant must be a CampaignRunVariant"
-            raise TypeError(message)
-        if type(battle_index) is not int or battle_index < 0:
-            message = "campaign runtime battle_index must be a non-negative integer"
-            raise ValueError(message)
-        if not isinstance(entry_kind, RuntimeSessionEntryKind):
-            message = "campaign runtime entry_kind must be a RuntimeSessionEntryKind"
-            raise TypeError(message)
-        if state is not None and (not isinstance(state, CampaignSessionState) or state.variant is not variant):
-            message = "campaign runtime state must match the selected variant"
-            raise ValueError(message)
-        if not self._runtime_profile_available:
-            message = "campaign runtime profile has already been released"
-            raise CampaignRuntimeProfileError(message)
-        if self._runtime_profile_session_active:
-            message = "campaign runtime profile session is already active"
-            raise CampaignRuntimeProfileError(message)
-        self.session_state = state
-        self.session_variant = variant
-        self.map_is_clear_mode = variant is CampaignRunVariant.LOOP
-        self._runtime_profile.begin_session(RuntimeSessionContext(variant, battle_index, entry_kind))
-        self._runtime_profile_session_active = True
-
-    def initialize_session(
-        self,
-        variant: CampaignRunVariant,
-        battle_index: int,
-        entry_kind: RuntimeSessionEntryKind,
-        state: CampaignSessionState | None = None,
-    ) -> None:
-        self._begin_runtime_session(variant, battle_index, entry_kind, state)
-        try:
-            self.map_init(self.MAP)
-            self.battle_count = battle_index
-            self._apply_map_patches(MapMutationPhase.MAP_INIT)
-        except BaseException as error:
-            preserve_cleanup_failure(
-                error,
-                partial(self.finish_runtime_session, RuntimeSessionOutcome.FAILED),
-                message="campaign session initialization and cleanup both failed",
-            )
-            raise
-
-    def resume_session(self, state: CampaignSessionState) -> None:
-        if not isinstance(state, CampaignSessionState):
-            message = "campaign runtime resume requires a CampaignSessionState"
-            raise TypeError(message)
-        if not self._runtime_profile_session_active:
-            message = "campaign runtime profile session is not active"
-            raise CampaignRuntimeProfileError(message)
-        if state.variant is not self.session_variant:
-            message = "campaign runtime resume variant must match the active runtime"
-            raise ValueError(message)
-        self.session_state = state
-        self.battle_count = state.battle_index
-
-    def finish_runtime_session(self, outcome: RuntimeSessionOutcome) -> None:
-        if not isinstance(outcome, RuntimeSessionOutcome):
-            message = "campaign runtime outcome must be a RuntimeSessionOutcome"
-            raise TypeError(message)
-        if not self._runtime_profile_session_active:
-            message = "campaign runtime profile session is not active"
-            raise CampaignRuntimeProfileError(message)
-        self._runtime_profile_available = False
-        self._runtime_profile_session_active = False
-        errors: list[BaseException] = []
-        for cleanup in (
-            partial(self._runtime_profile.end_session, outcome),
-            self._runtime_profile.reset,
-        ):
-            try:
-                cleanup()
-            except BaseException as error:  # ruff:ignore[blind-except] - end 与 reset 是独立的关闭阶段。
-                errors.append(error)
-        raise_cleanup_errors(errors, message="campaign runtime session cleanup failed")
-
-    def discard_runtime(self) -> None:
-        if self._runtime_profile_session_active:
-            message = "active campaign runtime must finish its session before discard"
-            raise CampaignRuntimeProfileError(message)
-        if not self._runtime_profile_available:
-            return
-        self._runtime_profile_available = False
-        self._runtime_profile.reset()
-
-    @property
-    def runtime_session_active(self) -> bool:
-        return self._runtime_profile_session_active
-
-    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
-        return self._runtime_profile.map_has_mob_move(cancellation)
-
-    def use_support_fleet(self, cancellation: CancellationSource) -> bool:
-        return self._runtime_profile.use_support_fleet(cancellation)
-
-    def use_single_fleet_override(
-        self,
-        cancellation: CancellationSource,
-    ) -> bool | None:
-        return self._runtime_profile.use_single_fleet_override(cancellation)
-
-    def disable_mob_move(self) -> None:
-        self._runtime_profile.disable_mob_move()
-
-    def disable_support_fleet(self) -> None:
-        self._runtime_profile.disable_support_fleet()
-
-    def prepare_battle(self, battle_index: int) -> None:
-        if type(battle_index) is not int or battle_index < 0:
-            message = "campaign battle_index must be a non-negative integer"
-            raise ValueError(message)
-        self._apply_map_patches(MapMutationPhase.BEFORE_BATTLE, battle_index)
-
     def is_event_entrance_available(self) -> bool:
         """只返回入口事实；调度变化由 CampaignTask effects 统一提交。"""
 
@@ -1356,145 +658,151 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def handle_map_stop(self) -> None:
         """地图成就只产生事实；task disable/关卡推进由 typed workflow 提交。"""
 
-    def _pause_auto_search(self, cancellation: CancellationSource) -> None:
-        cancellation.raise_if_requested()
-        if not self.is_auto_search_running():
-            return
-        self.device.click(AUTO_SEARCH_MAP_OPTION_ON)
-        for _ in range(20):
-            cancellation.raise_if_requested()
-            self.device.screenshot()
-            if not self.is_auto_search_running():
-                return
-            self.device.sleep(0.2)
-        message = "auto-search did not reach a paused map safe point"
-        raise CampaignRuntimeEvidenceError(message)
 
-    def _visible_targets(self, cancellation: CancellationSource) -> tuple[int, int, int]:
-        cancellation.raise_if_requested()
-        self.full_scan()
-        cancellation.raise_if_requested()
-        self.find_path_initial()
-        grids = tuple(self.map)
-        enemy = sum(grid.is_enemy and not grid.is_siren and not grid.is_boss for grid in grids)
-        siren = sum(grid.is_siren for grid in grids)
-        boss = sum(grid.is_boss for grid in grids)
-        return enemy, siren, boss
+@dataclass(frozen=True, slots=True)
+class Mumu12CampaignMapAssembly:
+    runtime: DeclarativeCampaignMapRuntime
+    owner: Mumu12CampaignMapSessionOwner
+    program_state: RuntimeProgramState
+    program_capabilities: CampaignProgramCapabilityReader
 
-    def _expected_visible_after(self, target: BattleTarget) -> tuple[int, int, int]:
-        state = self.session_state
-        if state is None:
-            message = "auto-search battle requires a campaign session state"
-            raise CampaignRuntimeEvidenceError(message)
-        remaining = state.remaining.clear(target)
-        next_index = state.battle_index + 1
-        variant = (
-            self.definition.map.normal
-            if self.session_variant is CampaignRunVariant.NORMAL
-            else self.definition.map.loop
-        )
-        if next_index < len(variant.spawn_waves):
-            remaining = remaining.add_wave(variant.spawn_waves[next_index])
-        return remaining.enemy, remaining.siren, remaining.boss
 
-    def execute_auto_search_battle(
+@dataclass(frozen=True, slots=True)
+class Mumu12CampaignHardAssembly:
+    runtime: DeclarativeCampaignMapRuntime
+    owner: Mumu12CampaignHardAttemptOwner
+
+
+class Mumu12CampaignMapAssemblyFactory(Protocol):
+    def build_map(
         self,
-        battle_index: int,
-        cancellation: CancellationSource,
-    ) -> BattleTarget:
-        """推进一次游戏自律 battle，并以暂停后的地图差分闭合实际目标。"""
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> Mumu12CampaignMapAssembly: ...
 
-        state = self.session_state
-        if state is None or state.battle_index != battle_index:
-            message = "auto-search battle does not match the active campaign safe point"
-            raise CampaignRuntimeEvidenceError(message)
-        before = self.battle_count
-        ended = False
+
+class Mumu12CampaignHardAssemblyFactory(Protocol):
+    def build_hard(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> Mumu12CampaignHardAssembly: ...
+
+
+class DeclarativeCampaignRuntimeFactory:
+    """构造完整 runtime，并把唯一 profile lease 原子移交给对应 owner。"""
+
+    __slots__ = ("_runtime_builder",)
+
+    def __init__(
+        self,
+        runtime_builder: Callable[
+            [AzurLaneConfig, Device, CampaignStageDefinition],
+            DeclarativeCampaignMapRuntime,
+        ] = DeclarativeCampaignMapRuntime,
+    ) -> None:
+        if isinstance(runtime_builder, type) and not issubclass(runtime_builder, DeclarativeCampaignMapRuntime):
+            message = "campaign runtime builder must build DeclarativeCampaignMapRuntime"
+            raise TypeError(message)
+        if not callable(runtime_builder):
+            message = "campaign runtime builder must be callable"
+            raise TypeError(message)
+        self._runtime_builder = runtime_builder
+
+    def _build_runtime(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> DeclarativeCampaignMapRuntime:
+        runtime = self._runtime_builder(config, device, definition)
+        if not isinstance(runtime, DeclarativeCampaignMapRuntime):
+            message = "campaign runtime builder returned an invalid runtime"
+            raise TypeError(message)
+        return runtime
+
+    @staticmethod
+    def _require_hard_behavior(runtime: DeclarativeCampaignMapRuntime) -> None:
+        if not isinstance(
+            runtime._hard_behavior,  # ruff:ignore[private-member-access] - capability 必须在任何交互前验证。
+            CampaignClearModeExecutor,
+        ):
+            message = "hard campaign attempt requires the typed clear-mode behavior"
+            raise CampaignRuntimeProfileError(message)
+
+    def build_map(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> Mumu12CampaignMapAssembly:
+        runtime = self._build_runtime(config, device, definition)
+        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - factory 接管 runtime 构造的唯一 lease。
         try:
-            cancellation.raise_if_requested()
-            self.auto_search_execute_a_battle()
-        except CampaignEnd:
-            ended = True
-
-        confirmed = self.battle_count - before
-        if ended and confirmed == 0 and state.remaining.boss == 1:
-            self.battle_count += 1
-            return BattleTarget.BOSS
-        if confirmed != 1:
-            message = f"one auto-search action changed battle_count by {confirmed}, expected exactly one"
-            raise CampaignRuntimeEvidenceError(message)
-
-        self._pause_auto_search(cancellation)
-        observed = self._visible_targets(cancellation)
-        available = (
-            (BattleTarget.ENEMY, state.remaining.enemy),
-            (BattleTarget.SIREN, state.remaining.siren),
-            (BattleTarget.BOSS, state.remaining.boss),
-        )
-        matched = tuple(
-            target for target, count in available if count and self._expected_visible_after(target) == observed
-        )
-        if len(matched) != 1:
-            message = f"auto-search battle target is ambiguous: observed={observed}, candidates={matched}"
-            raise CampaignRuntimeEvidenceError(message)
-        return matched[0]
-
-    def execute_hard_attempt(self, cancellation: CancellationSource) -> None:
-        """完成一次困难图结算；hard clear-mode 的一次 attempt 是最小可恢复业务单元。"""
-
-        cancellation.raise_if_requested()
-        self._begin_runtime_session(
-            CampaignRunVariant.LOOP,
-            0,
-            RuntimeSessionEntryKind.FRESH,
-        )
-        try:
-            self._execute_hard_attempt_body(cancellation)
+            owner = Mumu12CampaignMapSessionOwner(
+                runtime,
+                lease,
+                runtime._submarine_services.fresh_combat,  # ruff:ignore[private-member-access] - assembly 固化 profile hook。
+                runtime._map_initialization_service,  # ruff:ignore[private-member-access] - assembly 固化初始化服务。
+            )
+            return Mumu12CampaignMapAssembly(
+                runtime=runtime,
+                owner=owner,
+                program_state=runtime._runtime_profile,  # ruff:ignore[private-member-access] - product 只暴露窄 program state。
+                program_capabilities=runtime._program_capabilities,  # ruff:ignore[private-member-access] - product 只暴露已编译能力。
+            )
         except BaseException as error:
-            if self._runtime_profile_session_active:
-                preserve_cleanup_failure(
-                    error,
-                    partial(self.finish_runtime_session, RuntimeSessionOutcome.FAILED),
-                    message="hard campaign attempt and cleanup both failed",
-                )
+            preserve_cleanup_failure(
+                error,
+                lease.discard,
+                message="campaign map assembly and cleanup both failed",
+            )
             raise
-        self.finish_runtime_session(RuntimeSessionOutcome.COMPLETED)
 
-    def _execute_hard_attempt_body(self, cancellation: CancellationSource) -> None:
-        self.ENTRANCE.area = self.ENTRANCE.button
-        self.enter_map(self.ENTRANCE, mode="hard")
-        if not self.map_is_auto_search:
-            message = "hard campaign attempt requires the game's clear-mode auto search"
-            raise CampaignRuntimeEvidenceError(message)
-        self.map = self.MAP
-        self.battle_count = 0
-        self.lv_reset()
-        self.lv_get()
-        for _ in range(20):
-            cancellation.raise_if_requested()
-            try:
-                self.auto_search_execute_a_battle()
-            except CampaignEnd:
-                return
-        message = "hard campaign attempt did not reach settlement within 20 battles"
-        raise CampaignRuntimeEvidenceError(message)
+    def build_hard(
+        self,
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> Mumu12CampaignHardAssembly:
+        runtime = self._build_runtime(config, device, definition)
+        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - factory 接管 runtime 构造的唯一 lease。
+        try:
+            self._require_hard_behavior(runtime)
+            owner = Mumu12CampaignHardAttemptOwner(runtime, lease)
+        except BaseException as error:
+            preserve_cleanup_failure(
+                error,
+                lease.discard,
+                message="hard campaign assembly and cleanup both failed",
+            )
+            raise
+        return Mumu12CampaignHardAssembly(runtime=runtime, owner=owner)
+
+
+_DECLARATIVE_CAMPAIGN_RUNTIME_FACTORY: Final = DeclarativeCampaignRuntimeFactory()
+
+
+@dataclass(slots=True)
+class _RuntimeHandle:
+    runtime: DeclarativeCampaignMapRuntime
+    owner: Mumu12CampaignMapSessionOwner
+    program_state: RuntimeProgramState
+    program_capabilities: CampaignProgramCapabilityReader
+    cancellation: SafeUnitCancellation
+    ownership: _RuntimeOwnership
 
 
 class Mumu12CampaignRuntimeProvider:
     """一次 workflow turn 只暴露一个与 typed session 精确匹配的固定 runtime。"""
 
     __slots__ = (
-        "_active_runtime",
-        "_active_session",
-        "_active_unit_cancellation",
+        "_assembly_factory",
         "_config",
         "_device",
-        "_prepared_at_boundary",
-        "_prepared_job",
-        "_prepared_runtime",
-        "_prepared_session",
-        "_prepared_unit_cancellation",
-        "_runtime_factory",
+        "_handle",
     )
 
     def __init__(
@@ -1502,10 +810,7 @@ class Mumu12CampaignRuntimeProvider:
         config: AzurLaneConfig,
         device: Device,
         *,
-        runtime_factory: Callable[
-            [AzurLaneConfig, Device, CampaignStageDefinition],
-            DeclarativeCampaignMapRuntime,
-        ] = DeclarativeCampaignMapRuntime,
+        assembly_factory: Mumu12CampaignMapAssemblyFactory = _DECLARATIVE_CAMPAIGN_RUNTIME_FACTORY,
     ) -> None:
         if not isinstance(config, AzurLaneConfig):
             message = "campaign provider config must be an AzurLaneConfig"
@@ -1513,23 +818,13 @@ class Mumu12CampaignRuntimeProvider:
         if not isinstance(device, Device):
             message = "campaign provider device must be a Device"
             raise TypeError(message)
-        if isinstance(runtime_factory, type) and not issubclass(runtime_factory, DeclarativeCampaignMapRuntime):
-            message = "campaign runtime factory must build DeclarativeCampaignMapRuntime"
-            raise TypeError(message)
-        if not callable(runtime_factory):
-            message = "campaign runtime factory must be callable"
+        if isinstance(assembly_factory, type) or not callable(getattr(assembly_factory, "build_map", None)):
+            message = "campaign assembly factory must implement build_map"
             raise TypeError(message)
         self._config = config
         self._device = device
-        self._runtime_factory = runtime_factory
-        self._active_runtime: DeclarativeCampaignMapRuntime | None = None
-        self._active_session: CampaignSession | None = None
-        self._active_unit_cancellation: SafeUnitCancellation | None = None
-        self._prepared_at_boundary = False
-        self._prepared_job: CampaignJobSpec | None = None
-        self._prepared_runtime: DeclarativeCampaignMapRuntime | None = None
-        self._prepared_session: CampaignSession | None = None
-        self._prepared_unit_cancellation: SafeUnitCancellation | None = None
+        self._assembly_factory = assembly_factory
+        self._handle: _RuntimeHandle | None = None
 
     @staticmethod
     def _selected_session(job: CampaignJobSpec) -> CampaignSession:
@@ -1592,29 +887,74 @@ class Mumu12CampaignRuntimeProvider:
         )
         self._device.config = self._config
 
-    def _new_runtime(
+    def _reset_to_map_boundary(
         self,
         job: CampaignJobSpec,
         session: CampaignSession,
         cancellation: CancellationSource,
-    ) -> tuple[DeclarativeCampaignMapRuntime, SafeUnitCancellation]:
+    ) -> None:
+        """不构造地图 runtime，仅通过通用 UI 把客户端收口到选图页。"""
+
         cancellation.raise_if_requested()
         definition = compose_campaign_attempt_definition(session.definition, job.difficulty)
         self._activate_config(job, definition)
-        runtime = self._runtime_factory(self._config, self._device, definition)
-        if not isinstance(runtime, DeclarativeCampaignMapRuntime):
-            message = "campaign runtime factory returned an invalid runtime"
-            raise TypeError(message)
+        device = cast("Device", CancellationAwareMumu12Device(self._device, cancellation))
+        UI(config=self._config, device=device).ui_goto(
+            page_campaign_menu,
+            skip_first_screenshot=False,
+        )
+        cancellation.raise_if_requested()
+
+    def _new_handle(
+        self,
+        job: CampaignJobSpec,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> _RuntimeHandle:
+        cancellation.raise_if_requested()
+        definition = compose_campaign_attempt_definition(session.definition, job.difficulty)
+        self._activate_config(job, definition)
+        assembly = self._assembly_factory.build_map(self._config, self._device, definition)
         try:
-            unit_cancellation = self._refresh_runtime_cancellation(job, runtime, cancellation)
+            unit_cancellation = self._refresh_runtime_cancellation(job, assembly.runtime, cancellation)
         except BaseException as error:
             preserve_cleanup_failure(
                 error,
-                runtime.discard_runtime,
+                assembly.owner.discard,
                 message="campaign runtime construction and cleanup both failed",
             )
             raise
-        return runtime, unit_cancellation
+        return _RuntimeHandle(
+            runtime=assembly.runtime,
+            owner=assembly.owner,
+            program_state=assembly.program_state,
+            program_capabilities=assembly.program_capabilities,
+            cancellation=unit_cancellation,
+            ownership=_PreparedRuntimeOwnership(job, session),
+        )
+
+    def _release_handle(self, outcome: RuntimeSessionOutcome) -> None:
+        handle = self._handle
+        self._handle = None
+        if handle is None:
+            return
+        if handle.owner.active:
+            handle.owner.close(outcome)
+        else:
+            handle.owner.discard()
+
+    def _release_handle_after_error(
+        self,
+        error: BaseException,
+        outcome: RuntimeSessionOutcome,
+        *,
+        message: str,
+    ) -> None:
+        preserve_cleanup_failure(
+            error,
+            partial(self._release_handle, outcome),
+            message=message,
+        )
 
     def _refresh_runtime_cancellation(
         self,
@@ -1652,16 +992,6 @@ class Mumu12CampaignRuntimeProvider:
             raise TypeError(message)
         return value if value > 0 else None
 
-    def _discard_prepared_runtime(self) -> None:
-        runtime = self._prepared_runtime
-        self._prepared_at_boundary = False
-        self._prepared_job = None
-        self._prepared_runtime = None
-        self._prepared_session = None
-        self._prepared_unit_cancellation = None
-        if runtime is not None and runtime is not self._active_runtime:
-            runtime.discard_runtime()
-
     def before_entry(
         self,
         job: CampaignJobSpec,
@@ -1672,37 +1002,24 @@ class Mumu12CampaignRuntimeProvider:
         if self._selected_session(job) != session or state != session.initial_state():
             message = "campaign pre-entry evidence requires the selected map boundary"
             raise ValueError(message)
-        if self._active_runtime is not None:
+        handle = self._handle
+        if handle is not None and isinstance(handle.ownership, _ActiveRuntimeOwnership):
             message = "fresh campaign entry cannot replace an active map runtime"
             raise CampaignRuntimeEvidenceError(message)
-        self._discard_prepared_runtime()
-        runtime, unit_cancellation = self._new_runtime(job, session, cancellation)
-        self._prepared_job = job
-        self._prepared_runtime = runtime
-        self._prepared_session = session
-        self._prepared_unit_cancellation = unit_cancellation
+        if handle is not None:
+            self._release_handle(RuntimeSessionOutcome.INTERRUPTED)
+        self._reset_to_map_boundary(job, session, cancellation)
+        handle = self._new_handle(job, session, cancellation)
+        self._handle = handle
+        runtime = handle.runtime
+        ownership = cast("_PreparedRuntimeOwnership", handle.ownership)
         progress = job.progress
         pending = None if progress is None else progress.pending_gems_replacement
         if pending is not None and pending.trigger is GemsFleetReplacementTrigger.HARD_PREPARATION:
-            self._prepared_at_boundary = True
+            handle.ownership = replace(ownership, at_boundary=True)
             return CampaignGuardEvidence(CampaignGuardPhase.PRE_ENTRY)
-        if job.progress is not None:
-            cancellation.raise_if_requested()
-            runtime.device.screenshot()
-            cancellation.raise_if_requested()
-            if runtime.is_in_map():
-                self._prepared_job = job
-                self._prepared_runtime = runtime
-                self._prepared_session = session
-                self._prepared_unit_cancellation = unit_cancellation
-                return CampaignGuardEvidence(
-                    CampaignGuardPhase.PRE_ENTRY,
-                    resuming_checkpoint=True,
-                )
         event_available: bool | None = None
         if self._is_event_stage(job, session):
-            cancellation.raise_if_requested()
-            runtime.ui_goto(page_campaign_menu)
             cancellation.raise_if_requested()
             event_available = runtime.is_event_entrance_available()
             if not event_available:
@@ -1712,8 +1029,15 @@ class Mumu12CampaignRuntimeProvider:
                 )
 
         cancellation.raise_if_requested()
-        runtime.ensure_campaign_ui(session.definition.ref.stage_id, mode=job.difficulty.value)
-        self._prepared_at_boundary = job.progress is not None
+        entrance = runtime.stage_navigator.select(
+            session.definition.ref.stage_id,
+            mode=job.difficulty.value,
+        )
+        handle.ownership = replace(
+            ownership,
+            at_boundary=job.progress is not None,
+            entrance=entrance,
+        )
         return self._read_pre_entry_evidence(
             job,
             runtime,
@@ -1777,10 +1101,15 @@ class Mumu12CampaignRuntimeProvider:
         if state.status is not CampaignSessionStatus.COMPLETED:
             message = "campaign post-battle evidence requires a completed map"
             raise ValueError(message)
-        runtime = self._active_runtime
-        if runtime is None or self._active_session != session:
+        handle = self._handle
+        if (
+            handle is None
+            or not isinstance(handle.ownership, _ActiveRuntimeOwnership)
+            or handle.ownership.session != session
+        ):
             message = "campaign post-battle evidence requires the active runtime"
             raise CampaignRuntimeEvidenceError(message)
+        runtime = handle.runtime
         emotion = runtime.emotion
         emotion_bug = not emotion.is_ignore and emotion.total_reduced >= emotion.bug_threshold
         return CampaignGuardEvidence(
@@ -1797,114 +1126,100 @@ class Mumu12CampaignRuntimeProvider:
             map_is_threat_safe=bool(runtime.map_is_threat_safe),
         )
 
-    def _take_prepared_runtime(
-        self,
-        job: CampaignJobSpec,
-        session: CampaignSession,
-    ) -> tuple[DeclarativeCampaignMapRuntime | None, bool, SafeUnitCancellation | None]:
-        if self._prepared_job is not job or self._prepared_session != session:
-            return None, False, None
-        runtime = self._prepared_runtime
-        at_boundary = self._prepared_at_boundary
-        unit_cancellation = self._prepared_unit_cancellation
-        self._prepared_at_boundary = False
-        self._prepared_job = None
-        self._prepared_runtime = None
-        self._prepared_session = None
-        self._prepared_unit_cancellation = None
-        return runtime, at_boundary, unit_cancellation
-
-    def _take_active_runtime(
+    def _handle_for_activation(
         self,
         job: CampaignJobSpec,
         session: CampaignSession,
         cancellation: CancellationSource,
-    ) -> tuple[DeclarativeCampaignMapRuntime | None, SafeUnitCancellation | None]:
-        runtime = self._active_runtime
-        if runtime is None:
-            return None, None
-        if self._active_session != session:
+    ) -> _RuntimeHandle:
+        handle = self._handle
+        if handle is None:
+            handle = self._new_handle(job, session, cancellation)
+            self._handle = handle
+            return handle
+        ownership = handle.ownership
+        if isinstance(ownership, _PreparedRuntimeOwnership):
+            if ownership.job is not job or ownership.session != session:
+                message = "prepared campaign runtime does not match the selected attempt"
+                raise CampaignRuntimeEvidenceError(message)
+            return handle
+        if job.progress is None:
+            message = "fresh campaign entry cannot replace an active map runtime"
+            raise CampaignRuntimeEvidenceError(message)
+        if ownership.session != session:
             message = "campaign checkpoint does not match the retained map runtime"
             raise CampaignRuntimeEvidenceError(message)
+        progress_state = job.progress.session_state
         expected = compose_campaign_attempt_definition(session.definition, job.difficulty)
-        if runtime.definition != expected or not runtime.runtime_session_active:
+        if (
+            handle.runtime.definition != expected
+            or not handle.owner.active
+            or handle.runtime.session_variant is not progress_state.variant
+            or ownership.checkpoint != progress_state
+        ):
             message = "retained campaign runtime does not match the selected attempt"
             raise CampaignRuntimeEvidenceError(message)
-        unit_cancellation = self._refresh_runtime_cancellation(job, runtime, cancellation)
-        self._active_unit_cancellation = unit_cancellation
-        return runtime, unit_cancellation
+        handle.cancellation = self._refresh_runtime_cancellation(job, handle.runtime, cancellation)
+        return handle
 
-    def _release_active_runtime(self, outcome: RuntimeSessionOutcome) -> None:
-        runtime = self._active_runtime
-        self._active_runtime = None
-        self._active_session = None
-        self._active_unit_cancellation = None
-        if runtime is None:
-            return
-        self._release_runtime(runtime, outcome)
-
-    @staticmethod
-    def _release_runtime(
-        runtime: DeclarativeCampaignMapRuntime,
-        outcome: RuntimeSessionOutcome,
-    ) -> None:
-        if runtime.runtime_session_active:
-            runtime.finish_runtime_session(outcome)
-        else:
-            runtime.discard_runtime()
-
-    def _release_activation_runtime(self, runtime: DeclarativeCampaignMapRuntime) -> None:
-        if runtime is self._active_runtime:
-            self._release_active_runtime(RuntimeSessionOutcome.FAILED)
-        else:
-            self._release_runtime(runtime, RuntimeSessionOutcome.FAILED)
+    def _prepare_activation_handle(
+        self,
+        job: CampaignJobSpec,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> _RuntimeHandle | CampaignCheckpointReset:
+        progress = job.progress
+        handle_missing = self._handle is None
+        if handle_missing:
+            self._reset_to_map_boundary(job, session, cancellation)
+            if progress is not None and progress.session_state != session.initial_state():
+                return CampaignCheckpointReset("cold checkpoint was reset to the campaign map boundary")
+        handle = self._handle_for_activation(job, session, cancellation)
+        if not handle_missing or progress is None:
+            return handle
+        ownership = handle.ownership
+        if not isinstance(ownership, _PreparedRuntimeOwnership):
+            message = "cold campaign activation did not create a prepared runtime"
+            raise CampaignRuntimeEvidenceError(message)
+        handle.ownership = replace(ownership, at_boundary=True)
+        return handle
 
     def _activate_checkpoint(
         self,
+        job: CampaignJobSpec,
         session: CampaignSession,
-        runtime: DeclarativeCampaignMapRuntime,
+        handle: _RuntimeHandle,
         progress_state: CampaignSessionState,
         cancellation: CancellationSource,
-    ) -> CampaignSession | CampaignCheckpointUnavailable:
+    ) -> _ActivatedMap | CampaignCheckpointReset:
+        runtime = handle.runtime
         cancellation.raise_if_requested()
         runtime.device.screenshot()
         cancellation.raise_if_requested()
         if not runtime.is_in_map():
-            if runtime is self._active_runtime:
-                self._release_active_runtime(RuntimeSessionOutcome.INTERRUPTED)
-            else:
-                runtime.discard_runtime()
-            return CampaignCheckpointUnavailable("client is not inside the checkpoint map")
-        if runtime.runtime_session_active:
-            runtime.resume_session(progress_state)
-        else:
-            runtime.initialize_session(
-                progress_state.variant,
-                progress_state.battle_index,
-                RuntimeSessionEntryKind.RESUME,
-                progress_state,
-            )
-        runtime.prepare_battle(progress_state.battle_index)
-        return session
+            self._release_handle(RuntimeSessionOutcome.INTERRUPTED)
+            self._reset_to_map_boundary(job, session, cancellation)
+            return CampaignCheckpointReset("client left the retained checkpoint map")
+        return _ActivatedMap(session, progress_state)
 
     def _activate_fresh(
         self,
         job: CampaignJobSpec,
         session: CampaignSession,
-        runtime: DeclarativeCampaignMapRuntime,
-        unit_cancellation: SafeUnitCancellation,
+        handle: _RuntimeHandle,
         *,
-        prepared: bool,
+        entrance: Button | None,
     ) -> _ActivatedMap | CampaignMapAchievementReached | CampaignGemsReplacementFailed:
-        if not prepared:
-            runtime.ensure_campaign_ui(session.definition.ref.stage_id, mode=job.difficulty.value)
-        runtime.ENTRANCE.area = runtime.ENTRANCE.button
+        runtime = handle.runtime
+        if entrance is None:
+            entrance = runtime.stage_navigator.select(
+                session.definition.ref.stage_id,
+                mode=job.difficulty.value,
+            )
+        entrance.area = entrance.button
         try:
-            runtime.enter_map(runtime.ENTRANCE, mode=job.difficulty.value)
-        except GemsHardPreparationFailed as error:
-            self._active_runtime = runtime
-            self._active_session = session
-            self._active_unit_cancellation = unit_cancellation
+            runtime.enter_map(entrance, mode=job.difficulty.value)
+        except GemsHardPreparationError as error:
             return CampaignGemsReplacementFailed(
                 GemsFleetReplacementRequest(
                     GemsFleetReplacementTrigger.HARD_PREPARATION,
@@ -1912,32 +1227,20 @@ class Mumu12CampaignRuntimeProvider:
                 ),
                 str(error),
             )
-        except ScriptEnd as stop_error:
-            try:
-                reached = runtime.triggered_map_stop()
-            except BaseException as inspection_error:  # ruff:ignore[blind-except] - 必须保留 ScriptEnd 与检查失败。
-                message = "campaign map-stop inspection failed"
-                raise BaseExceptionGroup(message, (stop_error, inspection_error)) from None
-            if reached:
-                runtime.discard_runtime()
-                return CampaignMapAchievementReached(
-                    full_clear=bool(runtime.map_is_100_percent_clear),
-                    three_stars=bool(runtime.map_is_3_stars),
-                    threat_safe=bool(runtime.map_is_threat_safe),
-                )
-            raise
+        except MapAchievementReached:
+            result = CampaignMapAchievementReached(
+                full_clear=bool(runtime.map_is_100_percent_clear),
+                three_stars=bool(runtime.map_is_3_stars),
+                threat_safe=bool(runtime.map_is_threat_safe),
+            )
+            self._release_handle(RuntimeSessionOutcome.COMPLETED)
+            return result
 
         runtime.handle_map_fleet_lock()
         variant = CampaignRunVariant.LOOP if runtime.map_is_clear_mode else CampaignRunVariant.NORMAL
         activated = self._entered_session(job, session, variant)
         state = activated.initial_state()
-        runtime.initialize_session(
-            variant,
-            state.battle_index,
-            RuntimeSessionEntryKind.FRESH,
-            state,
-        )
-        runtime.prepare_battle(state.battle_index)
+        handle.owner.initialize(activated.variant)
         return _ActivatedMap(activated, state)
 
     @staticmethod
@@ -1956,80 +1259,143 @@ class Mumu12CampaignRuntimeProvider:
         self,
         job: CampaignJobSpec,
         cancellation: CancellationSource,
-    ) -> (
-        CampaignSession | CampaignCheckpointUnavailable | CampaignMapAchievementReached | CampaignGemsReplacementFailed
-    ):
+    ) -> CampaignSession | CampaignCheckpointReset | CampaignMapAchievementReached | CampaignGemsReplacementFailed:
         session = self._selected_session(job)
-        runtime, prepared_at_boundary, unit_cancellation = self._take_prepared_runtime(job, session)
-        prepared = runtime is not None
-        progress = job.progress
-        if runtime is None and progress is not None and not prepared_at_boundary:
-            runtime, unit_cancellation = self._take_active_runtime(job, session, cancellation)
-        if runtime is None:
-            runtime, unit_cancellation = self._new_runtime(job, session, cancellation)
-        with _RuntimeActivationOwner(partial(self._release_activation_runtime, runtime)) as owner:
-            if unit_cancellation is None:
-                message = "campaign runtime is missing its safe-unit cancellation gate"
-                raise CampaignRuntimeEvidenceError(message)
+        try:
+            progress = job.progress
+            prepared = self._prepare_activation_handle(job, session, cancellation)
+            if isinstance(prepared, CampaignCheckpointReset):
+                return prepared
+            handle = prepared
+            ownership = handle.ownership
+            prepared_at_boundary = ownership.at_boundary if isinstance(ownership, _PreparedRuntimeOwnership) else False
+            entrance = ownership.entrance if isinstance(ownership, _PreparedRuntimeOwnership) else None
             if progress is not None and not prepared_at_boundary:
                 result = self._activate_checkpoint(
+                    job,
                     session,
-                    runtime,
+                    handle,
                     progress.session_state,
                     cancellation,
                 )
-                if isinstance(result, CampaignCheckpointUnavailable):
-                    owner.transfer()
+                if isinstance(result, CampaignCheckpointReset):
                     return result
                 activated = result
             else:
                 fresh = self._activate_fresh(
                     job,
                     session,
-                    runtime,
-                    unit_cancellation,
-                    prepared=prepared,
+                    handle,
+                    entrance=entrance,
                 )
                 if not isinstance(fresh, _ActivatedMap):
-                    owner.transfer()
                     return fresh
-                activated = fresh.session
+                activated = fresh
 
             self._config.apply_runtime_overlay(
                 Campaign_UseAutoSearch=job.execution.automation.use_auto_search,
             )
-            self._active_runtime = runtime
-            self._active_session = activated
-            self._active_unit_cancellation = unit_cancellation
-            owner.transfer()
-            return activated
+        except BaseException as error:
+            outcome = (
+                RuntimeSessionOutcome.INTERRUPTED if isinstance(error, AbortRequested) else RuntimeSessionOutcome.FAILED
+            )
+            self._release_handle_after_error(
+                error,
+                outcome,
+                message="campaign activation and runtime cleanup both failed",
+            )
+            raise
+        else:
+            handle.ownership = _ActiveRuntimeOwnership(activated.session, activated.state)
+            return activated.session
+
+    def _active_handle_for(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> _RuntimeHandle:
+        cancellation.raise_if_requested()
+        handle = self._handle
+        if (
+            handle is None
+            or not isinstance(handle.ownership, _ActiveRuntimeOwnership)
+            or handle.ownership.session != session
+        ):
+            message = "requested campaign session is not the active MuMu12 runtime"
+            raise CampaignRuntimeEvidenceError(message)
+        return handle
 
     def active_runtime(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
     ) -> CampaignMapRuntime:
+        handle = self._active_handle_for(session, cancellation)
+        return cast("CampaignMapRuntime", handle.runtime)
+
+    def battle_program_mode(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> BattleProgramMode:
+        handle = self._active_handle_for(session, cancellation)
+        return read_mumu12_battle_program_mode(
+            handle.runtime,
+            handle.program_state,
+            handle.program_capabilities,
+            cancellation,
+        )
+
+    def _commit_active_runtime(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> _RuntimeHandle:
         cancellation.raise_if_requested()
-        if self._active_runtime is None or self._active_session != session:
-            message = "requested campaign session is not the active MuMu12 runtime"
+        handle = self._handle
+        if (
+            handle is None
+            or not isinstance(handle.ownership, _ActiveRuntimeOwnership)
+            or handle.ownership.session != session
+        ):
+            message = "requested campaign session has no active safe unit"
             raise CampaignRuntimeEvidenceError(message)
-        return cast("CampaignMapRuntime", self._active_runtime)
+        handle.cancellation.commit()
+        return handle
+
+    def commit_battle_program_unit(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> Mumu12CommittedBattleProgramUnit:
+        handle = self._commit_active_runtime(session, cancellation)
+        port = build_mumu12_battle_program_port(
+            handle.runtime,
+            handle.program_state,
+            handle.program_capabilities,
+        )
+        return Mumu12CommittedBattleProgramUnit(port, handle.cancellation)
+
+    def commit_auto_search_unit(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> Mumu12CommittedAutoSearchUnit:
+        handle = self._commit_active_runtime(session, cancellation)
+        return Mumu12CommittedAutoSearchUnit(
+            cast("Mumu12AutoSearchRuntime", handle.runtime),
+            handle.cancellation,
+        )
 
     def commit_active_unit(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
-        cancellation.raise_if_requested()
-        runtime = self._active_runtime
-        unit_cancellation = self._active_unit_cancellation
-        if runtime is None or self._active_session != session or unit_cancellation is None:
-            message = "requested campaign session has no active safe unit"
-            raise CampaignRuntimeEvidenceError(message)
-        unit_cancellation.commit()
+        handle = self._commit_active_runtime(session, cancellation)
         return CommittedCampaignUnit(
-            cast("CampaignMapRuntime", runtime),
-            unit_cancellation,
+            cast("CampaignMapRuntime", handle.runtime),
+            handle.cancellation,
         )
 
     def commit_replacement_unit(
@@ -2038,22 +1404,14 @@ class Mumu12CampaignRuntimeProvider:
         cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
         cancellation.raise_if_requested()
-        if self._prepared_session == session:
-            runtime = self._prepared_runtime
-            unit_cancellation = self._prepared_unit_cancellation
-        elif self._active_session == session:
-            runtime = self._active_runtime
-            unit_cancellation = self._active_unit_cancellation
-        else:
-            runtime = None
-            unit_cancellation = None
-        if runtime is None or unit_cancellation is None:
+        handle = self._handle
+        if handle is None or handle.ownership.session != session:
             message = "requested campaign session has no prepared gems replacement unit"
             raise CampaignRuntimeEvidenceError(message)
-        unit_cancellation.commit()
+        handle.cancellation.commit()
         return CommittedCampaignUnit(
-            cast("CampaignMapRuntime", runtime),
-            unit_cancellation,
+            cast("CampaignMapRuntime", handle.runtime),
+            handle.cancellation,
         )
 
     @staticmethod
@@ -2082,9 +1440,9 @@ class Mumu12CampaignRuntimeProvider:
         return RuntimeSessionOutcome.INTERRUPTED
 
     def discard_checkpoint(self) -> None:
-        """失效 checkpoint 不再拥有任何 prepared 或 active runtime。"""
+        """失效 checkpoint 不再拥有 runtime handle。"""
 
-        self._release_owned_runtimes(RuntimeSessionOutcome.INTERRUPTED)
+        self._release_handle(RuntimeSessionOutcome.INTERRUPTED)
 
     def finish(
         self,
@@ -2106,42 +1464,39 @@ class Mumu12CampaignRuntimeProvider:
             CampaignStopReason.PROGRAM_CONTINUE,
         )
         if resumable:
-            runtime = self._active_runtime
-            if runtime is None or self._active_session != session or not runtime.runtime_session_active:
+            handle = self._handle
+            if (
+                handle is None
+                or not isinstance(handle.ownership, _ActiveRuntimeOwnership)
+                or handle.ownership.session != session
+                or not handle.owner.active
+            ):
                 message = "resumable campaign report requires the matching active runtime"
                 raise CampaignRuntimeEvidenceError(message)
-            if self._prepared_runtime is not None:
-                message = "resumable campaign report cannot retain a prepared runtime"
-                raise CampaignRuntimeEvidenceError(message)
-            runtime.resume_session(state)
+            handle.ownership = replace(handle.ownership, checkpoint=state)
             return
 
         outcome = self._runtime_outcome(state, stop_reason)
-        self._release_owned_runtimes(outcome)
+        self._release_handle(outcome)
 
-    def _release_owned_runtimes(self, outcome: RuntimeSessionOutcome) -> None:
-        errors: list[BaseException] = []
-        for cleanup in (
-            self._discard_prepared_runtime,
-            partial(self._release_active_runtime, outcome),
-        ):
-            try:
-                cleanup()
-            except BaseException as error:  # ruff:ignore[blind-except] - 两个 owner 必须独立释放。
-                errors.append(error)
-        raise_cleanup_errors(errors, message="campaign runtime ownership cleanup failed")
+
+@dataclass(frozen=True, slots=True)
+class _HardRuntimeHandle:
+    runtime: DeclarativeCampaignMapRuntime
+    owner: Mumu12CampaignHardAttemptOwner
+    stage: StageRef
+    entrance: Button
 
 
 class Mumu12HardCampaignPort:
     """用同一 declarative map runtime 执行困难图，不再加载 campaign Python module。"""
 
     __slots__ = (
-        "_active_runtime",
-        "_active_stage",
+        "_assembly_factory",
         "_config",
         "_device",
+        "_handle",
         "_remaining_reader",
-        "_runtime_factory",
         "_sessions",
     )
 
@@ -2151,10 +1506,7 @@ class Mumu12HardCampaignPort:
         device: Device,
         sessions: HardCampaignSessionSource,
         *,
-        runtime_factory: Callable[
-            [AzurLaneConfig, Device, CampaignStageDefinition],
-            DeclarativeCampaignMapRuntime,
-        ] = DeclarativeCampaignMapRuntime,
+        assembly_factory: Mumu12CampaignHardAssemblyFactory = _DECLARATIVE_CAMPAIGN_RUNTIME_FACTORY,
         remaining_reader: Callable[[Device], int] | None = None,
     ) -> None:
         if not isinstance(config, AzurLaneConfig):
@@ -2166,11 +1518,8 @@ class Mumu12HardCampaignPort:
         if not isinstance(sessions, HardCampaignSessionSource):
             message = "hard campaign port sessions must implement the hard campaign content contract"
             raise TypeError(message)
-        if isinstance(runtime_factory, type) and not issubclass(runtime_factory, DeclarativeCampaignMapRuntime):
-            message = "hard campaign runtime factory must build DeclarativeCampaignMapRuntime"
-            raise TypeError(message)
-        if not callable(runtime_factory):
-            message = "hard campaign runtime factory must be callable"
+        if isinstance(assembly_factory, type) or not callable(getattr(assembly_factory, "build_hard", None)):
+            message = "hard campaign assembly factory must implement build_hard"
             raise TypeError(message)
         if remaining_reader is not None and not callable(remaining_reader):
             message = "hard remaining reader must be callable"
@@ -2178,20 +1527,20 @@ class Mumu12HardCampaignPort:
         self._config = config
         self._device = device
         self._sessions = sessions
-        self._runtime_factory = runtime_factory
+        self._assembly_factory = assembly_factory
         self._remaining_reader = _read_hard_remaining if remaining_reader is None else remaining_reader
-        self._active_runtime: DeclarativeCampaignMapRuntime | None = None
-        self._active_stage: StageRef | None = None
+        self._handle: _HardRuntimeHandle | None = None
 
     def _stage_ref(self, settings: HardSettings) -> StageRef:
         return self._sessions.resolve_hard_stage_ref(settings.stage)
 
-    def _require_active(self, settings: HardSettings) -> DeclarativeCampaignMapRuntime:
+    def _require_handle(self, settings: HardSettings) -> _HardRuntimeHandle:
         stage = self._stage_ref(settings)
-        if self._active_runtime is None or self._active_stage != stage:
+        handle = self._handle
+        if handle is None or handle.stage != stage:
             message = "hard campaign operation does not match the active stage"
             raise CampaignRuntimeEvidenceError(message)
-        return self._active_runtime
+        return handle
 
     def remaining_attempts(
         self,
@@ -2199,7 +1548,7 @@ class Mumu12HardCampaignPort:
         cancellation: CancellationSource,
     ) -> int:
         cancellation.raise_if_requested()
-        if self._active_runtime is not None:
+        if self._handle is not None:
             message = "hard campaign already has an active runtime"
             raise CampaignRuntimeEvidenceError(message)
         stage = self._stage_ref(settings)
@@ -2212,22 +1561,25 @@ class Mumu12HardCampaignPort:
             Campaign_Mode=CampaignDifficulty.HARD.value,
         )
         self._device.config = self._config
-        runtime = self._runtime_factory(self._config, self._device, definition)
-        if not isinstance(runtime, DeclarativeCampaignMapRuntime):
-            message = "hard campaign runtime factory returned an invalid runtime"
-            raise TypeError(message)
-        runtime.device = cast("Device", CancellationAwareMumu12Device(self._device, cancellation))
+        assembly = self._assembly_factory.build_hard(self._config, self._device, definition)
         try:
-            remaining = self._read_remaining_attempts(runtime, settings, cancellation)
+            assembly.runtime.device = cast(
+                "Device",
+                CancellationAwareMumu12Device(self._device, cancellation),
+            )
+            remaining, entrance = self._read_remaining_attempts(
+                assembly.runtime,
+                settings,
+                cancellation,
+            )
         except BaseException as error:
             preserve_cleanup_failure(
                 error,
-                runtime.discard_runtime,
+                assembly.owner.release,
                 message="hard campaign attempt discovery and cleanup both failed",
             )
             raise
-        self._active_runtime = runtime
-        self._active_stage = stage
+        self._handle = _HardRuntimeHandle(assembly.runtime, assembly.owner, stage, entrance)
         return remaining
 
     def _read_remaining_attempts(
@@ -2235,8 +1587,8 @@ class Mumu12HardCampaignPort:
         runtime: DeclarativeCampaignMapRuntime,
         settings: HardSettings,
         cancellation: CancellationSource,
-    ) -> int:
-        runtime.ensure_campaign_ui(settings.stage, mode="hard")
+    ) -> tuple[int, Button]:
+        entrance = runtime.stage_navigator.select(settings.stage, mode="hard")
         cancellation.raise_if_requested()
         runtime.device.screenshot()
         cancellation.raise_if_requested()
@@ -2244,16 +1596,16 @@ class Mumu12HardCampaignPort:
         if type(remaining) is not int or remaining < 0:
             message = "hard remaining reader must return a non-negative integer"
             raise TypeError(message)
-        return remaining
+        return remaining, entrance
 
     def advance_one(
         self,
         settings: HardSettings,
         cancellation: CancellationSource,
     ) -> HardBattleOutcome:
-        runtime = self._require_active(settings)
+        handle = self._require_handle(settings)
         cancellation.raise_if_requested()
-        runtime.execute_hard_attempt(cancellation)
+        handle.owner.execute(handle.entrance, cancellation)
         return HardBattleOutcome.SETTLED
 
     def exit_ui(
@@ -2261,23 +1613,19 @@ class Mumu12HardCampaignPort:
         settings: HardSettings,
         cancellation: CancellationSource,
     ) -> None:
-        runtime = self._require_active(settings)
+        handle = self._require_handle(settings)
         cancellation.raise_if_requested()
-        runtime.ensure_auto_search_exit()
+        handle.runtime.ensure_auto_search_exit()
         cancellation.raise_if_requested()
 
     def release(self) -> None:
         """无条件释放当前 turn 的 runtime，不依赖已可能取消的交互信号。"""
 
-        runtime = self._active_runtime
-        self._active_runtime = None
-        self._active_stage = None
-        if runtime is None:
+        handle = self._handle
+        self._handle = None
+        if handle is None:
             return
-        if runtime.runtime_session_active:
-            runtime.finish_runtime_session(RuntimeSessionOutcome.INTERRUPTED)
-        else:
-            runtime.discard_runtime()
+        handle.owner.release()
 
 
 def _read_hard_remaining(device: Device) -> int:
@@ -2292,10 +1640,12 @@ def build_mumu12_campaign_dependencies(
     """组装 Campaign factory 所需的 session source 与单 battle live workflow。"""
 
     provider = Mumu12CampaignRuntimeProvider(config, device)
+    auto_search = Mumu12CampaignAutoSearchExecutor(provider)
     programs = Mumu12CampaignBattleProgramExecutor(provider)
     gems_fleets = Mumu12GemsFleetReplacementExecutor(provider)
     workflow = build_existing_campaign_map_workflow(
         provider,
+        auto_search,
         CampaignLiveServices(
             activator=provider,
             guards=provider,

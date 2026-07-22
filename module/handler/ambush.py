@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.base.timer import Timer
 from module.base.utils import get_color, red_overlay_transparency
 from module.combat.combat import Combat
@@ -10,12 +12,17 @@ from module.template.assets import (
     TEMPLATE_MAP_WALK_OUT_OF_STEP,
 )
 
+if TYPE_CHECKING:
+    from module.map.fleet_navigation import FleetNavigationController
+
 vars(TEMPLATE_AMBUSH_EVADE_SUCCESS)["pre_process"] = info_letter_preprocess
 vars(TEMPLATE_AMBUSH_EVADE_FAILED)["pre_process"] = info_letter_preprocess
 vars(TEMPLATE_MAP_WALK_OUT_OF_STEP)["pre_process"] = info_letter_preprocess
 
 
 class AmbushHandler(Combat):
+    navigation: FleetNavigationController
+
     MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = 0.40
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.35  # 实测通常为 0.50～0.53。
     MAP_AIR_RAID_CONFIRM_SECOND = 0.5
@@ -80,12 +87,12 @@ class AmbushHandler(Combat):
             logger.attr("Ambush_evade", "success")
         elif TEMPLATE_AMBUSH_EVADE_FAILED.match(image):
             logger.attr("Ambush_evade", "failed")
-            self.combat(expected_end="no_searching", fleet_index=self.fleet_show_index)
+            self.combat(expected_end="no_searching", fleet_index=self.navigation.shown_index)
         else:
             logger.warning("Unrecognized info when ambush evade.")
             self.ensure_no_info_bar()
             if self.combat_appear():
-                self.combat(fleet_index=self.fleet_show_index)
+                self.combat(fleet_index=self.navigation.shown_index)
 
     def _handle_ambush_attack(self) -> None:
         logger.info("Map ambushed")
@@ -109,7 +116,7 @@ class AmbushHandler(Combat):
                 continue
 
         logger.attr("Ambush_evade", "attack")
-        self.combat(expected_end="no_searching", fleet_index=self.fleet_show_index)
+        self.combat(expected_end="no_searching", fleet_index=self.navigation.shown_index)
 
     def _handle_ambush(self) -> None:
         if self.config.Campaign_AmbushEvade:

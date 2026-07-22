@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: 5-4
   shape: H5
@@ -136,7 +136,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
@@ -148,8 +147,6 @@ mechanics:
   - battle: 4
     operations:
     - check_accessibility
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

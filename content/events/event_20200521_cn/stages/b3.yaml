@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: B3
   shape: N10
@@ -72,7 +72,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 2
@@ -82,8 +81,6 @@ mechanics:
     initial_siren_cells: []
   enemy_movement: []
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls:
     - - E1

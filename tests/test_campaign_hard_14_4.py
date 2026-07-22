@@ -1,11 +1,8 @@
-from dataclasses import replace
-
 from module.adapters.campaign_mumu12 import compile_campaign_map
 from module.content.campaign_session import CampaignRunVariant
 from module.content.campaign_session_source import CompiledCampaignSessionSource
 from module.content.catalog import ContentCatalog
 from module.content.manifest import load_default_event_manifests
-from module.content.mechanic_rules import MapMutationRules
 from module.content.models import StageRef
 from module.content.stage_definition import CellId
 from module.content.stage_loader import StageSpecLoader, load_default_stage
@@ -48,12 +45,14 @@ def test_campaign_hard_14_4_resolves_to_its_complete_declarative_override() -> N
     assert hard.runtime_profile.profile_id == main.runtime_profile.profile_id
     assert hard.rules == main.rules
     assert hard.enemy_filter == main.enemy_filter
-    assert hard.mechanics == replace(main.mechanics, map_mutations=MapMutationRules())
+    assert hard.mechanics == main.mechanics
+    assert main.map.normal_enemy_spawn_candidates is not None
+    assert hard.map.normal_enemy_spawn_candidates is None
     assert hard.battle_programs == main.battle_programs
-    assert compiled.shape == (10, 8)
-    assert [str(grid) for grid in compiled.camera_data] == ["D2", "D6", "D7", "H2", "H6", "H7"]
-    assert [str(grid) for grid in compiled.camera_data_spawn_point] == ["H2"]
-    assert [str(grid) for grid in compiled.manual_map_covered] == ["A4"]
+    assert compiled.layout.shape == (10, 8)
+    assert [str(grid) for grid in compiled.layout.camera_data] == ["D2", "D6", "D7", "H2", "H6", "H7"]
+    assert [str(grid) for grid in compiled.layout.camera_data_spawn_point] == ["H2"]
+    assert [str(grid) for grid in compiled.layout.manual_coverage] == ["A4"]
     assert compiled.map_data == _NORMAL_MAP_DATA
     assert compiled.map_data_loop == _LOOP_MAP_DATA
     assert tuple(cell.weight for cell in hard.map.normal.cells) == tuple(cell.weight for cell in main.map.normal.cells)
@@ -74,4 +73,4 @@ def test_campaign_main_14_4_preserves_the_shared_manual_covered_cell() -> None:
     definition = load_default_stage(StageRef("campaign_main", "14-4"))
 
     assert definition.map.map_covered == (CellId(0, 3),)
-    assert [str(grid) for grid in compile_campaign_map(definition).manual_map_covered] == ["A4"]
+    assert [str(grid) for grid in compile_campaign_map(definition).layout.manual_coverage] == ["A4"]

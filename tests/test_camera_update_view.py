@@ -147,7 +147,7 @@ class _Camera(Camera):
         return self.popup_confirmed
 
     @override
-    def _map_swipe(self, vector: Point, box: Area = (123, 159, 1175, 628)) -> bool:
+    def _map_swipe(self, vector: Point, box: Area | None = None) -> bool:
         del box
         self.swipes.append(tuple(vector))
         return True

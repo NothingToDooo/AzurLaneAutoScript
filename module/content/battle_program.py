@@ -16,7 +16,7 @@ from module.content.mechanic_rules import (
     EncounterExpectation,
     EnsureFleet,
     EnsureFleetAt,
-    FixedTargetSequence,
+    FleetClearSelectedTarget,
     FleetClearTarget,
     FleetRole,
     MapItemKind,
@@ -26,13 +26,11 @@ from module.content.mechanic_rules import (
     MoveFleetToBestCandidate,
     PickupAmmo,
     PickupMapItem,
-    PresetRouteVariant,
     ProtectFleet,
     PushFleetForward,
     RescueFleet,
     RoadblockAction,
     StepFleetOn,
-    SwitchFleet,
 )
 
 
@@ -399,10 +397,10 @@ type ProgramMechanicAction = (
     | StepFleetOn
     | MoveFleet
     | MoveFleetToBestCandidate
-    | SwitchFleet
     | EnsureFleet
     | EnsureFleetAt
     | FleetClearTarget
+    | FleetClearSelectedTarget
     | PickupAmmo
     | PickupMapItem
     | ClearAllMystery
@@ -424,10 +422,10 @@ _MECHANIC_ACTION_TYPES = (
     StepFleetOn,
     MoveFleet,
     MoveFleetToBestCandidate,
-    SwitchFleet,
     EnsureFleet,
     EnsureFleetAt,
     FleetClearTarget,
+    FleetClearSelectedTarget,
     PickupAmmo,
     PickupMapItem,
     ClearAllMystery,
@@ -559,68 +557,6 @@ class MechanicActionBranch:
             "when_not_applied",
             _validated_statements(self.when_not_applied, allow_empty=True),
         )
-
-
-@dataclass(frozen=True, slots=True)
-class ExecutePresetRoute:
-    battle: int
-    routes: tuple[PresetRouteVariant, ...]
-    fixed_targets: tuple[FixedTargetSequence, ...]
-
-    def __post_init__(self) -> None:
-        if type(self.battle) is not int or self.battle < 0:
-            message = "preset route execution battle must be a non-negative integer"
-            raise ContentValidationError(message)
-        routes = tuple(self.routes)
-        fixed_targets = tuple(self.fixed_targets)
-        if not routes or any(not isinstance(route, PresetRouteVariant) for route in routes):
-            message = "preset route execution requires typed route variants"
-            raise ContentValidationError(message)
-        if any(not isinstance(sequence, FixedTargetSequence) for sequence in fixed_targets):
-            message = "preset route execution contains an invalid fixed target sequence"
-            raise TypeError(message)
-        object.__setattr__(self, "routes", routes)
-        object.__setattr__(self, "fixed_targets", fixed_targets)
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptPresetRoute:
-    action: ExecutePresetRoute
-    expected_target: EncounterExpectation = EncounterExpectation.ANY
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.action, ExecutePresetRoute):
-            message = "attempt preset route requires an ExecutePresetRoute"
-            raise TypeError(message)
-        _validate_expected_target(self.expected_target)
-
-
-@dataclass(frozen=True, slots=True)
-class ExecuteFixedTarget:
-    battle: int
-    sequences: tuple[FixedTargetSequence, ...]
-
-    def __post_init__(self) -> None:
-        if type(self.battle) is not int or self.battle < 0:
-            message = "fixed target execution battle must be a non-negative integer"
-            raise ContentValidationError(message)
-        sequences = tuple(self.sequences)
-        if not sequences or any(not isinstance(sequence, FixedTargetSequence) for sequence in sequences):
-            message = "fixed target execution requires typed target sequences"
-            raise ContentValidationError(message)
-        object.__setattr__(self, "sequences", sequences)
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptFixedTarget:
-    action: ExecuteFixedTarget
-    expected_target: EncounterExpectation
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.action, ExecuteFixedTarget):
-            message = "attempt fixed target requires an ExecuteFixedTarget"
-            raise TypeError(message)
-        _validate_expected_target(self.expected_target)
 
 
 @dataclass(frozen=True, slots=True)
@@ -756,8 +692,6 @@ type ProgramStatement = (
     | PerformMechanicAction
     | ReturnMechanicAction
     | MechanicActionBranch
-    | AttemptPresetRoute
-    | AttemptFixedTarget
     | ProgramBranch
     | SetProgramFlag
     | SetProgramFlagFromCondition
@@ -779,8 +713,6 @@ _STATEMENT_TYPES = (
     PerformMechanicAction,
     ReturnMechanicAction,
     MechanicActionBranch,
-    AttemptPresetRoute,
-    AttemptFixedTarget,
     ProgramBranch,
     SetProgramFlag,
     SetProgramFlagFromCondition,
@@ -945,8 +877,9 @@ def _condition_cells(condition: ProgramCondition) -> frozenset[CellId]:
 def _mechanic_action_cells(action: ProgramMechanicAction) -> frozenset[CellId]:
     if isinstance(action, RoadblockAction):
         cells = action.referenced_cells
-    elif isinstance(action, RescueFleet | EnsureFleetAt | FleetClearTarget | AirStrike):
-        cells = frozenset({action.target})
+    elif isinstance(action, RescueFleet | EnsureFleetAt | FleetClearTarget | FleetClearSelectedTarget | AirStrike):
+        action_cells = action.candidates if isinstance(action, FleetClearSelectedTarget) else (action.target,)
+        cells = frozenset(action_cells)
     elif isinstance(action, StepFleetOn):
         cells = frozenset((*action.candidates, *(cell for road in action.roadblocks for cell in road.referenced_cells)))
     elif isinstance(action, MoveFleet):
@@ -987,10 +920,6 @@ def _statement_cells(statement: ProgramStatement) -> frozenset[CellId]:
                 *(cell for nested in statement.when_not_applied for cell in _statement_cells(nested)),
             )
         )
-    elif isinstance(statement, AttemptPresetRoute):
-        cells = frozenset(cell for sequence in statement.action.fixed_targets for cell in sequence.targets)
-    elif isinstance(statement, AttemptFixedTarget):
-        cells = frozenset(cell for sequence in statement.action.sequences for cell in sequence.targets)
     else:
         cells = frozenset()
     return cells
@@ -1013,8 +942,4 @@ def _statement_battles(statement: ProgramStatement) -> frozenset[int]:
                 *(battle for nested in statement.when_not_applied for battle in _statement_battles(nested)),
             )
         )
-    if isinstance(statement, AttemptPresetRoute):
-        return frozenset({statement.action.battle})
-    if isinstance(statement, AttemptFixedTarget):
-        return frozenset({statement.action.battle})
     return frozenset()

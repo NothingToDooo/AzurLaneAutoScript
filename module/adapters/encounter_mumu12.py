@@ -7,7 +7,7 @@ from module.base.failure import cleanup_scope
 from module.config.config import AzurLaneConfig
 from module.daily.daily import OCR_REMAIN, Daily
 from module.device.device import Device
-from module.exception import OilExhausted, RequestHumanTakeover, ScriptEnd
+from module.exception import CampaignSelectionError, HumanTakeoverRequiredError, OilExhausted
 from module.exercise import assets as exercise_assets
 from module.exercise.exercise import ADMIRAL_TRIAL_HOUR_INTERVAL, OCR_EXERCISE_REMAIN, OCR_PERIOD_REMAIN, Exercise
 from module.gameplay.encounter import (
@@ -164,7 +164,7 @@ class _ReportingDaily(Daily):
         remaining = OCR_REMAIN.ocr_single(self.device.image)
         if remaining > remain:
             message = "daily remaining attempts increased after category execution"
-            raise RequestHumanTakeover(message)
+            raise HumanTakeoverRequiredError(message)
         self.attempts_completed = remain - remaining
         return True
 
@@ -244,7 +244,7 @@ class Mumu12HardWorkflow:
                 result = self._hard_campaign.advance_one(settings, cancellation)
             except OilExhausted:
                 result = HardBattleOutcome.RESOURCE_LIMIT
-            except ScriptEnd:
+            except CampaignSelectionError:
                 result = HardBattleOutcome.FAILED
             if not isinstance(result, HardBattleOutcome):
                 message = "HardCampaignPort.advance_one() must return a HardBattleOutcome"
@@ -385,10 +385,10 @@ class Mumu12ExerciseWorkflow:
         remaining_after = OCR_EXERCISE_REMAIN.ocr_single(device.image)
         if remaining_after > remaining_before:
             message = "exercise remaining attempts increased after battle"
-            raise RequestHumanTakeover(message)
+            raise HumanTakeoverRequiredError(message)
         if settled and remaining_after >= remaining_before:
             message = "exercise battle settled without a confirmed remaining-attempt decrement"
-            raise RequestHumanTakeover(message)
+            raise HumanTakeoverRequiredError(message)
         return ExerciseReport(
             observed_at=_observed_at(self._clock),
             attempts_remaining=remaining_after,

@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: SP1
   shape: K7
@@ -113,7 +113,6 @@ mechanics:
   - battle: 0
     cells: []
     tag: clear_mechanism
-  map_mutations: []
   moving_enemies:
     turns:
     - 3
@@ -123,8 +122,6 @@ mechanics:
     initial_siren_cells: []
   enemy_movement: []
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

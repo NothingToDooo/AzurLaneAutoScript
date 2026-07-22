@@ -42,6 +42,7 @@ from module.content.campaign_session import (
     NoBattleTarget,
 )
 from module.gameplay.campaign_live import (
+    CampaignAutoSearchBattleExecutor,
     CampaignBattlefieldObserver,
     CampaignBattleIntentDriver,
     CampaignLiveClock,
@@ -64,7 +65,7 @@ class CampaignMapAdapterError(RuntimeError):
     pass
 
 
-class CampaignActionInterrupted(RuntimeError):
+class CampaignActionInterrupted(RuntimeError):  # ruff:ignore[error-suffix-on-exception-name] - 表示执行已安全中断并返回编排层。
     """UI primitive 已闭合到非 battle 安全点，需要 workflow 执行显式转移。"""
 
     def __init__(self, reason: BattleInterruptionReason) -> None:
@@ -97,40 +98,35 @@ class CampaignMapView(Protocol):
     def __iter__(self) -> Iterator[CampaignGrid]: ...
 
 
-class CampaignFleetRuntime(Protocol):
-    def clear_chosen_enemy(self, grid: CampaignGrid, expected: str = "") -> object: ...
-
-
-class CampaignMapRuntime(CampaignFleetRuntime, Protocol):
-    map: CampaignMapView
-    battle_count: int
-
+class CampaignNavigation(Protocol):
     @property
-    def fleet_1(self) -> CampaignFleetRuntime: ...
+    def boss_index(self) -> int: ...
 
-    @property
-    def fleet_boss(self) -> CampaignFleetRuntime: ...
+    def activate(self, index: int) -> bool: ...
 
-    @property
-    def fleet_boss_index(self) -> int: ...
+    def activate_boss(self) -> bool: ...
 
-    def full_scan(self) -> object: ...
+    def rebuild_paths(self) -> None: ...
 
-    def find_path_initial(self) -> object: ...
-
-    def read_battle_flag(self, flag: BattleFlag) -> bool: ...
-
-    def execute_auto_search_battle(
-        self,
-        battle_index: int,
-        cancellation: CancellationSource,
-    ) -> BattleTarget: ...
-
-    def brute_find_roadblocks(
+    def find_roadblocks(
         self,
         grid: CampaignGrid,
         fleet: int | None = None,
     ) -> Iterable[CampaignGrid]: ...
+
+
+class CampaignMapRuntime(Protocol):
+    map: CampaignMapView
+    battle_count: int
+
+    @property
+    def navigation(self) -> CampaignNavigation: ...
+
+    def full_scan(self) -> object: ...
+
+    def read_battle_flag(self, flag: BattleFlag) -> bool: ...
+
+    def clear_chosen_enemy(self, grid: CampaignGrid, expected: str = "") -> object: ...
 
 
 class CampaignMapRuntimeSource(Protocol):
@@ -195,18 +191,23 @@ class _SelectedBattle:
     target: CampaignGrid | None
     cleared: BattleTarget
     expected: str
-    executor: CampaignFleetRuntime | None = None
 
 
 class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleIntentDriver):
     """在已初始化的 Campaign Map 上执行一个原子 intent，并以 battle_count 确认事实。"""
 
-    __slots__ = ("_runtimes",)
+    __slots__ = ("_auto_search", "_runtimes")
 
-    def __init__(self, runtimes: CampaignRuntimeUnitSource) -> None:
+    def __init__(
+        self,
+        runtimes: CampaignRuntimeUnitSource,
+        auto_search: CampaignAutoSearchBattleExecutor,
+    ) -> None:
         _require_method(runtimes, "active_runtime", field_name="runtimes")
         _require_method(runtimes, "commit_active_unit", field_name="runtimes")
+        _require_method(auto_search, "execute", field_name="auto_search")
         self._runtimes = runtimes
+        self._auto_search = auto_search
 
     def observe(
         self,
@@ -219,7 +220,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         cancellation.raise_if_requested()
         runtime.full_scan()
         cancellation.raise_if_requested()
-        runtime.find_path_initial()
+        runtime.navigation.rebuild_paths()
         grids = tuple(runtime.map)
         return BattlefieldObservation(
             battle_index=state.battle_index,
@@ -231,9 +232,13 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     def issue_and_confirm(
         self,
         session: CampaignSession,
-        attempt: BattleAttempt,
+        state: CampaignSessionState,
         cancellation: CancellationSource,
     ) -> BattleOutcome:
+        attempt = self._pending_attempt(session, state)
+        if isinstance(attempt.intent, AutoSearchBattle):
+            return self._issue_auto_search(session, state, attempt, cancellation)
+
         runtime = self._runtime(session, cancellation)
         intent = self._eligible_intent(runtime, attempt.intent)
         if intent is None:
@@ -244,7 +249,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
             message = "campaign safe unit changed the active runtime"
             raise CampaignMapAdapterError(message)
         cancellation = committed.cancellation
-        if isinstance(intent, AutoSearchBattle | ClearSiren):
+        if isinstance(intent, ClearSiren):
             outcome = self._issue_search_intent(runtime, attempt, intent, cancellation)
         elif isinstance(intent, ClearFilteredEnemy | ClearEnemy | ClearAnyEnemy | ClearPriorityEnemy):
             selected = self._enemy_search(runtime, session, intent)
@@ -267,11 +272,9 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         self,
         runtime: CampaignMapRuntime,
         attempt: BattleAttempt,
-        intent: AutoSearchBattle | ClearSiren,
+        intent: ClearSiren,
         cancellation: CancellationSource,
     ) -> BattleOutcome:
-        if isinstance(intent, AutoSearchBattle):
-            return self._issue_auto_search(runtime, attempt, cancellation)
         if intent.include_hidden_candidates:
             for grid in runtime.map:
                 grid.may_siren = True
@@ -288,8 +291,8 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     def _eligible_intent(
         cls,
         runtime: CampaignMapRuntime,
-        intent: BattleIntent | AutoSearchBattle,
-    ) -> UnguardedBattleStep | AutoSearchBattle | None:
+        intent: BattleIntent,
+    ) -> UnguardedBattleStep | None:
         if not isinstance(intent, GuardedBattleStep):
             return intent
         if cls._condition_matches(runtime, intent.condition):
@@ -476,21 +479,40 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
                 return target
         return None
 
-    @staticmethod
     def _issue_auto_search(
-        runtime: CampaignMapRuntime,
+        self,
+        session: CampaignSession,
+        state: CampaignSessionState,
         attempt: BattleAttempt,
         cancellation: CancellationSource,
     ) -> BattleOutcome:
         cancellation.raise_if_requested()
         try:
-            target = runtime.execute_auto_search_battle(attempt.battle_index, cancellation)
+            target = self._auto_search.execute(session, state, cancellation)
         except CampaignActionInterrupted as interruption:
             return BattleInterrupted(attempt, interruption.reason)
         if not isinstance(target, BattleTarget):
             message = "auto-search battle must return a confirmed BattleTarget"
             raise CampaignMapAdapterError(message)
         return BattleSucceeded(attempt, target)
+
+    @staticmethod
+    def _pending_attempt(
+        session: CampaignSession,
+        state: CampaignSessionState,
+    ) -> BattleAttempt:
+        if not isinstance(session, CampaignSession):
+            message = "campaign map adapter requires a CampaignSession"
+            raise TypeError(message)
+        if not isinstance(state, CampaignSessionState):
+            message = "campaign map adapter requires a CampaignSessionState"
+            raise TypeError(message)
+        session.validate_state(state)
+        attempt = state.pending
+        if attempt is None:
+            message = "campaign battle state has no pending decision"
+            raise CampaignMapAdapterError(message)
+        return attempt
 
     def _runtime(
         self,
@@ -499,15 +521,10 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     ) -> CampaignMapRuntime:
         cancellation.raise_if_requested()
         runtime = self._runtimes.active_runtime(session, cancellation)
-        for method_name in (
-            "full_scan",
-            "find_path_initial",
-            "clear_chosen_enemy",
-            "brute_find_roadblocks",
-            "read_battle_flag",
-            "execute_auto_search_battle",
-        ):
+        for method_name in ("full_scan", "clear_chosen_enemy", "read_battle_flag"):
             _require_method(runtime, method_name, field_name="campaign map runtime")
+        for method_name in ("activate", "activate_boss", "rebuild_paths", "find_roadblocks"):
+            _require_method(runtime.navigation, method_name, field_name="campaign navigation")
         return runtime
 
     @staticmethod
@@ -556,7 +573,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         if boss is None:
             return NoBattleTarget(attempt)
         cancellation.raise_if_requested()
-        roadblocks = runtime.brute_find_roadblocks(boss, fleet=runtime.fleet_boss_index)
+        roadblocks = runtime.navigation.find_roadblocks(boss, fleet=runtime.navigation.boss_index)
         target = next(
             iter(_ordered(grid for grid in roadblocks if _ordinary_enemy(grid) and grid.is_accessible)),
             None,
@@ -565,12 +582,12 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
             return NoBattleTarget(attempt)
         if strategy is BossStrategy.MAP_SEARCH:
             cancellation.raise_if_requested()
-            executor = runtime.fleet_1
+            runtime.navigation.activate(1)
         elif strategy is BossStrategy.BRUTE_FORCE:
-            executor = runtime
+            pass
         else:
             assert_never(strategy)
-        selected = _SelectedBattle(target, BattleTarget.ENEMY, "", executor)
+        selected = _SelectedBattle(target, BattleTarget.ENEMY, "")
         return self._issue(runtime, attempt, selected, cancellation)
 
     def _clear_boss(
@@ -582,15 +599,15 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     ) -> BattleOutcome:
         cancellation.raise_if_requested()
         if strategy in (BossStrategy.FLEET_BOSS, BossStrategy.BRUTE_FORCE):
-            executor = runtime.fleet_boss
+            runtime.navigation.activate_boss()
         elif strategy is BossStrategy.FLEET_1:
-            executor = runtime.fleet_1
+            runtime.navigation.activate(1)
         elif strategy is BossStrategy.MAP_SEARCH:
-            executor = runtime
+            pass
         else:
             assert_never(strategy)
         target = self._first(runtime, lambda grid: grid.is_boss and grid.is_accessible)
-        selected = _SelectedBattle(target, BattleTarget.BOSS, "boss", executor)
+        selected = _SelectedBattle(target, BattleTarget.BOSS, "boss")
         return self._issue(runtime, attempt, selected, cancellation)
 
     @staticmethod
@@ -602,13 +619,12 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     ) -> BattleOutcome:
         if selected.target is None:
             return NoBattleTarget(attempt)
-        executor = runtime if selected.executor is None else selected.executor
         before = runtime.battle_count
         action_error: Exception | None = None
         interruption: CampaignActionInterrupted | None = None
         try:
             cancellation.raise_if_requested()
-            executor.clear_chosen_enemy(selected.target, expected=selected.expected)
+            runtime.clear_chosen_enemy(selected.target, expected=selected.expected)
         except CampaignActionInterrupted as error:
             interruption = error
         except Exception as error:  # ruff:ignore[blind-except] - battle_count 可证明异常前动作已经完成。
@@ -632,6 +648,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
 
 def build_existing_campaign_map_workflow(
     runtimes: CampaignRuntimeUnitSource,
+    auto_search: CampaignAutoSearchBattleExecutor,
     services: CampaignLiveServices,
     clock: CampaignLiveClock | None = None,
 ) -> LiveCampaignWorkflow:
@@ -639,7 +656,7 @@ def build_existing_campaign_map_workflow(
     if not isinstance(services, CampaignLiveServices) or services.activator is None:
         message = "campaign map workflow services require an activator"
         raise TypeError(message)
-    adapter = ExistingCampaignMapAdapter(runtimes)
+    adapter = ExistingCampaignMapAdapter(runtimes, auto_search)
     return LiveCampaignWorkflow(
         adapter,
         adapter,

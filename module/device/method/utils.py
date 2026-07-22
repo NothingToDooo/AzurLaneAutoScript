@@ -62,11 +62,7 @@ def possible_reasons(*args: str) -> None:
         logger.critical(f"Possible reason #{reason_number}: {reason}")
 
 
-class PackageNotInstalled(Exception):
-    pass
-
-
-class ImageTruncated(Exception):
+class PackageNotInstalledError(Exception):
     pass
 
 

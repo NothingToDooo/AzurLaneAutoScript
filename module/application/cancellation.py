@@ -62,7 +62,7 @@ class _OneShotSignal:
             return True
 
 
-class AbortRequested(Exception):
+class AbortRequested(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 表示协作式取消请求。
     def __init__(self, reason: str | None = None) -> None:
         validate_optional_reason(reason)
         self.reason = reason

@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, override
+from typing import TYPE_CHECKING, cast, override
 
 import numpy as np
 
@@ -10,8 +10,10 @@ from module.base.timer import Timer
 from module.base.utils import point_limit
 from module.exception import MapWalkError
 from module.handler.assets import MAINTENANCE_ANNOUNCE
+from module.handler.mystery_item import MysteryKind, MysteryResult
 from module.logger import logger
 from module.map.fleet import Fleet
+from module.map.fleet_navigation_ui import CampaignFleetMovementUi
 from module.map.map_grids import SelectedGrids
 from module.map.utils import location_ensure
 from module.map_detection.utils import area2corner, corner2inner
@@ -33,11 +35,9 @@ if TYPE_CHECKING:
     from module.base.type_alias import ImageArray, NumericArray, Point
     from module.config.config import AzurLaneConfig
     from module.device.device import Device
-    from module.map.fleet import FleetLocation
     from module.map.map_base import CampaignMap
-    from module.map.type_alias import GridLocation
+    from module.map.type_alias import FleetLocation, GridLocation
     from module.map_detection.grid import Grid
-    from module.map_detection.grid_info import GridInfo
     from module.os.radar import RadarGrid, RadarSelection
 
 FLEET_FILTER = Filter(regex=re.compile(r"fleet-?(\d)"), attr=("fleet",), preset=("callsubmarine",))
@@ -96,20 +96,37 @@ FLEET_LOW_RESOLVE = Button(
 )
 
 
-class OSFleet(OSCamera, Combat, Fleet, OSAsh):
-    def _goto(self, location: GridInfo | str | GridLocation, expected: str = "") -> None:
-        super()._goto(location, expected)
-        self.predict_radar()
-        self.map.show()
+class OSFleetMovementUi(CampaignFleetMovementUi):
+    """在通用到达提交后刷新大世界雷达与信标攻击状态。"""
 
-        if self.handle_ash_beacon_attack():
+    @override
+    def navigation_after_arrival(self, location: GridLocation) -> None:
+        runtime = cast("OSFleet", self._runtime)
+        runtime.predict_radar()
+        runtime.map.show()
+
+        if runtime.handle_ash_beacon_attack():
             # 信标攻击后镜头会重新聚焦当前舰队。
-            self.camera = location_ensure(location)
-            self.update()
+            runtime.camera = location
+            runtime.update()
+
+
+class OSFleet(OSCamera, Combat, Fleet, OSAsh):
+    @override
+    def _build_navigation_movement_ui(self) -> OSFleetMovementUi:
+        return OSFleetMovementUi(self, self._map_observer)
+
+    @override
+    def _navigation_walk_sight(self) -> tuple[int, int, int, int]:
+        return (-4, -1, 3, 2)
+
+    @override
+    def _active_hp_fleet_index(self) -> int:
+        return self.fleet_selector.get() or 1
 
     def map_data_init(self, map_: CampaignMap | None = None) -> None:
         map_ = OSCampaignMap()
-        map_.shape = self.zone.shape
+        map_.layout.initialize(self.zone.shape)
         super().map_data_init(map_)
 
     def map_control_init(self) -> None:
@@ -122,12 +139,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         self.ensure_edge_insight(preset=self.map.in_map_swipe_preset_data, swipe_limit=(6, 5))
 
     def find_current_fleet(self) -> FleetLocation:
-        self.fleet_1 = self.camera
-        return self.fleet_current
-
-    @property
-    def _walk_sight(self) -> tuple[int, int, int, int]:
-        return (-4, -1, 3, 2)
+        self.navigation.seed_surface(fleet_1=self.camera)
+        return self.navigation.current_location
 
     _os_map_event_handled = False
 
@@ -147,13 +160,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             return True
         return False
 
-    def handle_mystery(self, button: Grid | None = None) -> Literal["get_item", False]:
+    def handle_mystery(self, button: Grid | None = None) -> MysteryResult | None:
         """处理伏击后，舰队已到达时按神秘事件处理，否则仍按伏击处理。"""
         if button is None:
-            return False
+            return None
         if self._os_map_event_handled and button.predict_fleet() and button.predict_current_fleet():
-            return "get_item"
-        return False
+            return MysteryResult(MysteryKind.GET_ITEM, counts_toward_mystery=True)
+        return None
 
     @staticmethod
     def _get_goto_expected(grid: RadarGrid) -> str:
@@ -184,10 +197,11 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         logger.attr("Repair icon", need_repair)
 
         if any(need_repair):
+            fleet_index = self._active_hp_fleet_index()
             for index, repair in enumerate(need_repair):
                 if repair:
-                    self._hp_has_ship[self.fleet_current_index][index] = True
-                    self._hp[self.fleet_current_index][index] = 0
+                    self._hp_has_ship[fleet_index][index] = True
+                    self._hp[fleet_index][index] = 0
 
             logger.attr(
                 "HP",
@@ -207,25 +221,6 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
     def fleet_low_resolve_appear(self) -> bool:
         return self.image_color_count(FLEET_LOW_RESOLVE, color=FLEET_LOW_RESOLVE.color, threshold=221, count=250)
-
-    def get_sea_grids(self) -> SelectedGrids[GridInfo]:
-        """返回当前视野内按舰队或相机距离排序的海面格 SelectedGrids。"""
-        sea = []
-        for local in self.view:
-            if not local.predict_sea() or local.predict_current_fleet():
-                continue
-            if local.location is None:
-                message = "OS view grid has no location"
-                raise ValueError(message)
-            location = np.array(local.location) + self.camera - self.view.center_loca
-            location = (int(location[0]), int(location[1]))
-            if location == self.fleet_current or location not in self.map:
-                continue
-            sea.append(self.map[location])
-
-        fleet_current = self.fleet_current
-        center = fleet_current if len(fleet_current) else self.camera
-        return SelectedGrids(sea).sort_by_camera_distance(center)
 
     def wait_until_camera_stable(self, *, skip_first_screenshot: bool = True) -> None:
         """在 homography 检测模式下等待镜头定位稳定。"""
@@ -305,7 +300,10 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
     def _handle_walk_stable_combat(self, context: _WalkStableContext) -> bool:
         if not self.combat_appear():
             return False
-        self.combat(expected_end=self._walk_stable_abyssal_expected_end, fleet_index=self.fleet_show_index)
+        self.combat(
+            expected_end=self._walk_stable_abyssal_expected_end,
+            fleet_index=self._active_hp_fleet_index(),
+        )
         self._walk_stable_reset(context)
         context.result.add("event")
         return True

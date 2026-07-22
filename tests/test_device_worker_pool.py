@@ -2,7 +2,7 @@ from threading import Condition, Event, Lock, Thread
 
 import pytest
 
-from module.device.method.pool import Job, JobTimeout, WorkerPool
+from module.device.method.pool import Job, JobTimeoutError, WorkerPool
 
 
 class _ObservedCondition(Condition):
@@ -93,7 +93,7 @@ def test_timeout_keeps_worker_owned_until_the_call_really_finishes() -> None:
     worker = job.worker
     assert worker is not None
 
-    with pytest.raises(JobTimeout):
+    with pytest.raises(JobTimeoutError):
         job.get_or_timeout(0.01)
 
     assert worker.thread.is_alive()

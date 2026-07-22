@@ -1,11 +1,23 @@
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
+
+import pytest
 
 from module.base.button import Button
+from module.exception import CampaignEnd
 from module.map import assets as map_assets
+from module.map.fleet_navigation_ui import CampaignFleetSwitchUi
 from module.map.map_operation import MapOperation
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from module.base.button import MatchOffset
+    from module.handler.map_transition_ui import (
+        MapTransitionCombatRuntime,
+        MapTransitionRuntime,
+        MapTransitionUi,
+    )
+    from module.map.fleet import Fleet
 
 
 type _Call = (
@@ -123,6 +135,98 @@ class _MapOperation(MapOperation):
         return self.map_clear_percentage
 
 
+class _MapTransitionProbe:
+    def __init__(self, *, stage_return_results: tuple[bool, ...]) -> None:
+        self.stage_return_results = list(stage_return_results)
+        self.stage_return_calls: list[MapTransitionRuntime] = []
+
+    def handle_stage_return(self, runtime: MapTransitionRuntime) -> bool:
+        self.stage_return_calls.append(runtime)
+        return self.stage_return_results.pop(0)
+
+    @staticmethod
+    def stage_page_ready(runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        raise AssertionError
+
+    @staticmethod
+    def event_animation_visible(runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        raise AssertionError
+
+    @staticmethod
+    def combat_end_override(runtime: MapTransitionCombatRuntime) -> Callable[[], bool] | None:
+        del runtime
+        raise AssertionError
+
+
+class _TransitionDevice:
+    @staticmethod
+    def screenshot() -> None:
+        raise AssertionError
+
+    @staticmethod
+    def click(button: Button) -> None:
+        del button
+        raise AssertionError
+
+
+class _MapOperationTransitionContext(MapOperation):
+    device: _TransitionDevice
+
+    def __init__(self, transition: MapTransitionUi) -> None:
+        self.device = _TransitionDevice()
+        self._map_transition_ui = transition
+
+    @override
+    def handle_story_skip(self) -> bool:
+        del self
+        return False
+
+    @override
+    def handle_in_stage(self) -> bool:
+        raise AssertionError
+
+    @override
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del self, name, offset, interval
+        return False
+
+    @override
+    def appear_then_click(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
+        del self, button, offset, interval, similarity, threshold
+        return False
+
+    @override
+    def handle_auto_search_exit(self) -> bool:
+        del self
+        return False
+
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del self, button, offset, interval, similarity, threshold
+        return False
+
+
 def test_handle_map_mode_switch_normal_clicks_when_hard_visible() -> None:
     operation = _MapOperation()
     operation.hard_switch_visible = True
@@ -180,3 +284,22 @@ def test_handle_map_preparation_accepts_final_percentage_jump() -> None:
     operation.map_clear_percentage = 0.99
 
     assert operation.handle_map_preparation() is True
+
+
+def test_fleet_switch_ui_uses_injected_map_transition_service() -> None:
+    transition = _MapTransitionProbe(stage_return_results=(False,))
+    operation = _MapOperationTransitionContext(transition)
+    switch_ui = CampaignFleetSwitchUi(cast("Fleet", operation), transition)
+
+    assert not switch_ui.navigation_handle_switch_interruption()
+    assert transition.stage_return_calls == [operation]
+
+
+def test_withdraw_uses_injected_map_transition_service() -> None:
+    transition = _MapTransitionProbe(stage_return_results=(True,))
+    operation = _MapOperationTransitionContext(transition)
+
+    with pytest.raises(CampaignEnd):
+        operation.withdraw()
+
+    assert transition.stage_return_calls == [operation]

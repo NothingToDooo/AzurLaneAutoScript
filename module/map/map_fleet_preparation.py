@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, override
 
 import cv2
 import numpy as np
@@ -8,7 +8,7 @@ from scipy import signal
 from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import area_offset, color_similar, color_similarity_2d, get_color, image_size, rgb2gray
-from module.exception import HardNotSatisfied
+from module.exception import HardFleetRequirementsError
 from module.handler.assets import (
     AUTO_SEARCH_SET_ALL,
     AUTO_SEARCH_SET_BOSS,
@@ -23,6 +23,23 @@ from module.map import assets as map_assets
 
 if TYPE_CHECKING:
     from module.base.type_alias import ImageArray
+
+
+class FleetPreparationRuntime(Protocol):
+    def _standard_fleet_preparation(self) -> bool: ...
+
+
+class FleetPreparationService(Protocol):
+    def prepare(self, runtime: FleetPreparationRuntime) -> bool: ...
+
+
+class _StandardFleetPreparationService(FleetPreparationService):
+    @override
+    def prepare(self, runtime: FleetPreparationRuntime) -> bool:
+        return runtime._standard_fleet_preparation()  # ruff:ignore[private-member-access] - typed service 持有标准算法 primitive。
+
+
+STANDARD_FLEET_PREPARATION_SERVICE: FleetPreparationService = _StandardFleetPreparationService()
 
 
 @dataclass(slots=True)
@@ -116,7 +133,7 @@ class FleetOperator:
             logger.critical(
                 f'Stage "{stage}" is a hard mode, please prepare your fleet "{self!s}" in game before running Alas'
             )
-            raise HardNotSatisfied
+            raise HardFleetRequirementsError
 
     def clear(self, *, skip_first_screenshot: bool = True) -> None:
         main = self.main
@@ -246,6 +263,7 @@ class FleetOperator:
 
 
 class FleetPreparation(InfoHandler):
+    _fleet_preparation_service: FleetPreparationService = STANDARD_FLEET_PREPARATION_SERVICE
     map_fleet_checked = False
     map_is_hard_mode = False
 
@@ -323,7 +341,7 @@ class FleetPreparation(InfoHandler):
             if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
-            self.config.submarine = 0
+            self.config.apply_runtime_overlay(Submarine_Fleet=0)
 
     def _prepare_submarine_fleet(self, fleet_2: FleetOperator, submarine: FleetOperator) -> bool:
         # 缓存 submarine.allow()，避免设置 fleet_2 后结果不一致。
@@ -370,9 +388,12 @@ class FleetPreparation(InfoHandler):
             if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
-            self.config.submarine = 0
+            self.config.apply_runtime_overlay(Submarine_Fleet=0)
 
     def fleet_preparation(self) -> bool:
+        return self._fleet_preparation_service.prepare(self)
+
+    def _standard_fleet_preparation(self) -> bool:
         logger.info(f"Using fleet: {[self.config.Fleet_Fleet1, self.config.Fleet_Fleet2, self.config.Submarine_Fleet]}")
         if self.map_fleet_checked:
             return False

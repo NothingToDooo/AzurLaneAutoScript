@@ -98,6 +98,42 @@ def test_catalog_rejects_unknown_executor_kind(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
+    "obsolete_key",
+    [
+        "map_walk_turning_optimize",
+        "map_has_dynamic_red_border",
+        "map_has_pt_bonus",
+        "map_siren_count",
+        "map_air_strike_overlay_transparency_threshold",
+    ],
+)
+def test_catalog_rejects_removed_runtime_tuning_keys(
+    obsolete_key: str,
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "extensions": [],
+                "profiles": [
+                    {
+                        "id": "core",
+                        "extensions": [],
+                        "tunings": [{"key": obsolete_key, "value": 1}],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ContentValidationError, match="unknown RuntimeTuningKey"):
+        compile_campaign_runtime_profile_registry(path)
+
+
+@pytest.mark.parametrize(
     ("content", "message"),
     [
         ('{"schema_version": 1, "schema_version": 1}', "duplicate JSON key: schema_version"),

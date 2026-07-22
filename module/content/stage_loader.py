@@ -23,17 +23,13 @@ from module.content.mechanic_rules import (
     EncounterExpectation,
     EnsureFleet,
     EnsureFleetAt,
+    FleetClearSelectedTarget,
     FleetClearTarget,
     FleetCoordinationAction,
     FleetCoordinationRules,
     FleetRole,
-    MapCellAttribute,
-    MapCellPatch,
     MapInteractionRules,
     MapItemKind,
-    MapMutationPhase,
-    MapMutationRules,
-    MapMutationVariant,
     MapStructureRules,
     MoveFleet,
     MoveFleetToBestCandidate,
@@ -52,7 +48,6 @@ from module.content.mechanic_rules import (
     RoadPath,
     StageMechanicRules,
     StepFleetOn,
-    SwitchFleet,
     WallEdge,
 )
 from module.content.models import StageRef, StageSpec
@@ -61,9 +56,7 @@ from module.content.runtime_profile_catalog import load_default_campaign_runtime
 from module.content.stage_behavior_codec import (
     decode_battle_program,
     decode_enemy_movement_rules,
-    decode_fixed_target_sequences,
     decode_mechanic_procedures,
-    decode_preset_route_variants,
     decode_stage_policy,
 )
 from module.content.stage_definition import (
@@ -102,7 +95,7 @@ from module.content.yaml_loader import load_strict_yaml_mapping
 if TYPE_CHECKING:
     from module.content.battle_policy import StagePolicy
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 
 _TOP_LEVEL_FIELDS = {
     "schema_version",
@@ -123,6 +116,7 @@ _MAP_FIELDS = {
     "map_covered",
     "map_data",
     "map_data_loop",
+    "normal_enemy_spawn_candidates",
     "weight_data",
     "portal_data",
     "land_based_data",
@@ -144,13 +138,10 @@ _MECHANIC_FIELDS = {
     "fleet_coordination",
     "pickups",
     "map_interactions",
-    "map_mutations",
     "moving_enemies",
     "map_structures",
     "enemy_movement",
     "procedures",
-    "preset_routes",
-    "fixed_target_sequences",
 }
 _ROADBLOCK_FIELDS = {"tag", "battle", "roads", "selection"}
 _FLEET_ACTION_FIELDS = {
@@ -160,10 +151,10 @@ _FLEET_ACTION_FIELDS = {
     "rescue": {"tag", "battle", "fleet", "target"},
     "step_on": {"tag", "battle", "fleet", "candidates", "roadblocks"},
     "move": {"tag", "battle", "fleet", "destination", "expected"},
-    "switch": {"tag", "battle", "fleet"},
     "ensure": {"tag", "battle", "fleet"},
     "ensure_at": {"tag", "battle", "fleet", "target"},
     "clear_target": {"tag", "battle", "fleet", "target", "expected"},
+    "clear_selected_target": {"tag", "battle", "fleet", "candidates", "expected"},
 }
 _PICKUP_FIELDS = {
     "ammo": {"tag", "battle", "fleet"},
@@ -176,7 +167,6 @@ _MAP_INTERACTION_FIELDS = {
     "clear_map_items": {"tag", "battle", "cells"},
     "air_strike": {"tag", "battle", "target"},
 }
-_MAP_MUTATION_FIELDS = {"phase", "variant", "battle", "cell", "attribute", "value"}
 _MOVING_ENEMY_FIELDS = {
     "turns",
     "normal_turns",
@@ -824,8 +814,6 @@ def _fleet_action(
                 f"{location}.expected",
             ),
         )
-    elif tag == "switch":
-        action = SwitchFleet(battle=battle, fleet=fleet)
     elif tag == "ensure":
         action = EnsureFleet(battle=battle, fleet=fleet)
     elif tag == "ensure_at":
@@ -834,11 +822,23 @@ def _fleet_action(
             fleet=fleet,
             target=_grid_node(item["target"], path, f"{location}.target", shape),
         )
-    else:
+    elif tag == "clear_target":
         action = FleetClearTarget(
             battle=battle,
             fleet=fleet,
             target=_grid_node(item["target"], path, f"{location}.target", shape),
+            expected=_enum_value(
+                EncounterExpectation,
+                item["expected"],
+                path,
+                f"{location}.expected",
+            ),
+        )
+    else:
+        action = FleetClearSelectedTarget(
+            battle=battle,
+            fleet=fleet,
+            candidates=_grid_nodes(item["candidates"], path, f"{location}.candidates", shape),
             expected=_enum_value(
                 EncounterExpectation,
                 item["expected"],
@@ -925,42 +925,6 @@ def _map_interaction_rules(value: object, path: Path, shape: tuple[int, int]) ->
                 )
             )
     return MapInteractionRules(tuple(actions))
-
-
-def _map_mutation_rules(value: object, path: Path, shape: tuple[int, int]) -> MapMutationRules:
-    location = "mechanics.map_mutations"
-    patches: list[MapCellPatch] = []
-    for index, raw_patch in enumerate(_sequence(value, path, location)):
-        item_location = f"{location}[{index}]"
-        item = _fields_mapping(raw_patch, path, item_location, _MAP_MUTATION_FIELDS)
-        if set(item) != _MAP_MUTATION_FIELDS:
-            raise _fail(path, item_location, f"required fields are {sorted(_MAP_MUTATION_FIELDS)}")
-        raw_battle = item["battle"]
-        battle = None if raw_battle is None else _exact_integer(raw_battle, path, f"{item_location}.battle")
-        try:
-            patches.append(
-                MapCellPatch(
-                    phase=_enum_value(MapMutationPhase, item["phase"], path, f"{item_location}.phase"),
-                    battle=battle,
-                    cell=_grid_node(item["cell"], path, f"{item_location}.cell", shape),
-                    attribute=_enum_value(
-                        MapCellAttribute,
-                        item["attribute"],
-                        path,
-                        f"{item_location}.attribute",
-                    ),
-                    value=_boolean(item["value"], path, f"{item_location}.value"),
-                    variant=_enum_value(
-                        MapMutationVariant,
-                        item["variant"],
-                        path,
-                        f"{item_location}.variant",
-                    ),
-                )
-            )
-        except ContentValidationError as error:
-            raise _fail(path, item_location, str(error)) from error
-    return MapMutationRules(tuple(patches))
 
 
 def _moving_enemy_rules(value: object, path: Path, shape: tuple[int, int]) -> MovingEnemyRules:
@@ -1051,14 +1015,6 @@ def _mechanic_rules(value: object, path: Path, map_definition: MapDefinition) ->
             item["procedures"],
             "mechanics.procedures",
         )
-        preset_routes = decode_preset_route_variants(
-            item["preset_routes"],
-            "mechanics.preset_routes",
-        )
-        fixed_target_sequences = decode_fixed_target_sequences(
-            item["fixed_target_sequences"],
-            "mechanics.fixed_target_sequences",
-        )
     except ContentValidationError as error:
         raise _fail(path, "mechanics", str(error)) from error
     return StageMechanicRules(
@@ -1066,13 +1022,10 @@ def _mechanic_rules(value: object, path: Path, map_definition: MapDefinition) ->
         fleet_coordination=_fleet_coordination_rules(item["fleet_coordination"], path, shape),
         pickups=_pickup_rules(item["pickups"], path, shape),
         map_interactions=_map_interaction_rules(item["map_interactions"], path, shape),
-        map_mutations=_map_mutation_rules(item["map_mutations"], path, shape),
         moving_enemies=_moving_enemy_rules(item["moving_enemies"], path, shape),
         map_structures=_map_structure_rules(item["map_structures"], path, shape),
         enemy_movement=enemy_movement,
         procedures=procedures,
-        preset_routes=preset_routes,
-        fixed_target_sequences=fixed_target_sequences,
     )
 
 
@@ -1259,6 +1212,16 @@ def _build_map_definition(value: object, path: Path) -> MapDefinition:
             _land_based_data(data["land_based_data"], path, "map.land_based_data", max_coordinate)
             if "land_based_data" in data
             else ()
+        ),
+        normal_enemy_spawn_candidates=(
+            _grid_nodes(
+                data["normal_enemy_spawn_candidates"],
+                path,
+                "map.normal_enemy_spawn_candidates",
+                max_coordinate,
+            )
+            if "normal_enemy_spawn_candidates" in data
+            else None
         ),
     )
 

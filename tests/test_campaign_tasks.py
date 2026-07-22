@@ -595,6 +595,11 @@ def _case_for_stop_reason(
             gems_job,
             _report(reason, session=gems_fallback),
         ),
+        CampaignStopReason.CHECKPOINT_RESET: (
+            "main",
+            _spec(progress=_progress(runs_completed=2)),
+            _report(reason),
+        ),
     }
     case = cases.get(reason)
     if case is not None:
@@ -705,21 +710,28 @@ def test_stale_campaign_progress_is_deleted_before_external_work(progress: Campa
     )
 
 
-def test_physically_unavailable_campaign_checkpoint_is_deleted_and_retried_immediately() -> None:
-    session = _session()
-    progress = _progress(session=session, runs_completed=2)
+def test_checkpoint_reset_preserves_cumulative_progress_and_upserts_the_initial_boundary() -> None:
+    session = _session(
+        spawn_waves=(
+            SpawnWave(battle=0, enemy=1),
+            SpawnWave(battle=1, boss=1),
+        )
+    )
+    after_first = _succeed_battle(session, session.initial_state(), target=BattleTarget.ENEMY)
+    progress = _progress(session=session, runs_completed=2, state=after_first)
     report = _report(
-        CampaignStopReason.CHECKPOINT_UNAVAILABLE,
+        CampaignStopReason.CHECKPOINT_RESET,
         session=session,
-        session_state=progress.session_state,
+        session_state=session.initial_state(),
     )
 
     result = CampaignTask(_Workflow(report), _spec(sessions=(session,), progress=progress)).run(_context("main"))
 
+    reset = replace(progress, session_state=session.initial_state())
     assert result == TaskResult(
-        outcome=Deferred("campaign client session no longer matches its checkpoint"),
+        outcome=Deferred("campaign checkpoint was reset to a fresh map boundary"),
         effects=(RescheduleSelf(_OBSERVED_AT),),
-        state_effects=(_delete_effect(),),
+        state_effects=(_progress_effect(reset),),
     )
 
 

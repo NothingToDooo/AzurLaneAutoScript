@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: 16-3
   shape: K6
@@ -161,7 +161,6 @@ mechanics:
   - battle: 3
     tag: air_strike
     target: J6
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
@@ -179,8 +178,6 @@ mechanics:
   - battle: 3
     operations:
     - check_accessibility
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

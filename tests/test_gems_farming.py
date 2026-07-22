@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
+from module.base.button import Button
 from module.campaign import gems_farming as gems_module
 from module.campaign.gems_farming import (
     GemsEmotion,
@@ -16,7 +17,11 @@ from module.exception import CampaignEnd
 from module.retire.scanner import Ship
 
 if TYPE_CHECKING:
-    from module.base.button import Button
+    from collections.abc import Iterator
+
+    from module.base.button import MatchOffset
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
     from module.campaign.campaign_engine import CampaignEngine
     from module.config.config import AzurLaneConfig
 
@@ -87,6 +92,104 @@ def test_gems_emotion_uses_fleet1_as_logical_ledger_for_second_attack_slot() -> 
     assert attack_ledger.current == 98
     assert physical_fleet_2_record.current == 100
     assert emotion.config.records == [{"Emotion_Fleet1Value": 98}]
+
+
+class _StageNavigator:
+    def __init__(self, entrance: Button) -> None:
+        self.entrance = entrance
+        self.calls: list[tuple[str, str]] = []
+
+    def select(
+        self,
+        name: str,
+        mode: str = "normal",
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> Button:
+        del skip_first_screenshot
+        self.calls.append((name, mode))
+        return self.entrance
+
+
+class _ReachedTimer:
+    def __init__(self, seconds: float) -> None:
+        self.seconds = seconds
+        self.reset_count = 0
+
+    def reached(self) -> bool:
+        return self.seconds >= 0
+
+    def reset(self) -> None:
+        self.reset_count += 1
+
+
+class _HardFleetNavigationRunner(GemsFleetReplacement):
+    def __init__(self, navigator: _StageNavigator) -> None:
+        self.config = cast(
+            "AzurLaneConfig",
+            SimpleNamespace(
+                Campaign_Mode="hard",
+                Campaign_Name="12-4",
+                Fleet_FleetOrder="fleet1_all_fleet2_standby",
+            ),
+        )
+        self.campaign = cast(
+            "CampaignEngine",
+            SimpleNamespace(
+                stage_navigator=navigator,
+                handle_map_mode_switch=lambda _mode: False,
+                handle_map_preparation=lambda: False,
+                handle_retirement=lambda: False,
+            ),
+        )
+        self.fleet_visible = [False, False, True]
+        self.clicked: list[Button] = []
+
+    @override
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        yield cast("ImageArray", object())
+        yield cast("ImageArray", object())
+
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del offset, interval, similarity, threshold
+        return self.fleet_visible.pop(0) if button is gems_module.FLEET_PREPARATION else False
+
+    @override
+    def appear_then_click(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
+        del offset, interval, similarity, threshold
+        self.clicked.append(button)
+        return True
+
+
+def test_hard_fleet_navigation_uses_the_explicit_selected_entrance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entrance = Button(area=(), color=(), button=(1, 2, 3, 4), name="hard")
+    navigator = _StageNavigator(entrance)
+    runner = _HardFleetNavigationRunner(navigator)
+    monkeypatch.setattr(gems_module, "Timer", _ReachedTimer)
+
+    runner._goto_hard_fleet()  # ruff:ignore[private-member-access] - 验证换舰 UI 的入口传递边界。
+
+    assert navigator.calls == [("12-4", "hard")]
+    assert runner.clicked == [entrance]
+    assert entrance.area == entrance.button
 
 
 class _HardFleetPrepareResultRunner(GemsFleetReplacement):

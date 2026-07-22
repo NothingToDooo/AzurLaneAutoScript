@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: C2
   shape: G7
@@ -86,7 +86,6 @@ mechanics:
     tag: push_forward
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns:
     - 1
@@ -96,8 +95,6 @@ mechanics:
     initial_siren_cells: []
   enemy_movement: []
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

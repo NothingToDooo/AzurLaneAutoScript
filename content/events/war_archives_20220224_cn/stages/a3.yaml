@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: A3
   shape: I9
@@ -116,7 +116,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
@@ -128,8 +127,6 @@ mechanics:
   - battle: 0
     operations:
     - clear_bouncing_enemy
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

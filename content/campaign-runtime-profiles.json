@@ -5,14 +5,7 @@
         {
           "implementation": "hard_mode/campaign_clear_mode",
           "kind": "hard_mode",
-          "options": {
-            "expected_end": "in_stage",
-            "operations": [
-              "_expected_end",
-              "clear_boss",
-              "equipment_take_off_when_finished"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "campaign_hard/campaign_hard/campaign"
@@ -23,10 +16,7 @@
           "implementation": "map_mechanic/non_counting_mystery_popup",
           "kind": "map_mechanic",
           "options": {
-            "count_as_mystery": false,
-            "operations": [
-              "handle_mystery_items"
-            ]
+            "count_as_mystery": false
           }
         }
       ],
@@ -35,16 +25,9 @@
     {
       "executors": [
         {
-          "implementation": "map_mechanic/mob_move_strategy_state",
+          "implementation": "map_mechanic/mob_move_feature",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "strategy_set_execute"
-            ],
-            "state": [
-              "map_has_mob_move"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "campaign_main/campaign_15_base/campaign_base"
@@ -68,30 +51,9 @@
     {
       "executors": [
         {
-          "implementation": "map_mechanic/session_state_policy",
+          "implementation": "map_mechanic/chapter16_session_state",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "map_init"
-            ],
-            "rules": [
-              {
-                "all": [
-                  "use_support_fleet",
-                  "clear_mode"
-                ],
-                "target": "map_has_mob_move"
-              },
-              {
-                "fleet_order_contains": "standby",
-                "target": "use_single_fleet"
-              }
-            ],
-            "state": [
-              "map_has_mob_move",
-              "use_single_fleet"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "campaign_main/campaign_16_3/campaign"
@@ -99,30 +61,9 @@
     {
       "executors": [
         {
-          "implementation": "map_mechanic/session_state_policy",
+          "implementation": "map_mechanic/chapter16_session_state",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "map_init"
-            ],
-            "rules": [
-              {
-                "all": [
-                  "use_support_fleet",
-                  "clear_mode"
-                ],
-                "target": "map_has_mob_move"
-              },
-              {
-                "fleet_order_contains": "standby",
-                "target": "use_single_fleet"
-              }
-            ],
-            "state": [
-              "map_has_mob_move",
-              "use_single_fleet"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "campaign_main/campaign_16_4/campaign"
@@ -130,17 +71,22 @@
     {
       "executors": [
         {
-          "implementation": "map_mechanic/submarine_fresh_entry",
+          "implementation": "map_mechanic/submarine_support_popup",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "handle_submarine_support_popup",
-              "map_init"
-            ]
-          }
+          "options": {}
         }
       ],
-      "id": "campaign_main/campaign_16_base_submarine/campaign_base"
+      "id": "campaign_main/campaign_16_base_submarine/submarine_support_popup"
+    },
+    {
+      "executors": [
+        {
+          "implementation": "map_mechanic/submarine_fresh_combat",
+          "kind": "map_mechanic",
+          "options": {}
+        }
+      ],
+      "id": "campaign_main/campaign_16_base_submarine/submarine_fresh_combat"
     },
     {
       "executors": [
@@ -148,10 +94,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "campaign",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "campaign"
           }
         }
       ],
@@ -163,10 +106,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "campaign",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "campaign"
           }
         }
       ],
@@ -177,25 +117,14 @@
         {
           "implementation": "map_mechanic/support_fleet",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "_map_swipe",
-              "fleet_preparation"
-            ],
-            "state": [
-              "use_support_fleet"
-            ]
-          }
+          "options": {}
         },
         {
           "implementation": "engine/ui_mask",
           "kind": "engine_extension",
           "options": {
             "asset": "support_fleet",
-            "condition": "use_support_fleet",
-            "operations": [
-              "map_data_init"
-            ]
+            "condition": "use_support_fleet"
           }
         }
       ],
@@ -213,22 +142,7 @@
               "event": "ex",
               "sp": "sp"
             },
-            "operations": [
-              "_advance_archives_scroll",
-              "_archives_loading_complete",
-              "_discard_archives_scroll_record",
-              "_ensure_archives_search_page",
-              "_get_archives_entrance",
-              "_search_archives_entrance",
-              "_wait_archives_loaded",
-              "ui_goto_archives_campaign",
-              "ui_goto_event",
-              "ui_goto_sp"
-            ],
-            "page_fraction": 0.66,
-            "state": [
-              "first_run"
-            ]
+            "page_fraction": 0.66
           }
         }
       ],
@@ -294,19 +208,6 @@
               "d": "hard",
               "ex_sp": "ex"
             },
-            "main_routes": true,
-            "operations": [
-              "_campaign_ball_get",
-              "_campaign_ball_set",
-              "_campaign_ball_status",
-              "_campaign_ensure_ball_mode",
-              "campaign_get_chapter_index",
-              "campaign_set_chapter",
-              "campaign_set_chapter_ball",
-              "campaign_set_chapter_event",
-              "campaign_set_chapter_main",
-              "campaign_set_chapter_sp"
-            ],
             "sp_destination": "sp"
           }
         }
@@ -329,14 +230,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter"
-            ],
+            "route_target": "all",
             "routes": [
               {
                 "destination": "campaign",
@@ -393,9 +290,6 @@
                   "count": 10000
                 }
               }
-            ],
-            "operations": [
-              "is_event_animation"
             ]
           }
         }
@@ -421,7 +315,6 @@
               "sp": "vsp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -434,12 +327,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -482,12 +370,7 @@
                 20
               ]
             },
-            "menu_page": "campaign_menu",
-            "operations": [
-              "is_event_animation",
-              "ui_goto_event"
-            ],
-            "wait_until_animation_end": false
+            "menu_page": "campaign_menu"
           }
         }
       ],
@@ -512,14 +395,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter"
-            ],
+            "route_target": "all",
             "routes": [
               {
                 "destination": "campaign",
@@ -572,14 +451,7 @@
           "implementation": "observation/preserve_enemy_genre",
           "kind": "map_observation",
           "options": {
-            "genre": "Siren_Dace",
-            "operations": [
-              "full_scan",
-              "full_scan_movable"
-            ],
-            "state": [
-              "dace"
-            ]
+            "genre": "Siren_Dace"
           }
         }
       ],
@@ -608,7 +480,6 @@
               "sp": "vsp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -639,13 +510,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_match_multi",
-              "campaign_separate_name",
-              "campaign_set_chapter"
-            ],
+            "route_target": "all",
             "routes": [
               {
                 "destination": "campaign",
@@ -699,9 +564,6 @@
               {
                 "asset": "ANIMATION_BLUE"
               }
-            ],
-            "operations": [
-              "is_event_animation"
             ]
           }
         }
@@ -726,7 +588,6 @@
               "field": "stage_entrance",
               "input": "sp"
             },
-            "fallback": "next",
             "mode_policy": "noop",
             "name_rules": [
               {
@@ -741,12 +602,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -756,10 +612,7 @@
           "kind": "engine_extension",
           "options": {
             "asset": "event_20211125",
-            "condition": "always",
-            "operations": [
-              "map_data_init"
-            ]
+            "condition": "always"
           }
         }
       ],
@@ -770,11 +623,7 @@
         {
           "implementation": "event_20211125_cn/t4/campaign",
           "kind": "map_observation",
-          "options": {
-            "operations": [
-              "catch_camera_repositioning"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "event_20211125_cn/t4/campaign"
@@ -785,10 +634,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
@@ -796,9 +642,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "handled",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_SIREN": true,
               "MAP_SIREN_TEMPLATE": [
@@ -827,7 +670,6 @@
               "field": "stage_entrance",
               "input": "sp"
             },
-            "fallback": "next",
             "mode_policy": "noop",
             "name_rules": [
               {
@@ -842,13 +684,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_sp"
-            ],
+            "route_target": "sp",
             "routes": [
               {
                 "chapters": [
@@ -870,10 +706,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -893,7 +726,6 @@
               "sp": "esp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -913,12 +745,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_sp"
-            ],
+            "route_target": "sp",
             "routes": [
               {
                 "chapters": [
@@ -941,20 +768,13 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
           "implementation": "observation/red_overlay_enemy_search",
           "kind": "map_observation",
-          "options": {
-            "operations": [
-              "enemy_searching_appear"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "event_20220915_cn/campaign_base/campaign_base"
@@ -975,7 +795,6 @@
               "sp": "asp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -1010,12 +829,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -1029,11 +843,7 @@
         {
           "implementation": "event_20221124_cn/campaign_base/campaign_base",
           "kind": "event_ui",
-          "options": {
-            "operations": [
-              "ui_goto_event"
-            ]
-          }
+          "options": {}
         },
         {
           "implementation": "observation/auto_search_clear_status",
@@ -1043,20 +853,13 @@
               "th",
               "ht"
             ],
-            "operations": [
-              "map_get_info"
-            ],
             "override_map_clear_percentage": false
           }
         },
         {
-          "implementation": "event_20221124_cn/campaign_base/campaign_base",
+          "implementation": "map_mechanic/ryza_mystery_items",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "handle_mystery_items"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "event_20221124_cn/campaign_base/campaign_base"
@@ -1067,24 +870,13 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
-          "implementation": "engine/runtime_config_overlay",
+          "implementation": "engine/default_enemy_scale_balance",
           "kind": "engine_extension",
-          "options": {
-            "operations": [
-              "map_data_init"
-            ],
-            "overrides": {
-              "EnemyPriority_EnemyScaleBalanceWeight": "default_mode"
-            },
-            "phase": "map_init"
-          }
+          "options": {}
         }
       ],
       "id": "event_20221222_cn/campaign_base/campaign_base"
@@ -1151,18 +943,6 @@
               "d": "hard",
               "ex_sp": "ex"
             },
-            "main_routes": true,
-            "operations": [
-              "_campaign_ball_get",
-              "_campaign_ball_set",
-              "_campaign_ball_status",
-              "_campaign_ensure_ball_mode",
-              "campaign_set_chapter",
-              "campaign_set_chapter_ball",
-              "campaign_set_chapter_event",
-              "campaign_set_chapter_main",
-              "campaign_set_chapter_sp"
-            ],
             "sp_destination": "sp"
           }
         }
@@ -1174,14 +954,7 @@
         {
           "implementation": "event_20230817_cn/campaign_base/campaign_base",
           "kind": "event_ui",
-          "options": {
-            "operations": [
-              "event_20230817_story",
-              "get_story_button",
-              "handle_chapter_additional",
-              "is_stage_page_has_entrance"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "event_20230817_cn/campaign_base/campaign_base"
@@ -1192,10 +965,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -1215,7 +985,6 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -1248,11 +1017,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_separate_name",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -1280,14 +1045,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -1383,7 +1144,6 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {
@@ -1392,11 +1152,7 @@
               "jjsp": "sp",
               "usp": "sp"
             },
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_ocr_result_process",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "event",
@@ -1444,9 +1200,6 @@
                   "count": 500
                 }
               }
-            ],
-            "operations": [
-              "is_event_animation"
             ]
           }
         }
@@ -1476,9 +1229,6 @@
                   "count": 500
                 }
               }
-            ],
-            "operations": [
-              "is_event_animation"
             ]
           }
         }
@@ -1492,10 +1242,7 @@
           "kind": "map_observation",
           "options": {
             "fleet_1": "D5",
-            "fleet_2": "F5",
-            "operations": [
-              "find_current_fleet"
-            ]
+            "fleet_2": "F5"
           }
         }
       ],
@@ -1507,9 +1254,6 @@
           "implementation": "observation/focus_rules",
           "kind": "map_observation",
           "options": {
-            "operations": [
-              "in_sight"
-            ],
             "rules": [
               {
                 "focus_x": 7,
@@ -1538,10 +1282,7 @@
           "kind": "map_observation",
           "options": {
             "fleet_1": "D5",
-            "fleet_2": "F5",
-            "operations": [
-              "find_current_fleet"
-            ]
+            "fleet_2": "F5"
           }
         }
       ],
@@ -1601,9 +1342,6 @@
           "implementation": "observation/focus_rules",
           "kind": "map_observation",
           "options": {
-            "operations": [
-              "in_sight"
-            ],
             "rules": [
               {
                 "focus_x": 7,
@@ -1634,16 +1372,13 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": {
               "hard_config_override": true,
               "kind": "bridge_20241219"
             },
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -1658,15 +1393,6 @@
           "kind": "event_ui",
           "options": {
             "exp_info_blocked_page": "event",
-            "operations": [
-              "ensure_no_stage_entrance",
-              "get_story_entrance",
-              "handle_campaign_ui_additional",
-              "handle_exp_info",
-              "handle_get_chapter_additional",
-              "handle_in_stage",
-              "handle_story_entrance"
-            ],
             "state": [
               "entrance_timer"
             ]
@@ -1686,7 +1412,6 @@
               "sp": "tp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": {
               "hard_config_override": true,
               "kind": "bridge_20241219"
@@ -1701,11 +1426,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_get_entrance",
-              "campaign_separate_name"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -1719,20 +1440,14 @@
           "implementation": "event_20240912_cn/campaign_base/campaign_base",
           "kind": "navigation",
           "options": {
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_set_chapter_20241219"
-            ]
+            "mode_switch": "event_20240912"
           }
         },
         {
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -1747,13 +1462,10 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside_by_stage": {
@@ -1848,14 +1560,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside": "part1",
@@ -1896,11 +1604,7 @@
             },
             "destination": "event",
             "exp_info_blocked_page": "event",
-            "menu_page": "campaign_menu",
-            "operations": [
-              "handle_exp_info",
-              "ui_goto_event"
-            ]
+            "menu_page": "campaign_menu"
           }
         }
       ],
@@ -1921,10 +1625,7 @@
               "page": "event"
             },
             "destination": "event",
-            "menu_page": "campaign_menu",
-            "operations": [
-              "ui_goto_event"
-            ]
+            "menu_page": "campaign_menu"
           }
         }
       ],
@@ -1939,13 +1640,10 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside": "part2",
@@ -1969,9 +1667,6 @@
             "offset": [
               20,
               20
-            ],
-            "operations": [
-              "handle_exp_info"
             ]
           }
         },
@@ -1981,10 +1676,6 @@
           "options": {
             "campaign_name_prefixes": [
               "*"
-            ],
-            "operations": [
-              "get_map_clear_percentage",
-              "map_get_info"
             ],
             "override_map_clear_percentage": true
           }
@@ -2001,7 +1692,6 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {
@@ -2011,9 +1701,7 @@
               "usp": "sp",
               "ysp": "sp"
             },
-            "operations": [
-              "campaign_ocr_result_process"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -2030,13 +1718,10 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside_by_stage": {
@@ -2064,10 +1749,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -2082,13 +1764,10 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_set_chapter_20241219"
-            ],
+            "route_target": "switch_20241219",
             "routes": [
               {
                 "aside_by_stage": {
@@ -2127,7 +1806,6 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {
@@ -2135,9 +1813,7 @@
               "vsp": "sp",
               "ysp": "sp"
             },
-            "operations": [
-              "campaign_ocr_result_process"
-            ],
+            "route_target": null,
             "routes": [],
             "stage_match_similarity": null
           }
@@ -2174,13 +1850,7 @@
                 20
               ]
             },
-            "menu_page": "campaign_menu",
-            "operations": [
-              "event_animation_end",
-              "is_event_animation",
-              "ui_goto_event"
-            ],
-            "wait_until_animation_end": true
+            "menu_page": "campaign_menu"
           }
         }
       ],
@@ -2189,13 +1859,10 @@
     {
       "executors": [
         {
-          "implementation": "engine/event_animation_expected_end",
-          "kind": "engine_extension",
+          "implementation": "event_ui/event_animation_expected_end",
+          "kind": "event_ui",
           "options": {
-            "event_animation_end_battle": 3,
-            "operations": [
-              "_expected_end"
-            ]
+            "event_animation_end_battle": 3
           }
         }
       ],
@@ -2204,13 +1871,10 @@
     {
       "executors": [
         {
-          "implementation": "engine/event_animation_expected_end",
-          "kind": "engine_extension",
+          "implementation": "event_ui/event_animation_expected_end",
+          "kind": "event_ui",
           "options": {
-            "event_animation_end_battle": 3,
-            "operations": [
-              "_expected_end"
-            ]
+            "event_animation_end_battle": 3
           }
         }
       ],
@@ -2222,9 +1886,6 @@
           "implementation": "observation/focus_rules",
           "kind": "map_observation",
           "options": {
-            "operations": [
-              "in_sight"
-            ],
             "rules": [
               {
                 "focus_cell": "E3",
@@ -2244,9 +1905,6 @@
           "implementation": "observation/focus_rules",
           "kind": "map_observation",
           "options": {
-            "operations": [
-              "in_sight"
-            ],
             "rules": [
               {
                 "focus_cell": "E3",
@@ -2315,14 +1973,10 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_set_chapter"
-            ],
+            "route_target": "all",
             "routes": [
               {
                 "destination": "campaign",
@@ -2429,19 +2083,6 @@
               "d": "hard",
               "ex_sp": "ex"
             },
-            "main_routes": true,
-            "operations": [
-              "_campaign_ball_get",
-              "_campaign_ball_set",
-              "_campaign_ball_status",
-              "_campaign_ensure_ball_mode",
-              "campaign_get_chapter_index",
-              "campaign_set_chapter",
-              "campaign_set_chapter_ball",
-              "campaign_set_chapter_event",
-              "campaign_set_chapter_main",
-              "campaign_set_chapter_sp"
-            ],
             "sp_destination": "sp"
           }
         }
@@ -2454,14 +2095,7 @@
           "implementation": "observation/preserve_enemy_genre",
           "kind": "map_observation",
           "options": {
-            "genre": "Siren_Dace",
-            "operations": [
-              "full_scan",
-              "full_scan_movable"
-            ],
-            "state": [
-              "dace"
-            ]
+            "genre": "Siren_Dace"
           }
         }
       ],
@@ -2474,9 +2108,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "always",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_MISSILE_ATTACK": false
             }
@@ -2492,9 +2123,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "always",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_MISSILE_ATTACK": false
             }
@@ -2510,9 +2138,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "always",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_MISSILE_ATTACK": true
             }
@@ -2527,10 +2152,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
@@ -2538,9 +2160,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "handled",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_SIREN": true,
               "MAP_SIREN_TEMPLATE": [
@@ -2558,10 +2177,7 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         }
       ],
@@ -2581,7 +2197,6 @@
               "sp": "esp"
             },
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -2601,12 +2216,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_get_entrance",
-              "campaign_separate_name",
-              "campaign_set_chapter_sp"
-            ],
+            "route_target": "sp",
             "routes": [
               {
                 "chapters": [
@@ -2629,20 +2239,13 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
           "implementation": "observation/red_overlay_enemy_search",
           "kind": "map_observation",
-          "options": {
-            "operations": [
-              "enemy_searching_appear"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "war_archives_20220915_cn/campaign_base/campaign_base"
@@ -2653,24 +2256,13 @@
           "implementation": "event_ui/exp_info_page_guard",
           "kind": "event_ui",
           "options": {
-            "blocked_page": "event",
-            "operations": [
-              "handle_exp_info"
-            ]
+            "blocked_page": "event"
           }
         },
         {
-          "implementation": "engine/runtime_config_overlay",
+          "implementation": "engine/default_enemy_scale_balance",
           "kind": "engine_extension",
-          "options": {
-            "operations": [
-              "map_data_init"
-            ],
-            "overrides": {
-              "EnemyPriority_EnemyScaleBalanceWeight": "default_mode"
-            },
-            "phase": "map_init"
-          }
+          "options": {}
         }
       ],
       "id": "war_archives_20221222_cn/campaign_base/campaign_base"
@@ -2737,18 +2329,6 @@
               "d": "hard",
               "ex_sp": "ex"
             },
-            "main_routes": true,
-            "operations": [
-              "_campaign_ball_get",
-              "_campaign_ball_set",
-              "_campaign_ball_status",
-              "_campaign_ensure_ball_mode",
-              "campaign_set_chapter",
-              "campaign_set_chapter_ball",
-              "campaign_set_chapter_event",
-              "campaign_set_chapter_main",
-              "campaign_set_chapter_sp"
-            ],
             "sp_destination": "sp"
           }
         }
@@ -2769,7 +2349,6 @@
             },
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": "inherited",
             "name_rules": [
               {
@@ -2802,11 +2381,7 @@
               }
             ],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_get_chapter_index",
-              "campaign_separate_name",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "destination": "sp",
@@ -2829,16 +2404,12 @@
             "chapter_indices": {},
             "entrance_aliases": {},
             "entrance_search": {},
-            "fallback": "next",
             "mode_policy": {
               "kind": "hard_config_override"
             },
             "name_rules": [],
             "ocr_aliases": {},
-            "operations": [
-              "campaign_ensure_mode",
-              "campaign_set_chapter_event"
-            ],
+            "route_target": "event",
             "routes": [
               {
                 "chapters": [
@@ -3584,14 +3155,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -3672,14 +3235,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 280
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 3
         },
         {
           "key": "submarine",
@@ -4383,14 +3938,6 @@
           "value": 280
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "submarine",
           "value": 0
         }
@@ -4640,14 +4187,6 @@
             "prominence": 10,
             "width": 1
           }
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "poor_map_data",
@@ -5152,10 +4691,6 @@
         {
           "key": "map_swipe_predict_with_sea_grids",
           "value": false
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -5630,14 +5165,6 @@
               50
             ]
           }
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "mid_diff_range_h",
@@ -6230,14 +5757,6 @@
               10
             ]
           }
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "poor_map_data",
@@ -7104,14 +6623,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -7526,18 +7037,6 @@
           "value": 0.3
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_has_pt_bonus",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 3
-        },
-        {
           "key": "mid_diff_range_h",
           "value": [
             45,
@@ -7632,18 +7131,6 @@
         {
           "key": "map_grid_center_tolerance",
           "value": 0.3
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_has_pt_bonus",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "mid_diff_range_h",
@@ -9495,14 +8982,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -9572,14 +9051,6 @@
               50
             ]
           }
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 1
         },
         {
           "key": "mid_diff_range_h",
@@ -9804,14 +9275,6 @@
             ],
             "prominence": 10
           }
-        },
-        {
-          "key": "map_air_strike_overlay_transparency_threshold",
-          "value": 0.35
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -9959,10 +9422,6 @@
             "Carrier",
             "CarrierSpecial"
           ]
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -10444,14 +9903,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -10493,14 +9944,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 280
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 1
         },
         {
           "key": "submarine",
@@ -11015,10 +10458,6 @@
           ]
         },
         {
-          "key": "map_walk_turning_optimize",
-          "value": false
-        },
-        {
           "key": "map_walk_use_current_fleet",
           "value": true
         }
@@ -11350,14 +10789,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 350
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "submarine",
@@ -12071,14 +11502,6 @@
             ],
             "prominence": 10
           }
-        },
-        {
-          "key": "map_air_strike_overlay_transparency_threshold",
-          "value": 0.35
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -13008,18 +12431,6 @@
         {
           "key": "map_grid_center_tolerance",
           "value": 0.3
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_has_pt_bonus",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 1
         },
         {
           "key": "mid_diff_range_h",
@@ -14134,14 +13545,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 280
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 1
         },
         {
           "key": "submarine",
@@ -15389,14 +14792,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -16454,10 +15849,6 @@
         },
         {
           "key": "map_swipe_predict_with_sea_grids",
-          "value": false
-        },
-        {
-          "key": "map_walk_turning_optimize",
           "value": false
         },
         {
@@ -17632,10 +17023,6 @@
             "Carrier",
             "CarrierSpecial"
           ]
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -19228,14 +18615,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -19308,7 +18687,8 @@
     {
       "extensions": [
         "campaign_main/campaign_support_fleet/campaign_base",
-        "campaign_main/campaign_16_base_submarine/campaign_base"
+        "campaign_main/campaign_16_base_submarine/submarine_support_popup",
+        "campaign_main/campaign_16_base_submarine/submarine_fresh_combat"
       ],
       "id": "profile_fec37dabc92850b1",
       "tunings": [
@@ -19322,10 +18702,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 210
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },

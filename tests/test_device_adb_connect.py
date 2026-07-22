@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from module.device.connection import Connection
-from module.exception import EmulatorNotRunningError, RequestHumanTakeover
+from module.exception import EmulatorNotRunningError, HumanTakeoverRequiredError
 
 
 class _AdbClient:
@@ -96,7 +96,7 @@ def test_adb_connect_disconnects_offline_devices_before_connecting() -> None:
 def test_adb_connect_rejects_non_mumu_tcp_serial(serial: str) -> None:
     connection = _make_connection(serial=serial)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         connection.adb_connect()
     assert connection.adb_client.connect_calls == []
 
@@ -111,7 +111,7 @@ def test_adb_connect_returns_true_when_tcp_connect_succeeds() -> None:
 def test_adb_connect_rejects_bad_port() -> None:
     connection = _make_connection(connect_messages=["bad port number '99999'"])
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         connection.adb_connect()
 
 

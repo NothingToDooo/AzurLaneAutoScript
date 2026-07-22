@@ -66,7 +66,6 @@ class AzurLaneConfig(ManualConfig, GeneratedConfig):
     # 旧装备切换任务在运行期注入的舰队和装备记录。
     FLEET_DAILY: int | list[int]
     FLEET_DAILY_EQUIPMENT: list[int] | None
-    FLEET_HARD_EQUIPMENT: list[int] | None
     EXERCISE_FLEET_EQUIPMENT: list[int] | None
     EventDaily_LastStage: int | str
 
@@ -351,34 +350,18 @@ class AzurLaneConfig(ManualConfig, GeneratedConfig):
     def fleet_2(self) -> int:
         return self.Fleet_Fleet2
 
-    @fleet_2.setter
-    def fleet_2(self, value: int) -> None:
-        self.override(Fleet_Fleet2=value)
-
     @property
     def submarine(self) -> int:
         return self.Submarine_Fleet
 
-    @submarine.setter
-    def submarine(self, value: int) -> None:
-        self.override(Submarine_Fleet=value)
-
-    _fleet_boss = 0
-
     @property
     def fleet_boss(self) -> int:
-        if self._fleet_boss:
-            return self._fleet_boss
         if self.Fleet_Fleet2 and self.Fleet_FleetOrder in [
             "fleet1_mob_fleet2_boss",
             "fleet1_boss_fleet2_mob",
         ]:
             return 2
         return 1
-
-    @fleet_boss.setter
-    def fleet_boss(self, value: int) -> None:
-        self._fleet_boss = value
 
     def temporary(self, **kwargs: Unpack[ConfigOverrides]) -> ConfigBackup:
         """通过运行期投影临时覆盖属性，不触碰持久配置。"""

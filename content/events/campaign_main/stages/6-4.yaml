@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: 6-4
   shape: H6
@@ -259,7 +259,6 @@ mechanics:
     ignored: []
     nearby: true
     tag: clear_all_mystery
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
@@ -271,8 +270,6 @@ mechanics:
   - battle: 5
     operations:
     - check_accessibility
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

@@ -39,7 +39,7 @@ class AzurLaneDaemon(CampaignEngine):
         if self.appear_then_click(MAP_AMBUSH_EVADE, offset=(20, 20)):
             self.device.sleep(1)
             return True
-        return bool(self.handle_mystery_items())
+        return self.handle_mystery_items().handled
 
     def handle_daemon_map_preparation(self) -> bool:
         if not self.config.Daemon_EnterMap:

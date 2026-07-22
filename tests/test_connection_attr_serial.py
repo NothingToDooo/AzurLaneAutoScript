@@ -12,7 +12,7 @@ from module.device import connection_attr as connection_attr_module
 from module.device.connection_attr import ConnectionAttr
 from module.device.device import Device
 from module.device.runtime import DeviceRuntime
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 
 if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
@@ -244,5 +244,5 @@ def test_bind_serial_repeated_release_is_safe() -> None:
 def test_serial_check_rejects_non_mumu12_tcp_serial(serial: str) -> None:
     attr = _make_attr(serial)
 
-    with pytest.raises(RequestHumanTakeover):
+    with pytest.raises(HumanTakeoverRequiredError):
         attr.serial_check()

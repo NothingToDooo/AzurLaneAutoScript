@@ -10,7 +10,7 @@ from module.coalition.profile import (
 from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
 from module.content.activity_profile import CoalitionFleetMode, CoalitionFleetRule
-from module.exception import RequestHumanTakeover, ScriptError
+from module.exception import HumanTakeoverRequiredError, ScriptError
 from module.logger import logger
 from module.ui.assets import BACK_ARROW
 from module.ui.page import page_coalition
@@ -99,13 +99,13 @@ class CoalitionUI(Combat):
         if self.appear(coalition_assets.FLEET_NOT_PREPARED, offset=(20, 20)):
             logger.critical("FLEET_NOT_PREPARED")
             logger.critical("Please prepare your fleets before running coalition battles")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         if self.appear(coalition_assets.EMPTY_FLAGSHIP, offset=(20, 20)):
             logger.critical("EMPTY_FLAGSHIP, please prepare your fleets before running coalition battles")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         if self.appear(coalition_assets.EMPTY_VANGUARD, offset=(20, 20)):
             logger.critical("EMPTY_VANGUARD, please prepare your fleets before running coalition battles")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         return clicked
 
     def coalition_map_exit(self) -> None:
@@ -141,17 +141,17 @@ class CoalitionUI(Combat):
         if entrance_clicks > 5:
             logger.critical(f"Failed to enter {entrance}, too many clicks on {entrance}")
             logger.critical("Possible reason: the previous stage has not been cleared")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         if difficulty_clicks > 5:
             logger.critical(f"Failed to enter {difficulty}, too many clicks on {difficulty}")
             logger.critical("Possible reason: the difficulty asset is not correct")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         if fleet_clicks <= 5:
             return
         logger.critical(f"Failed to enter {entrance}, too many clicks on FLEET_PREPARATION")
         logger.critical("Possible reason: the fleets do not satisfy this stage's restrictions")
         logger.critical("Possible reason: this daily stage has already been completed")
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     def _click_stage(self, entrance: Button, timer: Timer) -> bool:
         if not timer.reached() or not self.in_coalition():

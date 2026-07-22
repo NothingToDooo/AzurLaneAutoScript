@@ -1,12 +1,21 @@
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
+from module.adapters.campaign_clear_mode_config import build_campaign_clear_mode_config_service
+from module.adapters.campaign_event_ui import (
+    CampaignEventUiContributor,
+    CampaignMapTransitionContributor,
+    build_campaign_event_ui_services,
+)
+from module.adapters.campaign_map_initialization import (
+    CampaignMapInitializationRuntime,
+    build_campaign_map_initialization_service,
+)
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
 )
 from module.adapters.campaign_runtime_semantic import semantic_runtime_executor_descriptors
 from module.config.config import AzurLaneConfig
@@ -23,7 +32,9 @@ from module.content.runtime_profile import (
 if TYPE_CHECKING:
     from typing import Unpack
 
+    from module.combat.combat_result_ui import CombatResultUi
     from module.config.config_generated import ConfigOverrides
+    from module.handler.map_transition_ui import MapTransitionRuntime
 
 
 class _Config(AzurLaneConfig):
@@ -36,23 +47,14 @@ class _Config(AzurLaneConfig):
 
 
 class _Runtime:
-    def __init__(self, manager: CampaignRuntimeProfileManager) -> None:
-        self.manager = manager
+    def __init__(self) -> None:
         self.config = _Config()
         self.battle_count = 0
-        self.event_animation_end = object()
         self.page_visible = False
         self.confirm_visible = False
         self.confirm_calls: list[tuple[object, tuple[int, int], float]] = []
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        return self.manager.invoke_super(operation, self, *args, **kwargs)
+        self.exp_info_calls = 0
+        self.exp_info_result = True
 
     def ui_page_appear(self, page: object) -> bool:
         del page
@@ -67,6 +69,47 @@ class _Runtime:
     ) -> bool:
         self.confirm_calls.append((button, offset, interval))
         return self.confirm_visible
+
+    def handle_exp_info(self) -> bool:
+        self.exp_info_calls += 1
+        return self.exp_info_result
+
+    @staticmethod
+    def handle_in_stage() -> bool:
+        return False
+
+    @staticmethod
+    def is_stage_page_has_entrance() -> bool:
+        return False
+
+    @staticmethod
+    def is_event_animation() -> bool:
+        return False
+
+
+class _WaitableAnimation:
+    def __init__(self) -> None:
+        self.waited: list[object] = []
+
+    @staticmethod
+    def is_visible(runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        return False
+
+    def wait_until_closed(self, runtime: MapTransitionRuntime) -> bool:
+        self.waited.append(runtime)
+        return True
+
+
+class _AnimationSource:
+    def __init__(self, animation: _WaitableAnimation) -> None:
+        self._contributor = CampaignEventUiContributor(
+            map_transition=CampaignMapTransitionContributor(animation=animation)
+        )
+
+    @property
+    def event_ui_contributor(self) -> CampaignEventUiContributor:
+        return self._contributor
 
 
 def _manager(
@@ -94,31 +137,28 @@ def _manager(
     )
 
 
+def _combat_result(manager: CampaignRuntimeProfileManager) -> CombatResultUi:
+    instances = manager.executor_instances(RuntimeExecutorKind.EVENT_UI)
+    return build_campaign_event_ui_services(instances).combat_result
+
+
 def test_exp_info_page_guard_short_circuits_only_on_blocked_page() -> None:
     manager = _manager(
         "event_ui/exp_info_page_guard",
         RuntimeExecutorKind.EVENT_UI,
-        {"operations": ["handle_exp_info"], "blocked_page": "event"},
+        {"blocked_page": "event"},
     )
-    runtime = _Runtime(manager)
-    fallbacks: list[str] = []
+    runtime = _Runtime()
+    combat_result = _combat_result(manager)
     runtime.page_visible = True
 
-    blocked = manager.event_ui.invoke(
-        RuntimeOperation.HANDLE_EXP_INFO,
-        runtime,
-        lambda: fallbacks.append("fallback") or True,
-    )
+    blocked = combat_result.handle_experience_result(runtime)
     runtime.page_visible = False
-    delegated = manager.event_ui.invoke(
-        RuntimeOperation.HANDLE_EXP_INFO,
-        runtime,
-        lambda: fallbacks.append("fallback") or True,
-    )
+    delegated = combat_result.handle_experience_result(runtime)
 
     assert blocked is False
     assert delegated is True
-    assert fallbacks == ["fallback"]
+    assert runtime.exp_info_calls == 1
 
 
 def test_exp_info_click_guard_uses_closed_asset_mapping() -> None:
@@ -126,31 +166,32 @@ def test_exp_info_click_guard_uses_closed_asset_mapping() -> None:
         "event_ui/exp_info_click_guard",
         RuntimeExecutorKind.EVENT_UI,
         {
-            "operations": ["handle_exp_info"],
             "asset": "ALCHEMIST_MATERIAL_CONFIRM",
             "offset": [20, 20],
             "interval": 1,
         },
     )
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
     runtime.confirm_visible = True
+    combat_result = _combat_result(manager)
 
-    result = manager.event_ui.invoke(
-        RuntimeOperation.HANDLE_EXP_INFO,
-        runtime,
-        lambda: True,
-    )
+    result = combat_result.handle_experience_result(runtime)
 
     assert result is False
+    assert runtime.exp_info_calls == 0
     assert len(runtime.confirm_calls) == 1
     assert runtime.confirm_calls[0][1:] == ((20, 20), 1.0)
+
+    runtime.confirm_visible = False
+    assert combat_result.handle_experience_result(runtime) is True
+    assert runtime.exp_info_calls == 1
 
 
 @pytest.mark.parametrize(
     ("condition", "handled", "expected_count"),
     [("handled", False, 0), ("handled", True, 1), ("always", False, 1)],
 )
-def test_clear_mode_overlay_is_session_ephemeral(
+def test_clear_mode_overlay_applies_for_configured_condition(
     condition: str,
     *,
     handled: bool,
@@ -160,20 +201,16 @@ def test_clear_mode_overlay_is_session_ephemeral(
         "engine/clear_mode_config_overlay",
         RuntimeExecutorKind.ENGINE_EXTENSION,
         {
-            "operations": ["handle_clear_mode_config_cover"],
             "condition": condition,
             "overrides": {"MAP_HAS_SIREN": True, "MAP_SIREN_TEMPLATE": ["SS"]},
         },
     )
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
+    service = build_campaign_clear_mode_config_service(manager.executor_instances_in_profile_order())
 
-    result = manager.engine.invoke(
-        RuntimeOperation.HANDLE_CLEAR_MODE_CONFIG_COVER,
-        runtime,
-        lambda: handled,
-    )
+    result = service.apply(runtime, handled=handled)
 
-    assert result is handled
+    assert result is None
     assert len(runtime.config.overlays) == expected_count
     if runtime.config.overlays:
         assert runtime.config.overlays[0] == {
@@ -182,56 +219,66 @@ def test_clear_mode_overlay_is_session_ephemeral(
         }
 
 
+def test_clear_mode_overlay_rejects_obsolete_operations_option() -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match=r"unknown option: operations"):
+        _manager(
+            "engine/clear_mode_config_overlay",
+            RuntimeExecutorKind.ENGINE_EXTENSION,
+            {
+                "operations": ["handle_clear_mode_config_cover"],
+                "condition": "always",
+                "overrides": {"MAP_HAS_MISSILE_ATTACK": True},
+            },
+        )
+
+
 def test_event_animation_expected_end_delegates_outside_configured_battle() -> None:
     manager = _manager(
-        "engine/event_animation_expected_end",
-        RuntimeExecutorKind.ENGINE_EXTENSION,
-        {"operations": ["_expected_end"], "event_animation_end_battle": 3},
+        "event_ui/event_animation_expected_end",
+        RuntimeExecutorKind.EVENT_UI,
+        {"event_animation_end_battle": 3},
     )
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
+    animation = _WaitableAnimation()
+    transition = build_campaign_event_ui_services(
+        (_AnimationSource(animation), *manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
+    ).map_transition
 
     runtime.battle_count = 3
-    special = manager.engine.invoke(
-        RuntimeOperation.EXPECTED_END,
-        runtime,
-        lambda expected: expected,
-        "no_searching",
-    )
+    special = transition.combat_end_override(runtime)
+    assert special is not None
+    assert special()
     runtime.battle_count = 2
-    delegated = manager.engine.invoke(
-        RuntimeOperation.EXPECTED_END,
-        runtime,
-        lambda expected: expected,
-        "no_searching",
-    )
+    delegated = transition.combat_end_override(runtime)
 
-    assert special is runtime.event_animation_end
-    assert delegated == "no_searching"
+    assert animation.waited == [runtime]
+    assert delegated is None
 
 
-def test_runtime_config_overlay_runs_after_map_data_initialization() -> None:
+def test_default_enemy_scale_balance_runs_before_map_control_initialization() -> None:
     manager = _manager(
-        "engine/runtime_config_overlay",
+        "engine/default_enemy_scale_balance",
         RuntimeExecutorKind.ENGINE_EXTENSION,
-        {
-            "operations": ["map_data_init"],
-            "phase": "map_init",
-            "overrides": {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"},
-        },
+        {},
     )
-    runtime = _Runtime(manager)
+    runtime = _Runtime()
 
-    result = manager.engine.invoke(
-        RuntimeOperation.MAP_DATA_INIT,
-        runtime,
-        lambda map_: ("initialized", map_),
-        "map",
-    )
+    initialization = build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())
+    initialization.pre_control(cast("CampaignMapInitializationRuntime", runtime))
 
-    assert result == ("initialized", "map")
     assert runtime.config.overlays == [
         {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"},
     ]
+
+
+@pytest.mark.parametrize("obsolete_option", ["operations", "overrides", "phase"])
+def test_default_enemy_scale_balance_rejects_obsolete_options(obsolete_option: str) -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match=rf"unknown option: {obsolete_option}"):
+        _manager(
+            "engine/default_enemy_scale_balance",
+            RuntimeExecutorKind.ENGINE_EXTENSION,
+            {obsolete_option: []},
+        )
 
 
 def test_semantic_executor_rejects_unknown_option_value_before_binding() -> None:
@@ -239,5 +286,5 @@ def test_semantic_executor_rejects_unknown_option_value_before_binding() -> None
         _manager(
             "event_ui/exp_info_page_guard",
             RuntimeExecutorKind.EVENT_UI,
-            {"operations": ["handle_exp_info"], "blocked_page": "unknown"},
+            {"blocked_page": "unknown"},
         )

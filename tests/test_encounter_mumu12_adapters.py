@@ -7,7 +7,7 @@ import module.adapters.encounter_mumu12 as adapters
 from module.application import AbortToken, DailySchedule, DelayRange
 from module.config.config import AzurLaneConfig
 from module.device.device import Device
-from module.exception import OilExhausted, ScriptEnd
+from module.exception import CampaignSelectionError, OilExhausted
 from module.gameplay.encounter import (
     DailyMissionPlan,
     DailyMissionPlans,
@@ -244,7 +244,7 @@ def test_hard_final_battle_exits_explicitly(runtime: tuple[AzurLaneConfig, Devic
     ("failure", "expected"),
     [
         (OilExhausted(), HardStopReason.RESOURCE_LIMIT),
-        (ScriptEnd(), HardStopReason.FAILED),
+        (CampaignSelectionError(), HardStopReason.FAILED),
     ],
 )
 def test_hard_maps_legacy_stop_semantics_without_reporting_success(

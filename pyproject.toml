@@ -39,7 +39,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
-namespace-packages = ["module"]
+namespace-packages = ["module", "dev_tools"]
 target-version = "py314"
 
 [tool.ruff.lint]
@@ -47,6 +47,7 @@ target-version = "py314"
 preview = true
 explicit-preview-rules = false
 select = ["ALL"]
+allowed-confusables = ["，", "；", "：", "～", "（", "）", "／", "×", "！", "–"]
 ignore = [
     "missing-trailing-comma",
     "CPY",
@@ -55,26 +56,24 @@ ignore = [
     "call-datetime-without-tzinfo",
     "call-datetime-now-without-tzinfo",
     "reimplemented-starmap",
-    "error-suffix-on-exception-name",
     "compare-to-empty-string",
-    "too-many-public-methods",
     "magic-value-comparison",
     "literal-membership",
-    "ambiguous-unicode-character-string",
-    "ambiguous-unicode-character-docstring",
-    "ambiguous-unicode-character-comment",
     "incorrectly-parenthesized-tuple-in-subscript",
 ]
 [tool.ruff.lint.per-file-ignores]
-"dev_tools/**/*.py" = ["implicit-namespace-package"]
 "dev_tools/emulator_test.py" = ["print"]
 "dev_tools/map_extractor.py" = ["print"]
 "dev_tools/os_extract.py" = ["print"]
 "dev_tools/research_extractor.py" = ["print"]
 "dev_tools/utils.py" = ["print"]
+"module/base/filter.py" = ["ambiguous-unicode-character-string"]
+"module/commission/project.py" = ["ambiguous-unicode-character-string"]
 "module/device/platform/utils.py" = ["invalid-class-name"]
 "module/game_setting/setting_generated.py" = ["mixed-case-variable-in-class-scope"]
+"module/os/map_operation.py" = ["ambiguous-unicode-character-string"]
 "tests/test_adb_session_start_server.py" = ["suspicious-subprocess-import"]
+"tests/test_base_atomic.py" = ["ambiguous-unicode-character-string"]
 "tests/test_campaign_runtime_profile_manager.py" = ["float-equality-comparison"]
 "tests/test_configuration_compiler.py" = ["float-equality-comparison"]
 "tests/test_device_imports.py" = ["suspicious-subprocess-import"]
@@ -89,13 +88,11 @@ ignore = [
 "tests/test_webui_utils.py" = ["import-private-name"]
 "tests/**/*.py" = ["assert", "implicit-namespace-package"]
 
-[tool.ruff.lint.pep8-naming]
-classmethod-decorators = ["cached_class_property"]
-
 [tool.ruff.lint.pylint]
 max-bool-expr = 6
 max-locals = 20
 max-nested-blocks = 6
+max-public-methods = 30
 max-statements-in-try = 20
 
 [tool.ty.environment]

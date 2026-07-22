@@ -1,0 +1,501 @@
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, cast
+
+import pytest
+
+from module.adapters.campaign_event_ui import (
+    CampaignEventCombatResultContributor,
+    CampaignEventStageRecoveryContributor,
+    CampaignEventUiContributor,
+    CampaignMapTransitionContributor,
+    EventCombatResultNext,
+    EventStageRecoveryNext,
+    MapTransitionNext,
+    build_campaign_event_ui_services,
+)
+from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileError
+from module.campaign.event_navigation import EventCampaignNavigation
+from module.exception import CampaignNameError
+from module.map.assets import WITHDRAW
+from module.ui.page import page_campaign_menu, page_event, page_main
+from module.war_archives.assets import WAR_ARCHIVES_CAMPAIGN_CHECK
+
+if TYPE_CHECKING:
+    from module.base.button import Button, MatchOffset
+    from module.campaign.campaign_engine import CampaignEngine
+    from module.campaign.event_destination import EventDestinationHost
+    from module.combat.combat_result_ui import CombatResultRuntime
+    from module.handler.map_transition_ui import MapTransitionRuntime
+    from module.ui.page import Page
+
+
+class _Host:
+    def __init__(self) -> None:
+        self.current_page = page_campaign_menu
+        self.archive_visible = False
+        self.entrance_available = True
+        self.calls: list[tuple[object, ...]] = []
+
+    def ui_get_current_page(self, *, skip_first_screenshot: bool = True) -> Page:
+        del skip_first_screenshot
+        self.calls.append(("current",))
+        return self.current_page
+
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del interval, similarity, threshold
+        self.calls.append(("appear", button, offset))
+        return button is WAR_ARCHIVES_CAMPAIGN_CHECK and self.archive_visible
+
+    def ui_goto_main(self) -> bool:
+        self.calls.append(("main",))
+        self.current_page = page_main
+        return True
+
+    def ui_goto(
+        self,
+        destination: Page,
+        *,
+        get_ship: bool = True,
+        offset: MatchOffset | None = (30, 30),
+        skip_first_screenshot: bool = True,
+    ) -> None:
+        del get_ship, offset, skip_first_screenshot
+        self.calls.append(("goto", destination))
+        self.current_page = destination
+
+    def is_event_entrance_available(self) -> bool:
+        self.calls.append(("available",))
+        return self.entrance_available
+
+
+class _EventNavigationHarness(_Host, EventCampaignNavigation):
+    pass
+
+
+class _StandardRecoveryHost(_Host):
+    def __init__(self, *, withdraw_visible: bool) -> None:
+        super().__init__()
+        self.withdraw_visible = withdraw_visible
+
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        if button is WITHDRAW:
+            del interval, similarity, threshold
+            self.calls.append(("appear", button, offset))
+            return self.withdraw_visible
+        return super().appear(button, offset, interval, similarity, threshold)
+
+    def ensure_no_info_bar(self, *, timeout: float) -> None:
+        self.calls.append(("info-bar", timeout))
+
+    def withdraw(self) -> None:
+        self.calls.append(("withdraw",))
+
+    @staticmethod
+    def handle_campaign_ui_additional() -> bool:
+        raise AssertionError
+
+    @staticmethod
+    def handle_chapter_additional() -> bool:
+        raise AssertionError
+
+    @staticmethod
+    def handle_get_chapter_additional() -> bool:
+        raise AssertionError
+
+
+@dataclass(slots=True)
+class _Destination:
+    name: str
+    calls: list[str]
+
+    def open(self, runtime: EventDestinationHost) -> bool:
+        del runtime
+        self.calls.append(self.name)
+        return True
+
+
+@dataclass(frozen=True, slots=True)
+class _ContributorSource:
+    event_ui_contributor: CampaignEventUiContributor
+
+
+@dataclass(slots=True)
+class _RecoveryLayer:
+    name: str
+    calls: list[str]
+
+    def handle(self, runtime: CampaignEngine, next_handler: EventStageRecoveryNext) -> bool:
+        self.calls.append(self.name)
+        return next_handler(runtime)
+
+
+@dataclass(slots=True)
+class _CombatResultLayer:
+    name: str
+    calls: list[str]
+    blocked: bool = False
+
+    def handle(
+        self,
+        runtime: CombatResultRuntime,
+        next_handler: EventCombatResultNext,
+    ) -> bool:
+        self.calls.append(self.name)
+        if self.blocked:
+            return False
+        return next_handler(runtime)
+
+
+class _VirtualCombatResultHost:
+    def __init__(self, calls: list[str]) -> None:
+        self.calls = calls
+
+    def handle_exp_info(self) -> bool:
+        self.calls.append("standard")
+        return True
+
+
+class _TransitionRuntime:
+    def __init__(self) -> None:
+        self.battle_count = 0
+        self.calls: list[str] = []
+
+    def handle_in_stage(self) -> bool:
+        self.calls.append("standard-stage-return")
+        return True
+
+    def is_stage_page_has_entrance(self) -> bool:
+        self.calls.append("standard-stage-page")
+        return True
+
+    def is_event_animation(self) -> bool:
+        self.calls.append("standard-animation")
+        return True
+
+
+@dataclass(slots=True)
+class _TransitionLayer:
+    name: str
+    calls: list[str]
+    handled: bool = False
+
+    def handle(self, runtime: MapTransitionRuntime, next_handler: MapTransitionNext) -> bool:
+        self.calls.append(self.name)
+        if self.handled:
+            return True
+        return next_handler(runtime)
+
+
+@dataclass(slots=True)
+class _Animation:
+    name: str
+    visible: bool
+    calls: list[str]
+
+    def is_visible(self, runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        self.calls.append(self.name)
+        return self.visible
+
+
+@dataclass(slots=True)
+class _WaitableAnimation(_Animation):
+    wait_result: bool = True
+
+    def wait_until_closed(self, runtime: MapTransitionRuntime) -> bool:
+        del runtime
+        self.calls.append(f"wait-{self.name}")
+        return self.wait_result
+
+
+def test_standard_destination_short_circuits_on_the_open_event_page() -> None:
+    host = _Host()
+    host.current_page = page_event
+
+    opened = build_campaign_event_ui_services(()).destination.open(host)
+
+    assert opened
+    assert host.calls == [
+        ("current",),
+        ("appear", WAR_ARCHIVES_CAMPAIGN_CHECK, (20, 20)),
+    ]
+
+
+def test_event_campaign_navigation_uses_the_shared_standard_destination() -> None:
+    navigation = _EventNavigationHarness()
+    navigation.current_page = page_event
+
+    assert navigation.ui_goto_event()
+    assert navigation.calls == [
+        ("current",),
+        ("appear", WAR_ARCHIVES_CAMPAIGN_CHECK, (20, 20)),
+    ]
+
+
+def test_standard_destination_leaves_archives_before_opening_event() -> None:
+    host = _Host()
+    host.current_page = page_event
+    host.archive_visible = True
+
+    opened = build_campaign_event_ui_services(()).destination.open(host)
+
+    assert opened
+    assert host.calls == [
+        ("current",),
+        ("appear", WAR_ARCHIVES_CAMPAIGN_CHECK, (20, 20)),
+        ("main",),
+        ("goto", page_campaign_menu),
+        ("available",),
+        ("goto", page_event),
+    ]
+
+
+def test_standard_destination_stops_when_event_is_unavailable() -> None:
+    host = _Host()
+    host.entrance_available = False
+
+    opened = build_campaign_event_ui_services(()).destination.open(host)
+
+    assert not opened
+    assert host.calls == [
+        ("current",),
+        ("goto", page_campaign_menu),
+        ("available",),
+    ]
+
+
+def test_later_destination_contribution_replaces_the_earlier_one() -> None:
+    calls: list[str] = []
+    base = _Destination("base", calls)
+    derived = _Destination("derived", calls)
+
+    services = build_campaign_event_ui_services(
+        (
+            _ContributorSource(CampaignEventUiContributor(destination=base)),
+            object(),
+            _ContributorSource(CampaignEventUiContributor(destination=derived)),
+        )
+    )
+
+    assert services.destination is derived
+    assert services.destination.open(_Host())
+    assert calls == ["derived"]
+
+
+def test_standard_stage_recovery_calls_campaign_engine_fallbacks_directly() -> None:
+    services = build_campaign_event_ui_services(())
+    host = _StandardRecoveryHost(withdraw_visible=True)
+    runtime = cast("CampaignEngine", host)
+
+    assert services.stage_recovery.recover_campaign_selection(runtime)
+    assert not services.stage_recovery.recover_chapter_selection(runtime)
+    with pytest.raises(CampaignNameError):
+        services.stage_recovery.recover_stage_page(runtime)
+
+    assert host.calls == [
+        ("appear", WITHDRAW, (30, 30)),
+        ("info-bar", 2),
+        ("withdraw",),
+        ("appear", WITHDRAW, (30, 30)),
+    ]
+
+
+def test_stage_recovery_composes_partial_contributors_per_hook() -> None:
+    calls: list[str] = []
+    base = _RecoveryLayer("base", calls)
+    derived = _RecoveryLayer("derived", calls)
+    services = build_campaign_event_ui_services(
+        (
+            _ContributorSource(
+                CampaignEventUiContributor(
+                    stage_recovery=CampaignEventStageRecoveryContributor(
+                        recover_campaign_selection=base.handle,
+                        recover_chapter_selection=base.handle,
+                    )
+                )
+            ),
+            _ContributorSource(
+                CampaignEventUiContributor(
+                    stage_recovery=CampaignEventStageRecoveryContributor(
+                        recover_chapter_selection=derived.handle,
+                        recover_stage_page=derived.handle,
+                    )
+                )
+            ),
+        )
+    )
+    runtime = cast("CampaignEngine", _StandardRecoveryHost(withdraw_visible=False))
+
+    assert not services.stage_recovery.recover_campaign_selection(runtime)
+    assert not services.stage_recovery.recover_chapter_selection(runtime)
+    assert not services.stage_recovery.recover_stage_page(runtime)
+
+    assert calls == ["base", "derived", "base", "derived"]
+
+
+def test_standard_combat_result_preserves_virtual_dispatch() -> None:
+    calls: list[str] = []
+    services = build_campaign_event_ui_services(())
+
+    assert services.combat_result.handle_experience_result(_VirtualCombatResultHost(calls))
+    assert calls == ["standard"]
+
+
+def test_combat_result_composes_later_contributors_and_short_circuits() -> None:
+    calls: list[str] = []
+    base = _CombatResultLayer("base", calls)
+    derived = _CombatResultLayer("derived", calls)
+    services = build_campaign_event_ui_services(
+        (
+            _ContributorSource(
+                CampaignEventUiContributor(
+                    combat_result=CampaignEventCombatResultContributor(
+                        handle_experience_result=base.handle,
+                    )
+                )
+            ),
+            _ContributorSource(
+                CampaignEventUiContributor(
+                    combat_result=CampaignEventCombatResultContributor(
+                        handle_experience_result=derived.handle,
+                    )
+                )
+            ),
+        )
+    )
+    runtime = _VirtualCombatResultHost(calls)
+
+    assert services.combat_result.handle_experience_result(runtime)
+    assert calls == ["derived", "base", "standard"]
+
+    calls.clear()
+    derived.blocked = True
+    assert not services.combat_result.handle_experience_result(runtime)
+    assert calls == ["derived"]
+
+
+def test_standard_map_transition_preserves_all_virtual_hooks() -> None:
+    runtime = _TransitionRuntime()
+    transition = build_campaign_event_ui_services(()).map_transition
+
+    assert transition.handle_stage_return(runtime)
+    assert transition.stage_page_ready(runtime)
+    assert transition.event_animation_visible(runtime)
+    assert transition.combat_end_override(runtime) is None
+    assert runtime.calls == [
+        "standard-stage-return",
+        "standard-stage-page",
+        "standard-animation",
+    ]
+
+
+@pytest.mark.parametrize("field", ["handle_stage_return", "stage_page_ready"])
+def test_map_transition_handlers_compose_later_first_and_short_circuit(
+    field: str,
+) -> None:
+    calls: list[str] = []
+    base = _TransitionLayer("base", calls)
+    derived = _TransitionLayer("derived", calls)
+    if field == "handle_stage_return":
+        base_contributor = CampaignMapTransitionContributor(handle_stage_return=base.handle)
+        derived_contributor = CampaignMapTransitionContributor(handle_stage_return=derived.handle)
+    else:
+        base_contributor = CampaignMapTransitionContributor(stage_page_ready=base.handle)
+        derived_contributor = CampaignMapTransitionContributor(stage_page_ready=derived.handle)
+    transition = build_campaign_event_ui_services(
+        (
+            _ContributorSource(CampaignEventUiContributor(map_transition=base_contributor)),
+            _ContributorSource(CampaignEventUiContributor(map_transition=derived_contributor)),
+        )
+    ).map_transition
+    runtime = _TransitionRuntime()
+
+    invoke = transition.handle_stage_return if field == "handle_stage_return" else transition.stage_page_ready
+    assert invoke(runtime)
+    assert calls == ["derived", "base"]
+    assert len(runtime.calls) == 1
+
+    calls.clear()
+    runtime.calls.clear()
+    derived.handled = True
+    assert invoke(runtime)
+    assert calls == ["derived"]
+    assert runtime.calls == []
+
+
+def test_later_animation_replaces_the_entire_owner_without_or_fallback() -> None:
+    calls: list[str] = []
+    earlier = _Animation("earlier", visible=True, calls=calls)
+    later = _Animation("later", visible=False, calls=calls)
+    transition = build_campaign_event_ui_services(
+        (
+            _ContributorSource(
+                CampaignEventUiContributor(map_transition=CampaignMapTransitionContributor(animation=earlier))
+            ),
+            _ContributorSource(
+                CampaignEventUiContributor(map_transition=CampaignMapTransitionContributor(animation=later))
+            ),
+        )
+    ).map_transition
+
+    assert not transition.event_animation_visible(_TransitionRuntime())
+    assert calls == ["later"]
+
+
+def test_combat_end_override_binds_the_final_waitable_animation_owner() -> None:
+    calls: list[str] = []
+    earlier = _WaitableAnimation("earlier", visible=True, calls=calls)
+    final = _WaitableAnimation("final", visible=False, calls=calls)
+    transition = build_campaign_event_ui_services(
+        (
+            _ContributorSource(
+                CampaignEventUiContributor(map_transition=CampaignMapTransitionContributor(animation=earlier))
+            ),
+            _ContributorSource(
+                CampaignEventUiContributor(
+                    map_transition=CampaignMapTransitionContributor(
+                        animation=final,
+                        event_animation_end_battle=3,
+                    )
+                )
+            ),
+        )
+    ).map_transition
+    runtime = _TransitionRuntime()
+    runtime.battle_count = 3
+
+    callback = transition.combat_end_override(runtime)
+    assert callback is not None
+    assert callback()
+    assert calls == ["wait-final"]
+
+    runtime.battle_count = 2
+    assert transition.combat_end_override(runtime) is None
+
+
+def test_combat_end_policy_requires_a_waitable_final_animation_owner() -> None:
+    source = _ContributorSource(
+        CampaignEventUiContributor(
+            map_transition=CampaignMapTransitionContributor(
+                animation=_Animation("visible-only", visible=True, calls=[]),
+                event_animation_end_battle=3,
+            )
+        )
+    )
+
+    with pytest.raises(CampaignRuntimeProfileError, match="typed animation wait provider"):
+        build_campaign_event_ui_services((source,))

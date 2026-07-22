@@ -14,7 +14,7 @@ from module.commission.project import COMMISSION_FILTER, Commission
 from module.config.config_generated import GeneratedConfig
 from module.config.utils import get_server_last_update, get_server_next_update
 from module.dorm.dorm import RewardDorm
-from module.exception import GameStuckError, OilMaxed, RequestHumanTakeover
+from module.exception import GameStuckError, HumanTakeoverRequiredError, OilMaxed
 from module.handler.info_handler import InfoHandler
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
@@ -633,4 +633,4 @@ class RewardCommission(UI, InfoHandler):
                 self.ui_ensure(page_reward)
 
         logger.critical("Failed to handle oil maxed after 3 trial")
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError

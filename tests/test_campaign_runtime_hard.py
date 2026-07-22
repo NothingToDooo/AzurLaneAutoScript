@@ -11,7 +11,7 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
+    RuntimeExecutorInstance,
 )
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -24,10 +24,8 @@ from module.content.runtime_profile import (
 )
 from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
 from module.exception import CampaignEnd
-from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 from module.map.map_base import CampaignMap
 from module.map.map_grids import SelectedGrids
-from module.ui.assets import CAMPAIGN_CHECK
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -41,6 +39,16 @@ class _Grid:
 
 
 class _Map:
+    def __init__(
+        self,
+        *,
+        bosses: tuple[_Grid, ...] = (),
+        possible_bosses: tuple[_Grid, ...] = (),
+    ) -> None:
+        self.layout = _Layout(bosses=bosses, possible_bosses=possible_bosses)
+
+
+class _Layout:
     def __init__(
         self,
         *,
@@ -65,7 +73,6 @@ class _Map:
 
 @dataclass(slots=True)
 class _Config:
-    FLEET_HARD_EQUIPMENT: object | None
     MAP_HAS_AMBUSH: bool = True
 
     def apply_runtime_overlay(self, **kwargs: object) -> None:
@@ -73,32 +80,9 @@ class _Config:
             setattr(self, name, value)
 
 
-class _Device:
-    def __init__(self, runtime: _Runtime) -> None:
-        self.runtime = runtime
-        self.clicks: list[object] = []
-
-    def screenshot(self) -> None:
-        self.runtime.screenshot_count += 1
-
-    def click(self, button: object) -> None:
-        self.clicks.append(button)
-
-
-class _Runtime:
-    def __init__(self, map_: _Map | None = None) -> None:
-        self.config = _Config(object())
-        self.map = _Map() if map_ is None else map_
-        self.ENTRANCE = object()
-        self.equipment_has_take_on = True
-        self.screenshot_count = 0
-        self.device = _Device(self)
+class _Navigation:
+    def __init__(self) -> None:
         self.goto_calls: list[tuple[object, str, bool | None, bool | None]] = []
-        self.appear_calls: list[tuple[object, tuple[int, int]]] = []
-        self.potential_boss_calls = 0
-        self.equipment_take_off_calls = 0
-        self.ui_back_calls: list[tuple[object, object]] = []
-        self.retirement_calls = 0
 
     def goto(
         self,
@@ -110,44 +94,21 @@ class _Runtime:
     ) -> None:
         self.goto_calls.append((location, expected, step_optimize, turning_optimize))
 
-    def appear(self, button: object, *, offset: tuple[int, int]) -> bool:
-        self.appear_calls.append((button, offset))
-        if button is MAP_PREPARATION:
-            return self.screenshot_count == 2
-        if button is FLEET_PREPARATION:
-            return self.screenshot_count == 3
-        return False
+
+class _Runtime:
+    def __init__(self, map_: _Map | None = None) -> None:
+        self.config = _Config()
+        self.map = _Map() if map_ is None else map_
+        self.navigation = _Navigation()
+        self.potential_boss_calls = 0
 
     def clear_potential_boss(self) -> bool:
         self.potential_boss_calls += 1
         return True
 
-    def equipment_take_off(self) -> bool:
-        self.equipment_take_off_calls += 1
-        return True
-
-    def handle_retirement(self) -> bool:
-        self.retirement_calls += 1
-        return False
-
-    def is_in_stage(self) -> bool:
-        return self.screenshot_count == 1
-
-    def ui_back(self, *, check_button: object, appear_button: object) -> None:
-        self.ui_back_calls.append((check_button, appear_button))
-
 
 def _options(**overrides: object) -> dict[str, object]:
-    options: dict[str, object] = {
-        "operations": [
-            "_expected_end",
-            "clear_boss",
-            "equipment_take_off_when_finished",
-        ],
-        "expected_end": "in_stage",
-    }
-    options.update(overrides)
-    return options
+    return dict(overrides)
 
 
 def _manager(options: Mapping[str, object] | None = None) -> CampaignRuntimeProfileManager:
@@ -171,30 +132,28 @@ def _manager(options: Mapping[str, object] | None = None) -> CampaignRuntimeProf
     )
 
 
+def _executor(manager: CampaignRuntimeProfileManager) -> hard_runtime.CampaignClearModeExecutor:
+    instance = manager.executor_instance(RuntimeExecutorKind.HARD_MODE)
+    assert isinstance(instance, hard_runtime.CampaignClearModeExecutor)
+    return instance
+
+
 def test_expected_end_is_fixed_to_in_stage() -> None:
-    manager = _manager()
-
-    result = manager.hard.invoke(
-        RuntimeOperation.EXPECTED_END,
-        _Runtime(),
-        lambda expected: expected,
-        "no_searching",
-    )
-
-    assert result == "in_stage"
+    assert _executor(_manager()).expected_end("no_searching") == "in_stage"
 
 
-def test_runtime_created_applies_hard_mode_config_overlay() -> None:
+def test_apply_runtime_config_applies_hard_mode_overlay() -> None:
     manager = _manager()
     runtime = _Runtime()
 
     manager.bind(runtime, CampaignMap("hard-runtime-config"))
+    _executor(manager).apply_runtime_config(runtime)
 
     assert runtime.config.MAP_HAS_AMBUSH is False
     manager.reset()
 
 
-def test_production_hard_profile_bind_uses_only_allowed_config_overlays() -> None:
+def test_production_hard_profile_builds_typed_behavior() -> None:
     profile_registry = load_default_campaign_runtime_profile_registry()
     hard_extension_id = CampaignRuntimeExtensionId("campaign_hard/campaign_hard/campaign")
     hard_profiles = tuple(
@@ -209,7 +168,13 @@ def test_production_hard_profile_bind_uses_only_allowed_config_overlays() -> Non
     )
     config = in_memory_config("hard-runtime-production-config", {})
 
-    manager.bind(SimpleNamespace(config=config), CampaignMap("hard-runtime-production-config"))
+    runtime = SimpleNamespace(config=config)
+    manager.bind(runtime, CampaignMap("hard-runtime-production-config"))
+    behavior = hard_runtime.build_campaign_clear_mode_behavior(
+        manager.executor_instances(RuntimeExecutorKind.HARD_MODE)
+    )
+    assert behavior is not None
+    behavior.apply_runtime_config(runtime)
 
     assert config.MAP_HAS_AMBUSH is False
     manager.reset()
@@ -221,88 +186,56 @@ def test_clear_boss_combines_candidates_and_chooses_lowest_weight_then_cost() ->
     runtime = _Runtime(_Map(bosses=(boss,), possible_bosses=(possible,)))
 
     with pytest.raises(CampaignEnd, match=r"BOSS Clear\."):
-        _manager().hard.invoke(
-            RuntimeOperation.CLEAR_BOSS,
-            runtime,
-            lambda: False,
-        )
+        _executor(_manager()).clear_boss(runtime)
 
-    assert runtime.goto_calls == [(possible, "boss", False, False)]
+    assert runtime.navigation.goto_calls == [(possible, "boss", False, False)]
     assert runtime.potential_boss_calls == 0
 
 
 def test_clear_boss_falls_back_to_all_spawn_points() -> None:
     runtime = _Runtime()
 
-    result = _manager().hard.invoke(
-        RuntimeOperation.CLEAR_BOSS,
-        runtime,
-        lambda: True,
-    )
+    result = _executor(_manager()).clear_boss(runtime)
 
     assert result is False
-    assert runtime.goto_calls == []
+    assert runtime.navigation.goto_calls == []
     assert runtime.potential_boss_calls == 1
 
 
-def test_equipment_cleanup_skips_when_not_configured() -> None:
-    runtime = _Runtime()
-    runtime.config.FLEET_HARD_EQUIPMENT = None
-
-    result = _manager().hard.invoke(
-        RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
-        runtime,
-        lambda: True,
-    )
-
-    assert result is False
-    assert runtime.screenshot_count == 0
+def test_hard_behavior_builder_returns_none_without_a_hard_executor() -> None:
+    assert hard_runtime.build_campaign_clear_mode_behavior(()) is None
 
 
-def test_equipment_cleanup_skips_when_not_mounted() -> None:
-    runtime = _Runtime()
-    runtime.equipment_has_take_on = False
+def test_hard_behavior_builder_returns_the_single_typed_executor() -> None:
+    behavior = _executor(_manager())
 
-    result = _manager().hard.invoke(
-        RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
-        runtime,
-        lambda: True,
-    )
-
-    assert result is False
-    assert runtime.screenshot_count == 0
+    assert hard_runtime.build_campaign_clear_mode_behavior((behavior,)) is behavior
 
 
-def test_equipment_cleanup_reaches_fleet_preparation_through_closed_assets() -> None:
-    runtime = _Runtime()
+def test_hard_behavior_builder_rejects_an_untyped_executor() -> None:
+    instance = RuntimeExecutorInstance({RuntimeExecutorKind.HARD_MODE})
 
-    result = _manager().hard.invoke(
-        RuntimeOperation.EQUIPMENT_TAKE_OFF_WHEN_FINISHED,
-        runtime,
-        lambda: False,
-    )
+    with pytest.raises(CampaignRuntimeProfileError, match="must provide CampaignClearModeExecutor"):
+        hard_runtime.build_campaign_clear_mode_behavior((instance,))
 
-    assert result is True
-    assert runtime.screenshot_count == 3
-    assert runtime.device.clicks == [runtime.ENTRANCE, MAP_PREPARATION]
-    assert runtime.appear_calls == [
-        (MAP_PREPARATION, (20, 20)),
-        (FLEET_PREPARATION, (20, 50)),
-    ]
-    assert runtime.equipment_take_off_calls == 1
-    assert runtime.ui_back_calls == [(CAMPAIGN_CHECK, FLEET_PREPARATION)]
+
+def test_hard_behavior_builder_rejects_multiple_executors() -> None:
+    behavior = _executor(_manager())
+
+    with pytest.raises(CampaignRuntimeProfileError, match="at most one"):
+        hard_runtime.build_campaign_clear_mode_behavior((behavior, behavior))
 
 
 @pytest.mark.parametrize(
     "options",
     [
         _options(operations=["clear_boss"]),
-        _options(expected_end="no_searching"),
+        _options(expected_end="in_stage"),
         _options(unexpected=True),
     ],
 )
-def test_invalid_hard_contract_is_rejected_at_manager_construction(
+def test_hard_profile_rejects_unknown_options(
     options: Mapping[str, object],
 ) -> None:
-    with pytest.raises(CampaignRuntimeProfileError):
+    with pytest.raises(CampaignRuntimeProfileError, match="unknown option"):
         _manager(options)

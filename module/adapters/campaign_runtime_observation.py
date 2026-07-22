@@ -7,75 +7,53 @@ from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplement
 from module.handler.assets import MAP_ENEMY_SEARCHING
 from module.handler.fast_forward import AUTO_SEARCH
 from module.logger import logger
-from module.map.utils import location_ensure
+from module.map.fleet_locator import (
+    FleetLocationContext,
+    SurfaceFleetLocationRequest,
+    SurfaceFleetLocations,
+)
 
+from .campaign_map_observer import (
+    CampaignMapObserverContributor,
+    CampaignMapObserverExecutor,
+    EnemySearchingNext,
+    FullScanMovableNext,
+    FullScanNext,
+    InSightNext,
+    LocateSurfaceFleetNext,
+    MapClearPercentageNext,
+    MapGetInfoNext,
+)
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
 )
 
 if TYPE_CHECKING:
-    from module.base.type_alias import Point
+    from module.base.type_alias import ImageArray
     from module.campaign.campaign_engine import CampaignEngine
     from module.config.config import AzurLaneConfig
-    from module.device.device import Device
     from module.map.map_grids import SelectedGrids
-    from module.map.utils import HasLocation
+    from module.map.map_observer import (
+        InSightRequest,
+        MapPreparationRuntime,
+        MapViewportRuntime,
+    )
+    from module.map.map_scanner import MapScannerRuntime, MapScanRequest, MovableScanRequest
     from module.map_detection.grid_info import GridInfo
 
 
-class _ObservationRuntimeHost(Protocol):
-    MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD: float
+class _AutoSearchClearStatusRuntime(Protocol):
     config: AzurLaneConfig
-    device: Device
-    map: object
-    fleet_1: object
-    fleet_2: object
-    fleet_current: object
     map_is_100_percent_clear: bool
     map_is_3_stars: bool
     map_is_threat_safe: bool
     map_has_clear_mode: bool
 
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
-
-    def is_in_map(self) -> bool: ...
-
-    def focus_to(self, location: object) -> object: ...
-
     def map_show_info(self) -> None: ...
-
-
-def _host(runtime: object) -> _ObservationRuntimeHost:
-    return cast("_ObservationRuntimeHost", runtime)
-
-
-def _operations(options: Mapping[str, RuntimeTuningValue]) -> frozenset[str]:
-    value = options["operations"]
-    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
-        message = "runtime observation operations must contain strings"
-        raise CampaignRuntimeProfileError(message)
-    return frozenset(cast("tuple[str, ...]", value))
-
-
-def _require_operations(
-    options: Mapping[str, RuntimeTuningValue],
-    expected: frozenset[str],
-) -> None:
-    actual = _operations(options)
-    if actual != expected:
-        message = f"runtime observation operations mismatch: expected={sorted(expected)}, actual={sorted(actual)}"
-        raise CampaignRuntimeProfileError(message)
 
 
 def _string(options: Mapping[str, RuntimeTuningValue], name: str) -> str:
@@ -86,52 +64,58 @@ def _string(options: Mapping[str, RuntimeTuningValue], name: str) -> str:
     return value
 
 
-class PreserveEnemyGenreExecutor(RuntimeExecutorInstance):
+class PreserveEnemyGenreExecutor(CampaignMapObserverExecutor):
     """全图扫描移动敌人时暂存并恢复会短暂消失的敌人类型。"""
 
     __slots__ = ("_genre", "_preserved")
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-        _require_operations(options, frozenset({"full_scan", "full_scan_movable"}))
-        state = options["state"]
-        if state != ("dace",):
-            message = "preserved enemy genre state must be ['dace']"
-            raise CampaignRuntimeProfileError(message)
         self._genre = _string(options, "genre")
         self._preserved: SelectedGrids[GridInfo] | None = None
         super().__init__(
-            {RuntimeExecutorKind.MAP_OBSERVATION},
-            methods={
-                RuntimeExecutorKind.MAP_OBSERVATION: {
-                    RuntimeOperation.FULL_SCAN: self._full_scan,
-                    RuntimeOperation.FULL_SCAN_MOVABLE: self._full_scan_movable,
-                }
-            },
+            CampaignMapObserverContributor(
+                full_scan=self._full_scan,
+                full_scan_movable=self._full_scan_movable,
+            )
         )
 
     @override
     def reset(self) -> None:
+        self._restore_preserved()
         super().reset()
+
+    def _restore_preserved(self) -> None:
+        preserved = self._preserved
+        if preserved is None:
+            return
         self._preserved = None
+        logger.attr("Preserved_enemy_genre", preserved)
+        for grid in preserved:
+            grid.is_siren = True
+            grid.enemy_genre = self._genre
 
-    def _full_scan_movable(self, runtime: object, *args: object, **kwargs: object) -> object:
-        host = _host(runtime)
-        typed_map = cast("CampaignEngine", runtime).map
-        self._preserved = typed_map.select(enemy_genre=self._genre)
+    def _full_scan_movable(
+        self,
+        runtime: MapScannerRuntime,
+        request: MovableScanRequest,
+        next_handler: FullScanMovableNext,
+    ) -> None:
+        self._preserved = runtime.map.layout.select(enemy_genre=self._genre)
         logger.attr("Preserved_enemy_genre", self._preserved)
-        return host.runtime_super(RuntimeOperation.FULL_SCAN_MOVABLE, *args, **kwargs)
+        try:
+            next_handler(runtime, request)
+        finally:
+            self._restore_preserved()
 
-    def _full_scan(self, runtime: object, *args: object, **kwargs: object) -> object:
-        host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.FULL_SCAN, *args, **kwargs)
-        if self._preserved is not None:
-            logger.attr("Preserved_enemy_genre", self._preserved)
-            for grid in self._preserved:
-                grid.is_siren = True
-                grid.enemy_genre = self._genre
-            self._preserved = None
-        return result
+    def _full_scan(
+        self,
+        runtime: MapScannerRuntime,
+        request: MapScanRequest,
+        next_handler: FullScanNext,
+    ) -> None:
+        next_handler(runtime, request)
+        self._restore_preserved()
 
 
 def _build_preserve_enemy_genre(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
@@ -139,53 +123,44 @@ def _build_preserve_enemy_genre(context: RuntimeExecutorBuildContext) -> Runtime
 
 
 def _build_red_overlay_enemy_search(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-    _require_operations(options, frozenset({"enemy_searching_appear"}))
+    del context
 
-    def enemy_searching_appear(runtime: object) -> object:
-        host = _host(runtime)
-        if not host.is_in_map():
-            return False
+    def enemy_searching_appear(
+        image: ImageArray,
+        next_handler: EnemySearchingNext,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool:
+        del next_handler
         transparency = red_overlay_transparency(
             MAP_ENEMY_SEARCHING.color,
-            get_color(host.device.image, MAP_ENEMY_SEARCHING.area),
+            get_color(image, MAP_ENEMY_SEARCHING.area),
         )
-        return bool(transparency > host.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD)
+        return bool(transparency > overlay_transparency_threshold)
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={
-            RuntimeExecutorKind.MAP_OBSERVATION: {
-                RuntimeOperation.ENEMY_SEARCHING_APPEAR: enemy_searching_appear,
-            }
-        },
-    )
+    return CampaignMapObserverExecutor(CampaignMapObserverContributor(enemy_searching=enemy_searching_appear))
 
 
 def _build_fixed_fleet_locations(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-    _require_operations(options, frozenset({"find_current_fleet"}))
     fleet_1 = node2location(_string(options, "fleet_1"))
     fleet_2 = node2location(_string(options, "fleet_2"))
 
-    def find_current_fleet(runtime: object) -> object:
-        host = _host(runtime)
+    def locate_surface_fleet(
+        context: FleetLocationContext,
+        request: SurfaceFleetLocationRequest,
+        next_handler: LocateSurfaceFleetNext,
+    ) -> SurfaceFleetLocations:
+        del context, next_handler
         logger.hr("Find current fleet")
         logger.info(f"No fleet scan, assume fleet_1 at {location2node(fleet_1)}")
-        host.fleet_1 = fleet_1
-        if host.config.fleet_2:
+        located_fleet_2 = request.previous.fleet_2
+        if request.fleet_2_enabled:
             logger.info(f"No fleet scan, assume fleet_2 at {location2node(fleet_2)}")
-            host.fleet_2 = fleet_2
-        return host.fleet_current
+            located_fleet_2 = fleet_2
+        return SurfaceFleetLocations(fleet_1=fleet_1, fleet_2=located_fleet_2)
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={
-            RuntimeExecutorKind.MAP_OBSERVATION: {
-                RuntimeOperation.FIND_CURRENT_FLEET: find_current_fleet,
-            }
-        },
-    )
+    return CampaignMapObserverExecutor(CampaignMapObserverContributor(locate_surface_fleet=locate_surface_fleet))
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,7 +235,6 @@ def _focus_rule(raw: RuntimeTuningValue) -> _FocusRule:
 
 def _build_focus_rules(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-    _require_operations(options, frozenset({"in_sight"}))
     raw_rules = options["rules"]
     if not isinstance(raw_rules, tuple) or not raw_rules:
         message = "focus rules must be a non-empty array"
@@ -268,36 +242,27 @@ def _build_focus_rules(context: RuntimeExecutorBuildContext) -> RuntimeExecutorI
     rules = tuple(_focus_rule(raw) for raw in raw_rules)
 
     def in_sight(
-        runtime: object,
-        location: HasLocation | str | Point,
-        sight: object = None,
-    ) -> object:
-        host = _host(runtime)
-        normalized = location_ensure(location)
-        x, y = normalized
-        node = location2node(normalized)
-        logger.info(f"In sight: {node}")
+        runtime: MapViewportRuntime,
+        request: InSightRequest,
+        next_handler: InSightNext,
+    ) -> None:
+        x, y = request.location
+        node = location2node(request.location)
         for rule in rules:
             if rule.matches(node=node, x=x, y=y):
                 target = rule.target(y=y)
+                logger.info(f"In sight: {node}")
                 logger.info(f"Focus to: {location2node(target)}")
-                return host.focus_to(target)
-        return host.runtime_super(RuntimeOperation.IN_SIGHT, normalized, sight=sight)
+                runtime.focus_to(target)
+                return
+        next_handler(runtime, request)
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={
-            RuntimeExecutorKind.MAP_OBSERVATION: {
-                RuntimeOperation.IN_SIGHT: in_sight,
-            }
-        },
-    )
+    return CampaignMapObserverExecutor(CampaignMapObserverContributor(in_sight=in_sight))
 
 
 def _auto_search_options(
     options: Mapping[str, RuntimeTuningValue],
 ) -> tuple[tuple[str, ...], bool]:
-    operations = _operations(options)
     prefixes_value = options["campaign_name_prefixes"]
     if (
         not isinstance(prefixes_value, tuple)
@@ -311,14 +276,6 @@ def _auto_search_options(
     if type(override_percentage) is not bool:
         message = "auto-search clear-status percentage option must be a boolean"
         raise CampaignRuntimeProfileError(message)
-    expected = {"map_get_info"}
-    if override_percentage:
-        expected.add("get_map_clear_percentage")
-    if operations != expected:
-        message = (
-            f"auto-search clear-status operations mismatch: expected={sorted(expected)}, actual={sorted(operations)}"
-        )
-        raise CampaignRuntimeProfileError(message)
     return prefixes, override_percentage
 
 
@@ -326,38 +283,41 @@ def _build_auto_search_clear_status(context: RuntimeExecutorBuildContext) -> Run
     options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
     prefixes, override_percentage = _auto_search_options(options)
 
-    def applies(host: _ObservationRuntimeHost) -> bool:
+    def applies(host: _AutoSearchClearStatusRuntime) -> bool:
         name = str(host.config.Campaign_Name).lower()
         return "*" in prefixes or name.startswith(prefixes)
 
-    def appears(runtime: object) -> bool:
+    def appears(runtime: MapPreparationRuntime) -> bool:
         return bool(AUTO_SEARCH.appear(main=cast("CampaignEngine", runtime)))
 
-    def map_get_info(runtime: object) -> object:
-        host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.MAP_GET_INFO)
-        if applies(host):
-            visible = appears(runtime)
-            host.map_is_100_percent_clear = visible
-            host.map_is_3_stars = visible
-            host.map_is_threat_safe = visible
-            host.map_has_clear_mode = visible
-            host.map_show_info()
-        return result
+    def map_get_info(
+        runtime: MapPreparationRuntime,
+        next_handler: MapGetInfoNext,
+    ) -> None:
+        next_handler(runtime)
+        host = cast("_AutoSearchClearStatusRuntime", runtime)
+        if not applies(host):
+            return
+        visible = appears(runtime)
+        host.map_is_100_percent_clear = visible
+        host.map_is_3_stars = visible
+        host.map_is_threat_safe = visible
+        host.map_has_clear_mode = visible
+        host.map_show_info()
 
-    methods = {RuntimeOperation.MAP_GET_INFO: map_get_info}
-    if override_percentage:
+    def get_map_clear_percentage(
+        runtime: MapPreparationRuntime,
+        next_handler: MapClearPercentageNext,
+    ) -> float:
+        if appears(runtime):
+            return 1.0
+        return next_handler(runtime)
 
-        def get_map_clear_percentage(runtime: object) -> object:
-            if appears(runtime):
-                return 1.0
-            return _host(runtime).runtime_super(RuntimeOperation.GET_MAP_CLEAR_PERCENTAGE)
-
-        methods[RuntimeOperation.GET_MAP_CLEAR_PERCENTAGE] = get_map_clear_percentage
-
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={RuntimeExecutorKind.MAP_OBSERVATION: methods},
+    return CampaignMapObserverExecutor(
+        CampaignMapObserverContributor(
+            map_get_info=map_get_info,
+            map_clear_percentage=(get_map_clear_percentage if override_percentage else None),
+        )
     )
 
 
@@ -368,21 +328,21 @@ def observation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDe
             RuntimeImplementationId("observation/preserve_enemy_genre"),
             {
                 observation: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "state", "genre"}),
+                    required=frozenset({"genre"}),
                 )
             },
             _build_preserve_enemy_genre,
         ),
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("observation/red_overlay_enemy_search"),
-            {observation: RuntimeExecutorOptionsSchema(required=frozenset({"operations"}))},
+            {observation: RuntimeExecutorOptionsSchema()},
             _build_red_overlay_enemy_search,
         ),
         RuntimeExecutorFactoryDescriptor(
             RuntimeImplementationId("observation/fixed_fleet_locations"),
             {
                 observation: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "fleet_1", "fleet_2"}),
+                    required=frozenset({"fleet_1", "fleet_2"}),
                 )
             },
             _build_fixed_fleet_locations,
@@ -391,7 +351,7 @@ def observation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDe
             RuntimeImplementationId("observation/focus_rules"),
             {
                 observation: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "rules"}),
+                    required=frozenset({"rules"}),
                 )
             },
             _build_focus_rules,
@@ -402,7 +362,6 @@ def observation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDe
                 observation: RuntimeExecutorOptionsSchema(
                     required=frozenset(
                         {
-                            "operations",
                             "campaign_name_prefixes",
                             "override_map_clear_percentage",
                         }

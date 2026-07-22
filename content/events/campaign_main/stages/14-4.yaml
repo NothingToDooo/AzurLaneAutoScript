@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: 14-4
   shape: K9
@@ -13,6 +13,32 @@ map:
   - H2
   map_covered:
   - A4
+  normal_enemy_spawn_candidates:
+  - A1
+  - G1
+  - B2
+  - C2
+  - F2
+  - H2
+  - D3
+  - D4
+  - G4
+  - K4
+  - C5
+  - D5
+  - F5
+  - K5
+  - B6
+  - C6
+  - G6
+  - C7
+  - I7
+  - B8
+  - E8
+  - G8
+  - H8
+  - I8
+  - J9
   map_data: 'ME -- ++ ++ -- ME ME ME ++ ++ ++
 
     -- ME ME ME ME ME ME -- SP SP --
@@ -185,133 +211,6 @@ mechanics:
     kind: flare
     tag: map_item
   map_interactions: []
-  map_mutations:
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: F1
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: H1
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: D2
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: E2
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: G2
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: H2
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: D3
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: I3
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: B4
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: E4
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: I6
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: D7
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: E7
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: F7
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: I7
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: B8
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: E8
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: G8
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: K8
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: I9
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: K9
-    attribute: may_enemy
-    value: false
   moving_enemies:
     turns: []
     normal_turns: []
@@ -320,8 +219,6 @@ mechanics:
     initial_siren_cells: []
   enemy_movement: []
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

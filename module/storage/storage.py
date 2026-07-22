@@ -31,7 +31,7 @@ EQUIPMENT_ITEMS = ItemGrid(EQUIPMENT_GRIDS, templates={}, amount_area=(90, 98, 1
 OCR_DISASSEMBLE_COUNT = Digit(storage_assets.DISASSEMBLE_COUNT_OCR, letter=(235, 235, 235))
 
 
-class StorageFull(Exception):
+class StorageFull(Exception):  # ruff:ignore[error-suffix-on-exception-name] - 通知调用方先执行仓库清理。
     pass
 
 

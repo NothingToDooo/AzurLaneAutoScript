@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING, TypedDict, cast, override
 
 import numpy as np
 import pytest
+from config_factory import in_memory_config
 
-from module.exception import HardNotSatisfied, RequestHumanTakeover
+from module.exception import HardFleetRequirementsError, HumanTakeoverRequiredError
 from module.map import assets as map_assets
 from module.map import map_fleet_preparation as fleet_preparation_module
 from module.map.map_fleet_preparation import FleetOperator, FleetOperatorAssets, FleetPreparation
@@ -12,6 +13,7 @@ from module.map.map_fleet_preparation import FleetOperator, FleetOperatorAssets,
 if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
     from module.base.type_alias import ImageArray
+    from module.config.config import AzurLaneConfig
     from module.handler.info_handler import InfoHandler
 
 
@@ -72,7 +74,7 @@ class _FakeFleetOperator:
 
 
 class _FleetPreparation(FleetPreparation):
-    config: SimpleNamespace
+    config: AzurLaneConfig
     device: _Device
 
     def __init__(
@@ -81,13 +83,12 @@ class _FleetPreparation(FleetPreparation):
         fleet1: int = 1,
         fleet2: int = 0,
         submarine: int = 0,
-        submarine_enabled: int = 1,
     ) -> None:
-        self.config = SimpleNamespace(
+        self.config = in_memory_config("fleet-preparation", {})
+        self.config.replace_runtime_overlay(
             Fleet_Fleet1=fleet1,
             Fleet_Fleet2=fleet2,
             Submarine_Fleet=submarine,
-            submarine=submarine_enabled,
         )
         self.device = _Device()
         self.map_fleet_checked = False
@@ -150,7 +151,7 @@ def test_fleet_preparation_skips_hard_mode_and_clears_unconfigured_submarine(mon
 
 def test_fleet_preparation_sets_two_fleets_in_config_order(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fleet_preparation_module, "FleetOperator", _FakeFleetOperator)
-    preparation = _FleetPreparation(fleet1=1, fleet2=2)
+    preparation = _FleetPreparation(fleet1=1, fleet2=2, submarine=1)
     preparation.operator_configs = {"submarine": {"allow": [False]}}
 
     assert preparation.fleet_preparation() is True
@@ -161,7 +162,8 @@ def test_fleet_preparation_sets_two_fleets_in_config_order(monkeypatch: pytest.M
         ("fleet1", "ensure_to_be", 1),
         ("fleet2", "ensure_to_be", 2),
     ]
-    assert preparation.config.submarine == 0
+    assert preparation.config.Submarine_Fleet == 0
+    assert "Submarine_Fleet" not in preparation.config.overridden
 
 
 def test_fleet_preparation_fast_clears_submarine_when_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -188,10 +190,10 @@ def test_hard_not_satisfied_remains_a_human_takeover_signal(monkeypatch: pytest.
     monkeypatch.setattr(operator, "is_hard_satisfied", lambda: False)
     monkeypatch.setattr(FleetOperator, "__str__", lambda _self: "fleet1")
 
-    with pytest.raises(HardNotSatisfied) as exc_info:
+    with pytest.raises(HardFleetRequirementsError) as exc_info:
         operator.raise_hard_not_satisfied()
 
-    assert isinstance(exc_info.value, RequestHumanTakeover)
+    assert isinstance(exc_info.value, HumanTakeoverRequiredError)
 
 
 @pytest.mark.parametrize(

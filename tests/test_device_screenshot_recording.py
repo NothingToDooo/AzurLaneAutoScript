@@ -6,7 +6,7 @@ import pytest
 
 from module.device.screenshot import Screenshot
 from module.diagnostics import ScreenshotHistory
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -104,7 +104,7 @@ def test_screenshot_raises_after_two_invalid_frames() -> None:
     screenshot = _Screenshot([black, black.copy()], black_checks=(False, False))
     screenshot.serial = "127.0.0.1:16384"
 
-    with pytest.raises(RequestHumanTakeover, match="Unable to capture a valid"):
+    with pytest.raises(HumanTakeoverRequiredError, match="Unable to capture a valid"):
         screenshot.screenshot()
 
     assert screenshot.record_calls == 1

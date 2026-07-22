@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: SP0
   shape: J6
@@ -79,7 +79,6 @@ mechanics:
     - E2
     - G5
     tag: clear_mechanism
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
@@ -88,8 +87,6 @@ mechanics:
     initial_siren_cells: []
   enemy_movement: []
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

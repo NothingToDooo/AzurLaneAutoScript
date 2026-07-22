@@ -19,7 +19,7 @@ from module.event import assets as event_assets
 from module.event_hospital.hospital import HOSPITAL_TAB, Hospital
 from module.eventstory.eventstory import EventStory
 from module.eventstory.profile import EVENT_STORY_CLIENT_PROFILES
-from module.exception import OilExhausted, RequestHumanTakeover, ScriptEnd
+from module.exception import CampaignSelectionError, HumanTakeoverRequiredError, OilExhausted
 from module.gameplay.activity import (
     ActivityCommand,
     ActivityDisposition,
@@ -375,7 +375,7 @@ class Mumu12EventStoryWorkflow(_Mumu12ActivityAdapter, ActivityWorkflow):
             cancellation.raise_if_requested()
             runner.combat(balance_hp=False)
         message = "event story exceeded the bounded 100-unit execution budget"
-        raise RequestHumanTakeover(message)
+        raise HumanTakeoverRequiredError(message)
 
 
 class Mumu12RaidDailyWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
@@ -480,7 +480,7 @@ class Mumu12RaidDailyWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
             runner.execute_once(plan)
         except OilExhausted:
             return self._resource_limited(spec.command, options.policy)
-        except ScriptEnd:
+        except CampaignSelectionError:
             return self._failed(spec.command, options.policy)
         return EncounterReport(spec.command, EncounterStopReason.IN_PROGRESS, self._now(), 1)
 
@@ -516,7 +516,7 @@ class Mumu12MaritimeEscortWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
                 return EncounterReport(spec.command, EncounterStopReason.COMPLETED, self._now(), 0)
             cancellation.raise_if_requested()
             result = runner.execute_once()
-        except ScriptEnd:
+        except CampaignSelectionError:
             return self._failed(spec.command, policy)
         if not isinstance(result, MaritimeEscortExecutionResult):
             message = "MaritimeEscort.execute_once() must return MaritimeEscortExecutionResult"
@@ -613,7 +613,7 @@ class Mumu12RaidWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
             runner.execute_once(plan)
         except OilExhausted:
             return self._resource_limited(spec.command, policy)
-        except ScriptEnd:
+        except CampaignSelectionError:
             return self._failed(spec.command, policy)
         stop = EncounterStopReason.RUN_LIMIT if spec.remaining_runs == 1 else EncounterStopReason.IN_PROGRESS
         return EncounterReport(spec.command, stop, self._now(), 1)
@@ -713,7 +713,7 @@ class Mumu12HospitalWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
             executed = runner.execute_selected_investigation_once()
         except OilExhausted:
             return self._resource_limited(spec.command, policy)
-        except ScriptEnd:
+        except CampaignSelectionError:
             return self._failed(spec.command, policy)
         stop = EncounterStopReason.IN_PROGRESS if executed else EncounterStopReason.COMPLETED
         return EncounterReport(spec.command, stop, self._now(), int(executed))
@@ -843,7 +843,7 @@ class Mumu12CoalitionWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
             runner.coalition_execute_once()
         except OilExhausted:
             return self._resource_limited(spec.command, policy)
-        except ScriptEnd:
+        except CampaignSelectionError:
             return self._failed(spec.command, policy)
         if spec.command is EncounterCommand.COALITION_SP:
             return EncounterReport(spec.command, EncounterStopReason.COMPLETED, self._now(), 1)

@@ -1,0 +1,147 @@
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol, override
+
+from module.handler.assets import MAP_ENEMY_SEARCHING
+from module.logger import logger
+from module.map.fleet_locator import (
+    STANDARD_CAMPAIGN_FLEET_LOCATOR,
+    CampaignFleetLocator,
+)
+from module.map.map_scanner import STANDARD_CAMPAIGN_MAP_SCANNER, CampaignMapScanner
+
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
+    from module.map.map_base import CampaignMap
+    from module.map.type_alias import GridLocation
+    from module.map_detection.grid_info import GridInfo
+
+
+class MapObserverRuntime(Protocol):
+    battle_count: int
+    map: CampaignMap
+
+
+class CombatMapObserver(Protocol):
+    """判断战斗结束后的地图镜头是否发生了需要重定位的移动。"""
+
+    def camera_repositioned_after_combat(
+        self,
+        runtime: MapObserverRuntime,
+        destination: GridInfo,
+    ) -> bool: ...
+
+
+class EnemySearchingObserver(Protocol):
+    """识别当前截图中的寻敌动画；地图页判定由调用者统一负责。"""
+
+    def appears(
+        self,
+        image: ImageArray,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool: ...
+
+
+@dataclass(frozen=True, slots=True)
+class InSightRequest:
+    """已经规范化的视野请求。"""
+
+    location: GridLocation
+    sight: tuple[int, int, int, int] | None = None
+
+
+class MapViewportRuntime(Protocol):
+    def focus_to(
+        self,
+        location: GridLocation,
+        swipe_limit: GridLocation = (4, 3),
+    ) -> None: ...
+
+    def _standard_in_sight(self, request: InSightRequest) -> None: ...
+
+
+class CampaignMapViewport(Protocol):
+    """调整地图视野，但不负责把调用参数规范化。"""
+
+    def in_sight(self, runtime: MapViewportRuntime, request: InSightRequest) -> None: ...
+
+
+class MapPreparationRuntime(Protocol):
+    """地图准备页状态读取所需的最小运行时原语。"""
+
+    def _standard_map_get_info(self) -> None: ...
+
+    def _standard_get_map_clear_percentage(self) -> float: ...
+
+
+class CampaignMapPreparation(Protocol):
+    """读取地图准备页状态，不暴露旧 string operation。"""
+
+    def map_get_info(self, runtime: MapPreparationRuntime) -> None: ...
+
+    def get_map_clear_percentage(self, runtime: MapPreparationRuntime) -> float: ...
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignMapObserver:
+    combat: CombatMapObserver
+    scanner: CampaignMapScanner
+    enemy_searching: EnemySearchingObserver
+    viewport: CampaignMapViewport
+    fleet_locator: CampaignFleetLocator
+    preparation: CampaignMapPreparation
+
+
+class _StandardCombatMapObserver(CombatMapObserver):
+    @override
+    def camera_repositioned_after_combat(
+        self,
+        runtime: MapObserverRuntime,
+        destination: GridInfo,
+    ) -> bool:
+        del destination
+        for data in runtime.map.spawn_data:
+            if data.get("battle") == runtime.battle_count and data.get("boss", 0):
+                logger.info("Catch camera re-positioning after boss appear")
+                return True
+        return False
+
+
+class _StandardEnemySearchingObserver(EnemySearchingObserver):
+    @override
+    def appears(
+        self,
+        image: ImageArray,
+        *,
+        overlay_transparency_threshold: float,
+    ) -> bool:
+        del overlay_transparency_threshold
+        return MAP_ENEMY_SEARCHING.match_luma(image, offset=(5, 5))
+
+
+class _StandardCampaignMapViewport(CampaignMapViewport):
+    @override
+    def in_sight(self, runtime: MapViewportRuntime, request: InSightRequest) -> None:
+        runtime._standard_in_sight(  # ruff:ignore[private-member-access] - 标准 viewport 只负责调用 Camera 私有算法原语。
+            request
+        )
+
+
+class _StandardCampaignMapPreparation(CampaignMapPreparation):
+    @override
+    def map_get_info(self, runtime: MapPreparationRuntime) -> None:
+        runtime._standard_map_get_info()  # ruff:ignore[private-member-access] - 标准 preparation 只负责调用 FastForward 私有算法原语。
+
+    @override
+    def get_map_clear_percentage(self, runtime: MapPreparationRuntime) -> float:
+        return runtime._standard_get_map_clear_percentage()  # ruff:ignore[private-member-access] - 标准 preparation 只负责调用 FastForward 私有算法原语。
+
+
+STANDARD_CAMPAIGN_MAP_OBSERVER = CampaignMapObserver(
+    combat=_StandardCombatMapObserver(),
+    scanner=STANDARD_CAMPAIGN_MAP_SCANNER,
+    enemy_searching=_StandardEnemySearchingObserver(),
+    viewport=_StandardCampaignMapViewport(),
+    fleet_locator=STANDARD_CAMPAIGN_FLEET_LOCATOR,
+    preparation=_StandardCampaignMapPreparation(),
+)

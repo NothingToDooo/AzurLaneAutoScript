@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: 12-3
   shape: J7
@@ -99,7 +99,6 @@ mechanics:
   fleet_coordination: []
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
@@ -111,8 +110,6 @@ mechanics:
   - battle: 6
     operations:
     - check_accessibility
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

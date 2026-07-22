@@ -1,6 +1,6 @@
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast, override
 
 from module.adapters.campaign_live import CampaignActionInterrupted
 from module.application import SafeUnitCancellation
@@ -16,6 +16,7 @@ from module.combat.assets import BATTLE_PREPARATION
 from module.config.config import AzurLaneConfig
 from module.content.campaign_session import BattleInterruptionReason
 from module.device.device import Device
+from module.exception import HardFleetRequirementsError
 from module.gameplay.campaign import GemsFarmingPolicy
 from module.gameplay.campaign_live import (
     GemsFleetReplacementCompleted,
@@ -25,6 +26,7 @@ from module.gameplay.campaign_live import (
 )
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
+from module.map.map_fleet_preparation import FleetPreparationRuntime, FleetPreparationService
 from module.ui.assets import BACK_ARROW
 
 if TYPE_CHECKING:
@@ -63,8 +65,34 @@ type GemsFleetReplacementFactory = Callable[[AzurLaneConfig, Device], GemsFleetR
 _HARD_PREPARATION_NO_REPLACEMENT = "hard fleet preparation found no valid replacement"
 
 
-class GemsHardPreparationFailed(RuntimeError):
+class GemsHardPreparationError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class GemsHardRetryFleetPreparationService(FleetPreparationService):
+    inner: FleetPreparationService
+    replace_hard_fleet: Callable[[CampaignEngine], None]
+
+    def __post_init__(self) -> None:
+        if isinstance(self.inner, type) or not callable(getattr(self.inner, "prepare", None)):
+            message = "gems hard retry requires an inner fleet preparation service"
+            raise TypeError(message)
+        if not callable(self.replace_hard_fleet):
+            message = "gems hard retry requires a fleet replacement callable"
+            raise TypeError(message)
+
+    @override
+    def prepare(self, runtime: FleetPreparationRuntime) -> bool:
+        try:
+            return self.inner.prepare(runtime)
+        except HardFleetRequirementsError:
+            self.replace_hard_fleet(cast("CampaignEngine", runtime))
+        try:
+            return self.inner.prepare(runtime)
+        except HardFleetRequirementsError as retry_error:
+            message = "hard fleet still does not satisfy its constraints after replacement"
+            raise GemsHardPreparationError(message) from retry_error
 
 
 class Mumu12GemsRuntimeBehavior:
@@ -111,15 +139,15 @@ class Mumu12GemsRuntimeBehavior:
         self._withdraw(runtime)
         raise CampaignActionInterrupted(BattleInterruptionReason.GEMS_LOW_EMOTION)
 
-    def prepare_hard_fleet(self, runtime: CampaignEngine) -> bool:
+    def prepare_hard_fleet(self, runtime: CampaignEngine) -> None:
         cancellation = self._unit_cancellation
         cancellation.raise_if_requested()
         cancellation.commit()
         runner = self._runner_factory(runtime.config, runtime.device)
         bound = _BoundGemsFleetReplacement.bind(runner, runtime, self.policy, cancellation)
         if bound.prepare_hard_fleet(cancellation):
-            return True
-        raise GemsHardPreparationFailed(_HARD_PREPARATION_NO_REPLACEMENT)
+            return
+        raise GemsHardPreparationError(_HARD_PREPARATION_NO_REPLACEMENT)
 
     @staticmethod
     def _withdraw(runtime: CampaignEngine) -> None:

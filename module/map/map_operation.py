@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Never
 import cv2
 
 from module.base.timer import Timer
-from module.exception import CampaignEnd, RequestHumanTakeover, ScriptEnd
+from module.exception import CampaignEnd, HumanTakeoverRequiredError, MapAchievementReached
 from module.handler.fast_forward import FastForwardHandler
 from module.handler.mystery import MysteryHandler
 from module.logger import logger
@@ -24,73 +24,12 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
     map_clear_percentage_prev: float = -1.0
     map_clear_percentage_timer = Timer(0.3, count=1)
 
-    # 屏幕上显示的舰队。
-    fleet_show_index = 1
-    # 注意这里不同于 get_fleet_current_index()。
-    # 在 fleet_current_index 中，1 表示道中队，2 表示 Boss 队。
-    fleet_current_index = 1
-
-    def get_fleet_show_index(self) -> int:
-        """在地图页识别屏幕显示的舰队，并返回 1 或 2。"""
-        if self.appear(map_assets.FLEET_NUM_1, offset=(20, 20)):
-            self.fleet_show_index = 1
-            return 1
-        if self.appear(map_assets.FLEET_NUM_2, offset=(20, 20)):
-            self.fleet_show_index = 2
-            return 2
-        logger.warning("Unknown fleet current index, use 1 by default")
-        self.fleet_show_index = 1
-        return 1
-
-    def get_fleet_current_index(self) -> int:
-        if self.fleets_reversed:
-            self.fleet_current_index = 3 - self.fleet_show_index
-            return self.fleet_current_index
-        self.fleet_current_index = self.fleet_show_index
-        return self.fleet_current_index
-
-    def fleet_set(self, index: int | None = None, *, skip_first_screenshot: bool = True) -> bool:
-        logger.info(f"Fleet set to {index}")
-        timeout = Timer(5, count=10).start()
-        count = 0
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
-            if timeout.reached():
-                logger.warning("Fleet set timeout, assume current fleet is correct")
-                break
-
-            if self.handle_story_skip():
-                timeout.reset()
-                continue
-            if self.handle_in_stage():
-                timeout.reset()
-                continue
-
-            self.get_fleet_show_index()
-            self.get_fleet_current_index()
-            logger.info(f"Fleet: {self.fleet_show_index}, fleet_current_index: {self.fleet_current_index}")
-            if self.fleet_current_index == index:
-                break
-            if self.appear_then_click(map_assets.SWITCH_OVER):
-                count += 1
-                self.device.sleep((1, 1.5))
-                timeout.reset()
-                continue
-            logger.warning("SWITCH_OVER not found")
-            continue
-
-        return count > 0
-
     @staticmethod
     def _check_enter_map_clicks(button: Button, campaign_click: int, fleet_click: int) -> None:
         if campaign_click > 5:
             logger.critical(f"Failed to enter {button}, too many click on {button}")
             logger.critical("Possible reason #1: You haven't reached the commander level to unlock this stage.")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         if fleet_click <= 5:
             return
         logger.critical(f"Failed to enter {button}, too many click on FLEET_PREPARATION")
@@ -100,7 +39,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             "This stage can only be farmed once a day, "
             "but it's the second time that you are entering"
         )
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     def _handle_daily_misclick(self) -> bool:
         if not self.appear(DAILY_CHECK, offset=(20, 20), interval=3):
@@ -120,7 +59,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             self.enter_map_cancel()
             self.handle_map_stop()
             message = MAP_ACHIEVEMENT_REACHED_TEMPLATE.format(condition=self.config.StopCondition_MapAchievement)
-            raise ScriptEnd(message)
+            raise MapAchievementReached(message)
         self.device.click(map_assets.MAP_PREPARATION)
         map_timer.reset()
         campaign_timer.reset()
@@ -376,7 +315,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
                 self.device.click(BACK_ARROW)
                 continue
 
-            if self.handle_in_stage():
+            if self._map_transition_ui.handle_stage_return(self):
                 raise CampaignEnd(MAP_WITHDRAW_MESSAGE)
 
     def handle_map_cat_attack(self) -> bool:
@@ -397,23 +336,3 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             return True
 
         return False
-
-    @property
-    def fleets_reversed(self) -> bool:
-        if not self.config.fleet_2:
-            return False
-        return self.config.Fleet_FleetOrder in ["fleet1_boss_fleet2_mob", "fleet1_standby_fleet2_all"]
-
-    def handle_fleet_reverse(self) -> bool:
-        if not self.map_is_hard_mode and self.config.Fleet_FleetOrder in [
-            "fleet1_boss_fleet2_mob",
-            "fleet1_standby_fleet2_all",
-        ]:
-            logger.warning(f"You shouldn't use a reversed fleet order ({self.config.Fleet_FleetOrder}) in normal mode.")
-            logger.warning(
-                'Please reverse your Fleet 1 and Fleet 2, use "fleet1_mob_fleet2_boss" or "fleet1_all_fleet2_standby"'
-            )
-        if not self.fleets_reversed:
-            return False
-
-        return self.fleet_set(index=2)

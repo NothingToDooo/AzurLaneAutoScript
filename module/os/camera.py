@@ -17,15 +17,13 @@ from module.os.radar import Radar
 
 if TYPE_CHECKING:
     from module.base.type_alias import Area, ImageArray, Point
-    from module.map.type_alias import GridLocation
     from module.map.utils import HasLocation
 
 
 class OSCamera(OSMapOperation, Camera):
     radar: Radar
-    fleet_current: GridLocation
 
-    def _map_swipe(self, vector: Point, box: Area = (239, 128, 993, 628)) -> bool:
+    def _map_swipe(self, vector: Point, box: Area | None = (239, 128, 993, 628)) -> bool:
         return super()._map_swipe(vector, box=box)
 
     @staticmethod
@@ -73,7 +71,7 @@ class OSCamera(OSMapOperation, Camera):
         location = location_ensure(grid)
         camera = location_ensure(camera) if camera is not None else self.camera
         if sight is None:
-            sight = self.map.camera_sight
+            sight = self.map.layout.camera_sight
 
         diff = np.array(location) - camera
         if diff[1] > sight[3]:

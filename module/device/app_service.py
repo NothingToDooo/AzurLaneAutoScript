@@ -2,9 +2,9 @@ import re
 from typing import TYPE_CHECKING
 
 from module.config.server import CN_ACTIVITY
-from module.device.method.utils import PackageNotInstalled
+from module.device.method.utils import PackageNotInstalledError
 from module.device.service_retry import session_retry
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -69,7 +69,7 @@ class AppController:
 
         message = f"Unable to start app after all strategies failed: {self.package}"
         logger.error(message)
-        raise RequestHumanTakeover(message)
+        raise HumanTakeoverRequiredError(message)
 
     def app_stop(self) -> None:
         logger.info(f"App stop: {self.package}")
@@ -86,7 +86,7 @@ class AppController:
             if allow_failure:
                 return False
             logger.error(output)
-            raise PackageNotInstalled(package_name)
+            raise PackageNotInstalledError(package_name)
         if "inaccessible" in output:
             logger.error(output)
             return False

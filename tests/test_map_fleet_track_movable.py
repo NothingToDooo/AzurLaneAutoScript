@@ -1,7 +1,17 @@
+from typing import cast
+
 import pytest
 
-from module.map import fleet as fleet_module
-from module.map.fleet import Fleet
+from module.map import map_scanner as scanner_module
+from module.map.fleet_navigation import FleetNavigationSnapshot
+from module.map.map_scanner import (
+    MovableEnemyRules,
+    MovableEnemySnapshot,
+    MovableEnemyTracker,
+    MovableScanRequest,
+    MovableTrackerContext,
+)
+from module.map.map_spawn_gap import MapSpawnGapPredictor, MapSpawnGapSnapshot, MapSpawnProgress
 
 _Location = tuple[int, int]
 _MaybeLocation = _Location | tuple[()]
@@ -55,24 +65,38 @@ class _Selected(list[_Grid]):  # ruff:ignore[subclass-builtin] - 测试替身须
         return result
 
 
-class _Config:
-    MAP_HAS_MOVABLE_NORMAL_ENEMY = False
-    MAP_ENEMY_TEMPLATE = True
-    MAP_HAS_WALL = False
-    MAP_HAS_PORTAL = False
-    MAP_HAS_AMBUSH = False
-    MOVABLE_ENEMY_FLEET_STEP = 2
+class _Topology:
+    def __init__(self, map_: _Map) -> None:
+        self._map = map_
+
+    def rebuild(self, **kwargs: object) -> None:
+        self._map.topology_rebuild_calls.append(kwargs)
+
+
+class _Pathfinder:
+    def __init__(self, map_: _Map) -> None:
+        self._map = map_
+
+    def project(self, grid: object, *, has_ambush: object) -> None:
+        self._map.path_project_calls.append((grid, has_ambush))
+        if grid is self._map.path_project_failure:
+            msg = "path projection failed"
+            raise RuntimeError(msg)
 
 
 class _Map:
     def __init__(self) -> None:
+        self.layout = self
         self.grids: dict[_Location, _Grid] = {}
         self.select_results: dict[tuple[tuple[str, object], ...], _Selected] = {}
-        self.manual_map_covered = _Selected([])
+        self.manual_coverage = _Selected([])
         self.covered_result = _Selected([])
         self.missing = {"siren": 0, "enemy": 0}
-        self.find_path_initial_calls: list[tuple[object, object]] = []
-        self.grid_connection_calls: list[dict[str, object]] = []
+        self.path_project_calls: list[tuple[object, object]] = []
+        self.topology_rebuild_calls: list[dict[str, object]] = []
+        self.path_project_failure: object | None = None
+        self.topology = _Topology(self)
+        self.pathfinder = _Pathfinder(self)
 
     def add_grid(self, location: _Location, *, may_siren: object = True) -> _Grid:
         grid = _Grid(location, may_siren=may_siren)
@@ -88,93 +112,157 @@ class _Map:
     def to_selected(self, locations: list[_Location]) -> _Selected:
         return _Selected([self.grids[location] for location in locations])
 
-    def missing_get(self, *_args: object, **_kwargs: object) -> tuple[None, dict[str, int]]:
-        return None, self.missing
-
-    def grid_covered(self, grid: _Grid, **_kwargs: object) -> _Selected:
+    def covered_by(self, grid: _Grid, **_kwargs: object) -> _Selected:
         if self.covered_result:
             return self.covered_result
         return _Selected([grid])
-
-    def find_path_initial(self, grid: object, *, has_ambush: object) -> None:
-        self.find_path_initial_calls.append((grid, has_ambush))
-
-    def grid_connection_initial(self, **kwargs: object) -> None:
-        self.grid_connection_calls.append(kwargs)
 
     def __getitem__(self, location: _Location) -> _Grid:
         return self.grids[location]
 
 
-class _Fleet(Fleet):
-    config: _Config
+class _Navigation:
+    def __init__(self, fleet_1: _Location, fleet_2: _MaybeLocation = ()) -> None:
+        self._fleet_1 = fleet_1
+        self._fleet_2 = fleet_2
+
+    @property
+    def current_location(self) -> _Location:
+        return self._fleet_1
+
+    @property
+    def snapshot(self) -> FleetNavigationSnapshot:
+        return FleetNavigationSnapshot(
+            fleet_1=self._fleet_1,
+            fleet_2=self._fleet_2,
+            submarine=(),
+            current_index=1,
+            shown_index=1,
+        )
+
+    def record_fleet_2(self, location: _Location) -> None:
+        self._fleet_2 = location
+
+
+class _MovableRuntime:
     map: _Map
-    fleet_1_location: _Location
-    fleet_2_location: _MaybeLocation
-    movable_before: _Selected
-    movable_before_normal: _Selected
+    navigation: _Navigation
 
     def __init__(self) -> None:
-        self.config = _Config()
         self.map = _Map()
-        self.battle_count = 0
-        self.mystery_count = 0
-        self.siren_count = 0
-        self.carrier_count = 0
-        self.fleet_current_index = 1
-        self.fleet_1_location = (0, 0)
-        self.fleet_2_location = ()
-        self.map.add_grid(self.fleet_1_location)
-        self.movable_before = _Selected([])
-        self.movable_before_normal = _Selected([])
+        self.navigation = _Navigation((0, 0))
+        self.map.add_grid(self.navigation.current_location)
+        self.map_spawn_gap_predictor = _SpawnGapPredictor(self.map)
+
+
+class _SpawnGapPredictor(MapSpawnGapPredictor):
+    def __init__(self, map_: _Map) -> None:
+        self._test_map = map_
+
+    def estimate(self, progress: MapSpawnProgress) -> MapSpawnGapSnapshot:
+        del progress
+        return MapSpawnGapSnapshot(possible={}, missing=self._test_map.missing)
 
 
 @pytest.fixture(autouse=True)
 def _patch_selected_grids(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(fleet_module, "SelectedGrids", _Selected)
+    monkeypatch.setattr(scanner_module, "SelectedGrids", _Selected)
+
+
+def _request(
+    *,
+    sirens: tuple[_Location, ...] = (),
+    missing: dict[str, int] | None = None,
+    wall: bool = False,
+    portal: bool = False,
+) -> tuple[_MovableRuntime, MovableScanRequest]:
+    runtime = _MovableRuntime()
+    if missing is not None:
+        runtime.map.missing = missing
+    request = MovableScanRequest(
+        snapshot=MovableEnemySnapshot(sirens=sirens),
+        progress=MapSpawnProgress(mode="movable"),
+        rules=MovableEnemyRules(
+            siren=True,
+            normal_enemy=False,
+            enemy_template=True,
+            wall=wall,
+            portal=portal,
+            ambush=False,
+            siren_step=2,
+        ),
+    )
+    return runtime, request
+
+
+def _track(runtime: _MovableRuntime, request: MovableScanRequest) -> None:
+    context = cast("MovableTrackerContext", runtime)
+    MovableEnemyTracker().track(context, request, siren=True)
 
 
 def test_track_movable_marks_matched_enemy_as_movable(monkeypatch: pytest.MonkeyPatch) -> None:
-    fleet = _Fleet()
-    before = fleet.map.add_grid((1, 0))
-    after = fleet.map.add_grid((2, 0))
-    fleet.movable_before = _Selected([before])
-    fleet.map.set_select({"is_siren": True}, _Selected([after]))
-    fleet.map.set_select({"may_siren": True}, _Selected([before, after]))
-    monkeypatch.setattr(fleet_module, "match_movable", lambda **_kwargs: ([(1, 0)], [(2, 0)]))
+    runtime, request = _request(sirens=((1, 0),))
+    before = runtime.map.add_grid((1, 0))
+    after = runtime.map.add_grid((2, 0))
+    runtime.map.set_select({"is_siren": True}, _Selected([after]))
+    runtime.map.set_select({"may_siren": True}, _Selected([before, after]))
+    monkeypatch.setattr(scanner_module, "match_movable", lambda **_kwargs: ([(1, 0)], [(2, 0)]))
 
-    fleet.track_movable()
+    _track(runtime, request)
 
     assert after.is_movable is True
 
 
 def test_track_movable_wipes_wrong_detection(monkeypatch: pytest.MonkeyPatch) -> None:
-    fleet = _Fleet()
-    wrong = fleet.map.add_grid((3, 0), may_siren=False)
-    fleet.map.set_select({"is_siren": True}, _Selected([wrong]))
-    fleet.map.set_select({"may_siren": True}, _Selected([]))
-    monkeypatch.setattr(fleet_module, "match_movable", lambda **_kwargs: ([], []))
+    runtime, request = _request()
+    wrong = runtime.map.add_grid((3, 0), may_siren=False)
+    runtime.map.set_select({"is_siren": True}, _Selected([wrong]))
+    runtime.map.set_select({"may_siren": True}, _Selected([]))
+    monkeypatch.setattr(scanner_module, "match_movable", lambda **_kwargs: ([], []))
 
-    fleet.track_movable()
+    _track(runtime, request)
 
     assert wrong.wiped is True
 
 
 def test_track_movable_predicts_missing_siren(monkeypatch: pytest.MonkeyPatch) -> None:
-    fleet = _Fleet()
-    lost = fleet.map.add_grid((4, 0))
-    predicted = fleet.map.add_grid((5, 0))
-    fleet.movable_before = _Selected([lost])
-    fleet.map.missing = {"siren": 1, "enemy": 0}
-    fleet.map.covered_result = _Selected([predicted])
-    fleet.map.set_select({"is_siren": True}, _Selected([]))
-    fleet.map.set_select({"may_siren": True}, _Selected([lost, predicted]))
-    fleet.map.set_select({"cost": 0}, _Selected([predicted]))
-    monkeypatch.setattr(fleet_module, "match_movable", lambda **_kwargs: ([], []))
+    runtime, request = _request(sirens=((4, 0),), missing={"siren": 1, "enemy": 0})
+    lost = runtime.map.add_grid((4, 0))
+    predicted = runtime.map.add_grid((5, 0))
+    runtime.map.covered_result = _Selected([predicted])
+    runtime.map.set_select({"is_siren": True}, _Selected([]))
+    runtime.map.set_select({"may_siren": True}, _Selected([lost, predicted]))
+    runtime.map.set_select({"cost": 0}, _Selected([predicted]))
+    monkeypatch.setattr(scanner_module, "match_movable", lambda **_kwargs: ([], []))
 
-    fleet.track_movable()
+    _track(runtime, request)
 
     assert predicted.is_siren is True
     assert predicted.is_enemy is True
     assert predicted.is_movable is True
-    assert fleet.map.find_path_initial_calls[-1] == (fleet.fleet_current, False)
+    assert runtime.map.path_project_calls[-1] == (runtime.navigation.current_location, False)
+
+
+def test_track_movable_restores_wall_and_fleet_path_after_projection_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime, request = _request(
+        sirens=((6, 0),),
+        missing={"siren": 1, "enemy": 0},
+        wall=True,
+        portal=True,
+    )
+    lost = runtime.map.add_grid((6, 0))
+    runtime.map.set_select({"is_siren": True}, _Selected([]))
+    runtime.map.set_select({"may_siren": True}, _Selected([lost]))
+    runtime.map.path_project_failure = lost
+    monkeypatch.setattr(scanner_module, "match_movable", lambda **_kwargs: ([], []))
+
+    with pytest.raises(RuntimeError, match="path projection failed"):
+        _track(runtime, request)
+
+    assert runtime.map.topology_rebuild_calls == [
+        {"wall": False, "portal": True},
+        {"wall": True, "portal": True},
+    ]
+    assert runtime.map.path_project_calls[-1] == (runtime.navigation.current_location, False)

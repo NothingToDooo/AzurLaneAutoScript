@@ -22,9 +22,6 @@ SCOUT_POSITION = ((403, 421), (625, 369), (821, 326))
 
 
 class HPBalancer(ModuleBase):
-    fleet_current_index = 1
-    fleet_show_index = 1
-
     def __init__(
         self,
         config: AzurLaneConfig,
@@ -34,22 +31,27 @@ class HPBalancer(ModuleBase):
         self._hp_has_ship: dict[int, list[bool]] = {}
         super().__init__(config=config, device=device)
 
+    @staticmethod
+    def _active_hp_fleet_index() -> int:
+        """返回血量缓存使用的舰队编号；非地图战斗固定使用 1。"""
+        return 1
+
     @property
     def hp(self) -> list[float]:
         """返回当前舰队六个位置的血量比例，范围为 0.0～1.0。"""
-        return self._hp[self.fleet_current_index]
+        return self._hp[self._active_hp_fleet_index()]
 
     @hp.setter
     def hp(self, value: list[float]) -> None:
-        self._hp[self.fleet_current_index] = value
+        self._hp[self._active_hp_fleet_index()] = value
 
     @property
     def hp_has_ship(self) -> list[bool]:
-        return self._hp_has_ship[self.fleet_current_index]
+        return self._hp_has_ship[self._active_hp_fleet_index()]
 
     @hp_has_ship.setter
     def hp_has_ship(self, value: list[bool]) -> None:
-        self._hp_has_ship[self.fleet_current_index] = value
+        self._hp_has_ship[self._active_hp_fleet_index()] = value
 
     def _calculate_hp(self, area: Area) -> float:
         """按血条颜色计算 0.0～1.0 的血量比例。"""
@@ -75,7 +77,7 @@ class HPBalancer(ModuleBase):
         scout = np.array(hp[3:]) * np.array(weight) / np.max(weight)
 
         self.hp = hp[:3] + [float(value) for value in scout]
-        if self.fleet_current_index not in self._hp_has_ship:
+        if self._active_hp_fleet_index() not in self._hp_has_ship:
             self.hp_has_ship = [bool(hp > 0.3) for hp in self.hp]
 
         logger.attr(

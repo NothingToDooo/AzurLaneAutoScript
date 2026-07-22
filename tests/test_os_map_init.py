@@ -1,30 +1,17 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Never, override
 
+from config_factory import in_memory_config
+
 from module.os.map import OSMap
 from module.ui.page import page_os
 
 if TYPE_CHECKING:
     from module.base.button import MatchOffset
+    from module.config.config import AzurLaneConfig
     from module.os.globe_zone import ZoneName
     from module.os.map import RescanMode
     from module.ui.page import Page
-
-
-class _Task:
-    command = "OpsiAshBeacon"
-
-
-class _Config:
-    def __init__(self) -> None:
-        self.task = _Task()
-        self.bound = ["Legacy_dL", "Legacy_tZ"]
-        self.Legacy_dL = 2
-        self.Legacy_tZ = 22
-        self.override_calls: list[dict[str, object]] = []
-
-    def override(self, **kwargs: object) -> None:
-        self.override_calls.append(kwargs)
 
 
 @dataclass
@@ -33,7 +20,7 @@ class _Zone:
 
 
 class _Map(OSMap):
-    config: _Config
+    config: AzurLaneConfig
     zone: _Zone
 
     def __init__(
@@ -45,7 +32,7 @@ class _Map(OSMap):
         os_page_visible: bool = False,
         special_zone: bool = False,
     ) -> None:
-        self.config = _Config()
+        self.config = in_memory_config("os-map-init", {})
         self.zone = _Zone(zone_id)
         self.in_map = in_map
         self.in_globe = in_globe
@@ -130,15 +117,20 @@ class _Map(OSMap):
         return 0
 
 
-def test_os_init_applies_personal_defaults_without_legacy_bound_overrides() -> None:
+def test_os_init_applies_personal_defaults_as_replaceable_runtime_overlay() -> None:
     runner = _Map()
-    runner.config.task.command = "iM"
 
     runner.os_init()
 
-    assert runner.config.override_calls == [
-        {"Submarine_Fleet": 1, "Submarine_Mode": "every_combat", "STORY_ALLOW_SKIP": False}
-    ]
+    assert runner.config.Submarine_Fleet == 1
+    assert runner.config.Submarine_Mode == "every_combat"
+    assert runner.config.STORY_ALLOW_SKIP is False
+    assert "Submarine_Fleet" not in runner.config.overridden
+
+    runner.config.replace_runtime_overlay(Submarine_Fleet=0)
+
+    assert runner.config.Submarine_Fleet == 0
+    assert "Submarine_Fleet" not in runner.config.overridden
 
 
 def test_os_init_moves_from_globe_to_map() -> None:

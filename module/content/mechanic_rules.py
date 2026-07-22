@@ -37,6 +37,7 @@ class EncounterExpectation(StrEnum):
     ANY = "any"
     ENEMY = "enemy"
     SIREN = "siren"
+    FORTRESS = "fortress"
     BOSS = "boss"
     MYSTERY = "mystery"
     STORY = "story"
@@ -138,7 +139,7 @@ class PushFleetForward:
 
     def __post_init__(self) -> None:
         _validate_battle(self.battle)
-        _validate_fleet(self.fleet)
+        _validate_fleet_2(self.fleet, operation="push forward")
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,9 +149,7 @@ class BreakSirenCaught:
 
     def __post_init__(self) -> None:
         _validate_battle(self.battle)
-        if self.fleet is not FleetRole.FLEET_2:
-            message = "break-siren-caught only supports fleet_2"
-            raise ContentValidationError(message)
+        _validate_fleet_2(self.fleet, operation="break siren caught")
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,7 +159,7 @@ class ProtectFleet:
 
     def __post_init__(self) -> None:
         _validate_battle(self.battle)
-        _validate_fleet(self.fleet)
+        _validate_fleet_2(self.fleet, operation="protect fleet")
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,7 +170,7 @@ class RescueFleet:
 
     def __post_init__(self) -> None:
         _validate_battle(self.battle)
-        _validate_fleet(self.fleet)
+        _validate_fleet_2(self.fleet, operation="rescue fleet")
         _validate_cell(self.target, field_name="rescue target")
 
 
@@ -184,7 +183,7 @@ class StepFleetOn:
 
     def __post_init__(self) -> None:
         _validate_battle(self.battle)
-        _validate_fleet(self.fleet)
+        _validate_fleet_2(self.fleet, operation="step fleet on")
         object.__setattr__(self, "candidates", _cells(self.candidates, field_name="step-on candidates"))
         roadblocks = tuple(self.roadblocks)
         if any(not isinstance(road, RoadGroup) for road in roadblocks):
@@ -257,16 +256,6 @@ class EnsureFleetAt:
 
 
 @dataclass(frozen=True, slots=True)
-class SwitchFleet:
-    battle: int
-    fleet: FleetRole
-
-    def __post_init__(self) -> None:
-        _validate_battle(self.battle)
-        _validate_fleet(self.fleet)
-
-
-@dataclass(frozen=True, slots=True)
 class EnsureFleet:
     battle: int
     fleet: FleetRole
@@ -292,6 +281,28 @@ class FleetClearTarget:
             raise TypeError(message)
 
 
+@dataclass(frozen=True, slots=True)
+class FleetClearSelectedTarget:
+    """由指定舰队清理有序候选中首个符合预期且可达的目标。"""
+
+    battle: int
+    candidates: tuple[CellId, ...]
+    fleet: FleetRole
+    expected: EncounterExpectation
+
+    def __post_init__(self) -> None:
+        _validate_battle(self.battle)
+        _validate_fleet(self.fleet)
+        object.__setattr__(
+            self,
+            "candidates",
+            _cells(self.candidates, field_name="fleet clear selected candidates"),
+        )
+        if not isinstance(self.expected, EncounterExpectation):
+            message = "fleet clear selected expectation must be an EncounterExpectation"
+            raise TypeError(message)
+
+
 type FleetCoordinationAction = (
     BreakSirenCaught
     | PushFleetForward
@@ -299,10 +310,10 @@ type FleetCoordinationAction = (
     | RescueFleet
     | StepFleetOn
     | MoveFleet
-    | SwitchFleet
     | EnsureFleet
     | EnsureFleetAt
     | FleetClearTarget
+    | FleetClearSelectedTarget
 )
 
 
@@ -319,10 +330,10 @@ class FleetCoordinationRules:
             | RescueFleet
             | StepFleetOn
             | MoveFleet
-            | SwitchFleet
             | EnsureFleet
             | EnsureFleetAt
             | FleetClearTarget
+            | FleetClearSelectedTarget
         )
         if any(not isinstance(action, action_types) for action in actions):
             message = "fleet coordination rules contain an invalid action"
@@ -448,18 +459,6 @@ class MapInteractionRules:
         object.__setattr__(self, "actions", actions)
 
 
-class MapMutationPhase(StrEnum):
-    MAP_DATA_INIT = "map_data_init"
-    MAP_INIT = "map_init"
-    BEFORE_BATTLE = "before_battle"
-
-
-class MapMutationVariant(StrEnum):
-    ALL = "all"
-    NORMAL = "normal"
-    LOOP = "loop"
-
-
 class MechanicOperation(StrEnum):
     """确实无参数的关卡机制操作。"""
 
@@ -478,77 +477,6 @@ class MoveEnemy:
         _validate_battle(self.battle)
         _validate_cell(self.source, field_name="moving enemy source")
         _validate_cell(self.target, field_name="moving enemy target")
-
-
-@dataclass(frozen=True, slots=True)
-class PresetRouteStep:
-    fleet: FleetRole
-    delta_x: int
-    delta_y: int
-    clear_enemy: bool
-
-    def __post_init__(self) -> None:
-        if self.fleet not in (FleetRole.FLEET_1, FleetRole.FLEET_2):
-            message = "preset route fleet must be fleet_1 or fleet_2"
-            raise ContentValidationError(message)
-        if type(self.delta_x) is not int or type(self.delta_y) is not int:
-            message = "preset route delta must contain integers"
-            raise TypeError(message)
-        if type(self.clear_enemy) is not bool:
-            message = "preset route clear_enemy must be a boolean"
-            raise TypeError(message)
-
-
-@dataclass(frozen=True, slots=True)
-class PresetRouteBattle:
-    battle: int
-    steps: tuple[PresetRouteStep, ...]
-
-    def __post_init__(self) -> None:
-        _validate_battle(self.battle)
-        steps = tuple(self.steps)
-        if not steps or any(not isinstance(step, PresetRouteStep) for step in steps):
-            message = "preset route battle must contain route steps"
-            raise ContentValidationError(message)
-        object.__setattr__(self, "steps", steps)
-
-
-@dataclass(frozen=True, slots=True)
-class PresetRouteVariant:
-    start_column: int
-    battles: tuple[PresetRouteBattle, ...]
-
-    def __post_init__(self) -> None:
-        if type(self.start_column) is not int or self.start_column < 0:
-            message = "preset route start column must be a non-negative integer"
-            raise ContentValidationError(message)
-        battles = tuple(self.battles)
-        if not battles or any(not isinstance(battle, PresetRouteBattle) for battle in battles):
-            message = "preset route variant must contain battles"
-            raise ContentValidationError(message)
-        if len({battle.battle for battle in battles}) != len(battles):
-            message = "preset route variant battle ids must be unique"
-            raise ContentValidationError(message)
-        object.__setattr__(self, "battles", battles)
-
-
-@dataclass(frozen=True, slots=True)
-class FixedTargetSequence:
-    battles: tuple[int, ...]
-    targets: tuple[CellId, ...]
-    fleet: FleetRole
-
-    def __post_init__(self) -> None:
-        battles = tuple(self.battles)
-        if not battles or any(type(battle) is not int or battle < 0 for battle in battles):
-            message = "fixed target sequence battles must be non-negative integers"
-            raise ContentValidationError(message)
-        if len(set(battles)) != len(battles):
-            message = "fixed target sequence battles must be unique"
-            raise ContentValidationError(message)
-        object.__setattr__(self, "battles", battles)
-        object.__setattr__(self, "targets", _cells(self.targets, field_name="fixed target sequence targets"))
-        _validate_fleet(self.fleet)
 
 
 @dataclass(frozen=True, slots=True)
@@ -586,64 +514,6 @@ class EnemyMovementRules:
             message = "enemy movement rules contain an invalid move"
             raise TypeError(message)
         object.__setattr__(self, "moves", moves)
-
-
-class MapCellAttribute(StrEnum):
-    MAY_ENEMY = "may_enemy"
-    IS_ENEMY = "is_enemy"
-    IS_SIREN = "is_siren"
-    IS_BOSS = "is_boss"
-    MAY_BOSS = "may_boss"
-    IS_ACCESSIBLE = "is_accessible"
-
-
-@dataclass(frozen=True, slots=True)
-class MapCellPatch:
-    phase: MapMutationPhase
-    cell: CellId
-    attribute: MapCellAttribute
-    value: bool
-    variant: MapMutationVariant = MapMutationVariant.ALL
-    battle: int | None = None
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.phase, MapMutationPhase):
-            message = "map mutation phase must be a MapMutationPhase"
-            raise TypeError(message)
-        _validate_cell(self.cell, field_name="map patch cell")
-        if not isinstance(self.attribute, MapCellAttribute):
-            message = "map patch attribute must be a MapCellAttribute"
-            raise TypeError(message)
-        if type(self.value) is not bool:
-            message = "map patch value must be a boolean"
-            raise TypeError(message)
-        if not isinstance(self.variant, MapMutationVariant):
-            message = "map mutation variant must be a MapMutationVariant"
-            raise TypeError(message)
-        if self.phase is MapMutationPhase.BEFORE_BATTLE:
-            if self.battle is None:
-                message = "before-battle map patch requires a battle"
-                raise ContentValidationError(message)
-            _validate_battle(self.battle)
-        elif self.battle is not None:
-            message = f"{self.phase.value} map patch does not accept a battle"
-            raise ContentValidationError(message)
-
-
-@dataclass(frozen=True, slots=True)
-class MapMutationRules:
-    patches: tuple[MapCellPatch, ...] = ()
-
-    def __post_init__(self) -> None:
-        patches = tuple(self.patches)
-        if any(not isinstance(patch, MapCellPatch) for patch in patches):
-            message = "map mutation rules must contain MapCellPatch values"
-            raise TypeError(message)
-        keys = tuple((patch.phase, patch.variant, patch.battle, patch.cell, patch.attribute) for patch in patches)
-        if len(set(keys)) != len(keys):
-            message = "map mutation rules contain duplicate patch targets"
-            raise ContentValidationError(message)
-        object.__setattr__(self, "patches", patches)
 
 
 @dataclass(frozen=True, slots=True)
@@ -743,12 +613,9 @@ class StageMechanicRules:
     fleet_coordination: FleetCoordinationRules = field(default_factory=FleetCoordinationRules)
     pickups: PickupRules = field(default_factory=PickupRules)
     map_interactions: MapInteractionRules = field(default_factory=MapInteractionRules)
-    map_mutations: MapMutationRules = field(default_factory=MapMutationRules)
     moving_enemies: MovingEnemyRules = field(default_factory=MovingEnemyRules)
     procedures: tuple[MechanicProcedure, ...] = ()
     enemy_movement: EnemyMovementRules = field(default_factory=EnemyMovementRules)
-    preset_routes: tuple[PresetRouteVariant, ...] = ()
-    fixed_target_sequences: tuple[FixedTargetSequence, ...] = ()
     map_structures: MapStructureRules = field(default_factory=MapStructureRules)
 
     def __post_init__(self) -> None:
@@ -757,7 +624,6 @@ class StageMechanicRules:
             (self.fleet_coordination, FleetCoordinationRules, "fleet_coordination"),
             (self.pickups, PickupRules, "pickups"),
             (self.map_interactions, MapInteractionRules, "map_interactions"),
-            (self.map_mutations, MapMutationRules, "map_mutations"),
             (self.moving_enemies, MovingEnemyRules, "moving_enemies"),
         )
         for value, expected_type, field_name in expected:
@@ -775,16 +641,6 @@ class StageMechanicRules:
         if not isinstance(self.map_structures, MapStructureRules):
             message = "stage mechanic map_structures has an invalid type"
             raise TypeError(message)
-        preset_routes = tuple(self.preset_routes)
-        if any(not isinstance(route, PresetRouteVariant) for route in preset_routes):
-            message = "stage mechanic preset_routes contain an invalid value"
-            raise TypeError(message)
-        fixed_sequences = tuple(self.fixed_target_sequences)
-        if any(not isinstance(sequence, FixedTargetSequence) for sequence in fixed_sequences):
-            message = "stage mechanic fixed_target_sequences contain an invalid value"
-            raise TypeError(message)
-        object.__setattr__(self, "preset_routes", preset_routes)
-        object.__setattr__(self, "fixed_target_sequences", fixed_sequences)
 
     @property
     def referenced_battles(self) -> frozenset[int]:
@@ -795,11 +651,8 @@ class StageMechanicRules:
             *self.map_interactions.actions,
         )
         battles = {action.battle for action in actions}
-        battles.update(patch.battle for patch in self.map_mutations.patches if patch.battle is not None)
         battles.update(procedure.battle for procedure in self.procedures)
         battles.update(move.battle for move in self.enemy_movement.moves)
-        battles.update(battle.battle for route in self.preset_routes for battle in route.battles)
-        battles.update(battle for sequence in self.fixed_target_sequences for battle in sequence.battles)
         return frozenset(battles)
 
     @property
@@ -814,13 +667,10 @@ class StageMechanicRules:
                 cells.add(action.cell)
         for action in self.map_interactions.actions:
             cells.update(_map_interaction_cells(action))
-        cells.update(patch.cell for patch in self.map_mutations.patches)
         cells.update(self.moving_enemies.initial_enemy_cells)
         cells.update(self.moving_enemies.initial_siren_cells)
         for move in self.enemy_movement.moves:
             cells.update((move.source, move.target))
-        for sequence in self.fixed_target_sequences:
-            cells.update(sequence.targets)
         cells.update(self.map_structures.referenced_cells)
         return frozenset(cells)
 
@@ -829,6 +679,13 @@ def _validate_fleet(fleet: FleetRole) -> None:
     if not isinstance(fleet, FleetRole):
         message = "fleet must be a FleetRole"
         raise TypeError(message)
+
+
+def _validate_fleet_2(fleet: FleetRole, *, operation: str) -> None:
+    _validate_fleet(fleet)
+    if fleet is not FleetRole.FLEET_2:
+        message = f"{operation} only supports fleet_2"
+        raise ContentValidationError(message)
 
 
 def _validate_cell(cell: CellId, *, field_name: str) -> None:
@@ -847,8 +704,9 @@ def _fleet_action_cells(action: FleetCoordinationAction) -> frozenset[CellId]:
         return frozenset({action.destination})
     if isinstance(action, EnsureFleetAt):
         return frozenset({action.target})
-    if isinstance(action, FleetClearTarget):
-        return frozenset({action.target})
+    if isinstance(action, FleetClearTarget | FleetClearSelectedTarget):
+        cells = action.candidates if isinstance(action, FleetClearSelectedTarget) else (action.target,)
+        return frozenset(cells)
     return frozenset()
 
 

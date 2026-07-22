@@ -14,7 +14,7 @@ from module.device.contracts import AdbRecoverySession
 from module.device.method.remove_warning import remove_shell_warning
 from module.device.method.utils import (
     RETRY_TRIES,
-    PackageNotInstalled,
+    PackageNotInstalledError,
     handle_adb_error,
     handle_unknown_host_service,
     random_port,
@@ -22,7 +22,7 @@ from module.device.method.utils import (
     retry_sleep,
 )
 from module.device.mumu import is_mumu12_serial
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 
@@ -56,14 +56,14 @@ def _adb_error_recovery(device: AdbRecoverySession, error: AdbError) -> Recovery
 
 
 def _connection_error_recovery(
-    device: AdbRecoverySession, error: AdbError | PackageNotInstalled | OSError
+    device: AdbRecoverySession, error: AdbError | PackageNotInstalledError | OSError
 ) -> Recovery | None:
     if isinstance(error, ConnectionResetError):
         logger.error(error)
         return device.adb_reconnect
     if isinstance(error, AdbError):
         return _adb_error_recovery(device, error)
-    if isinstance(error, PackageNotInstalled):
+    if isinstance(error, PackageNotInstalledError):
         logger.error(error)
         return device.detect_package
     if isinstance(error, OSError):
@@ -86,16 +86,16 @@ def retry[SessionT: AdbRecoverySession, **P, ResultT](
                     time.sleep(retry_sleep(_))
                     recovery()
                 return func(self, *args, **kwargs)
-            except RequestHumanTakeover:
+            except HumanTakeoverRequiredError:
                 break
-            except (AdbError, PackageNotInstalled, OSError) as e:
+            except (AdbError, PackageNotInstalledError, OSError) as e:
                 recovery = _connection_error_recovery(self, e)
                 if recovery is None:
                     break
 
         func_name = getattr(func, "__name__", type(func).__name__)
         logger.critical(f"Retry {func_name}() failed")
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     return retry_wrapper
 
@@ -261,7 +261,7 @@ class AdbSession(ConnectionAttr):
         if result is None:
             logger.error(output)
             logger.critical("Unable to get emulator resolution from `wm size`")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
 
         width = int(result.group("width"))
         height = int(result.group("height"))
@@ -279,7 +279,7 @@ class AdbSession(ConnectionAttr):
 
         logger.critical(f"Resolution not supported: {width}x{height}")
         logger.critical("Please set emulator resolution to 1280x720")
-        raise RequestHumanTakeover
+        raise HumanTakeoverRequiredError
 
     @cached_property
     @retry

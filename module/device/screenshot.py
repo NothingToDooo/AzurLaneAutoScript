@@ -8,7 +8,7 @@ from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import get_color, image_size, save_image
 from module.diagnostics import ScreenshotHistory
-from module.exception import RequestHumanTakeover, ScriptError
+from module.exception import HumanTakeoverRequiredError, ScriptError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ class Screenshot:
         else:
             self.error_screenshots.record(self.image)
             message = "Unable to capture a valid 1280x720 non-black screenshot"
-            raise RequestHumanTakeover(message)
+            raise HumanTakeoverRequiredError(message)
 
         self.error_screenshots.record(self.image)
 
@@ -136,7 +136,7 @@ class Screenshot:
                 return True
             logger.critical(f"Resolution not supported: {width}x{height}")
             logger.critical("Please set emulator resolution to 1280x720")
-            raise RequestHumanTakeover
+            raise HumanTakeoverRequiredError
         return False
 
     def check_screen_black(self) -> bool:

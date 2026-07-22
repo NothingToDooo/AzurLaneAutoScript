@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast, override
 
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
-from module.exception import RequestHumanTakeover
+from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
 from module.ui.assets import WAR_ARCHIVES_CHECK
 from module.ui.page import page_archives
@@ -26,7 +26,6 @@ from .campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
 )
 
 if TYPE_CHECKING:
@@ -44,33 +43,6 @@ _ARCHIVES_SWITCH = Switch("War_Archives_switch", is_selector=True)
 _ARCHIVES_SWITCH.add_state("ex", WAR_ARCHIVES_EX_ON)
 _ARCHIVES_SWITCH.add_state("sp", WAR_ARCHIVES_SP_ON)
 _ARCHIVES_SCROLL = Scroll(WAR_ARCHIVES_SCROLL, color=(247, 211, 66), name="WAR_ARCHIVES_SCROLL")
-
-_PUBLIC_OPERATIONS = frozenset(
-    {
-        "ui_goto_archives_campaign",
-        "ui_goto_event",
-        "ui_goto_sp",
-    }
-)
-_INTERNAL_OPERATIONS = frozenset(
-    {
-        "_advance_archives_scroll",
-        "_archives_loading_complete",
-        "_discard_archives_scroll_record",
-        "_ensure_archives_search_page",
-        "_get_archives_entrance",
-        "_search_archives_entrance",
-        "_wait_archives_loaded",
-    }
-)
-
-
-def _tuple_of_strings(options: Mapping[str, RuntimeTuningValue], name: str) -> tuple[str, ...]:
-    value = options[name]
-    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
-        message = f"war-archives option {name} must contain strings"
-        raise CampaignRuntimeProfileError(message)
-    return cast("tuple[str, ...]", value)
 
 
 def _positive_integer(options: Mapping[str, RuntimeTuningValue], name: str) -> int:
@@ -107,19 +79,6 @@ class WarArchivesCatalogExecutor(RuntimeExecutorInstance):
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.WAR_ARCHIVES_NAVIGATION)
-        operations = frozenset(_tuple_of_strings(options, "operations"))
-        unknown_operations = sorted(operations - _PUBLIC_OPERATIONS - _INTERNAL_OPERATIONS)
-        if unknown_operations:
-            message = f"unsupported war-archives operation: {unknown_operations[0]}"
-            raise CampaignRuntimeProfileError(message)
-        missing_operations = sorted(_PUBLIC_OPERATIONS - operations)
-        if missing_operations:
-            message = f"war-archives catalog is missing operation: {missing_operations[0]}"
-            raise CampaignRuntimeProfileError(message)
-        state = _tuple_of_strings(options, "state")
-        if state != ("first_run",):
-            message = "war-archives catalog state must be ['first_run']"
-            raise CampaignRuntimeProfileError(message)
         self._max_search_attempts = _positive_integer(options, "max_search_attempts")
         self._page_fraction = _fraction(options, "page_fraction")
         self._match_threshold = _fraction(options, "match_threshold")
@@ -131,16 +90,7 @@ class WarArchivesCatalogExecutor(RuntimeExecutorInstance):
         self._event_mode = self._mode(modes, "event")
         self._sp_mode = self._mode(modes, "sp")
         self._first_run = True
-        super().__init__(
-            {RuntimeExecutorKind.WAR_ARCHIVES_NAVIGATION},
-            methods={
-                RuntimeExecutorKind.WAR_ARCHIVES_NAVIGATION: {
-                    RuntimeOperation.UI_GOTO_ARCHIVES_CAMPAIGN: self._ui_goto_archives_campaign,
-                    RuntimeOperation.UI_GOTO_EVENT: self._ui_goto_event,
-                    RuntimeOperation.UI_GOTO_SP: self._ui_goto_sp,
-                }
-            },
-        )
+        super().__init__({RuntimeExecutorKind.WAR_ARCHIVES_NAVIGATION})
 
     @staticmethod
     def _mode(modes: Mapping[str, RuntimeTuningValue], name: str) -> str:
@@ -237,36 +187,35 @@ class WarArchivesCatalogExecutor(RuntimeExecutorInstance):
         logger.warning("Failed to find archives entrance")
         return None
 
-    def _ui_goto_archives_campaign(self, runtime: object, mode: object = "ex") -> object:
-        host = cast("CampaignEngine", runtime)
+    def open(self, runtime: CampaignEngine, mode: str = "ex") -> bool:
         if not isinstance(mode, str) or mode not in {"ex", "sp"}:
             message = "war-archives navigation mode must be 'ex' or 'sp'"
             raise CampaignRuntimeProfileError(message)
         result = True
-        if self._first_run or not host.appear(WAR_ARCHIVES_CAMPAIGN_CHECK, offset=(20, 20)):
-            result = host.ui_ensure(destination=page_archives)
-            _ARCHIVES_SWITCH.set(mode, main=host)
-            entrance = self._search_archives_entrance(host)
+        if self._first_run or not runtime.appear(WAR_ARCHIVES_CAMPAIGN_CHECK, offset=(20, 20)):
+            result = runtime.ui_ensure(destination=page_archives)
+            _ARCHIVES_SWITCH.set(mode, main=runtime)
+            entrance = self._search_archives_entrance(runtime)
             if entrance is None:
                 logger.critical(
                     "Respective server may not yet support the chosen War Archives campaign, "
                     "check back in the next app update"
                 )
-                raise RequestHumanTakeover
-            host.ui_click(
+                raise HumanTakeoverRequiredError
+            runtime.ui_click(
                 entrance,
                 appear_button=WAR_ARCHIVES_CHECK,
                 check_button=WAR_ARCHIVES_CAMPAIGN_CHECK,
                 skip_first_screenshot=True,
             )
         self._first_run = False
-        return result
+        return bool(result)
 
-    def _ui_goto_event(self, runtime: object) -> object:
-        return self._ui_goto_archives_campaign(runtime, self._event_mode)
+    def open_event(self, runtime: CampaignEngine) -> bool:
+        return self.open(runtime, self._event_mode)
 
-    def _ui_goto_sp(self, runtime: object) -> object:
-        return self._ui_goto_archives_campaign(runtime, self._sp_mode)
+    def open_sp(self, runtime: CampaignEngine) -> bool:
+        return self.open(runtime, self._sp_mode)
 
 
 def _build_war_archives_catalog(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
@@ -281,8 +230,6 @@ def war_archives_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryD
                 RuntimeExecutorKind.WAR_ARCHIVES_NAVIGATION: RuntimeExecutorOptionsSchema(
                     required=frozenset(
                         {
-                            "operations",
-                            "state",
                             "max_search_attempts",
                             "page_fraction",
                             "match_threshold",

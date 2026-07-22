@@ -13,6 +13,7 @@ from module.map.map_grids import SelectedGrids
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
+    from module.map.fleet_navigation import FleetNavigationController
     from module.map.map_grids import RoadGrids
     from module.map_detection.grid_info import GridInfo
 
@@ -53,30 +54,32 @@ class GridSelection[T]:
 
 
 class Map(Fleet):
+    navigation: FleetNavigationController
+
     def clear_chosen_enemy(self, grid: GridInfo, expected: str = "") -> bool:
         logger.info(f"targetEnemyScale:{self.config.EnemyPriority_EnemyScaleBalanceWeight}")
         logger.info(f"Clear enemy: {grid}")
         expected = f"combat_{expected}" if expected else "combat"
         battle_count = self.battle_count
-        self.show_fleet()
+        self.navigation.show()
         if self.emotion.is_calculate and self.config.Campaign_UseFleetLock:
-            self.emotion.wait(fleet_index=self.fleet_current_index)
-        self.goto(grid, expected=expected)
+            self.emotion.wait(fleet_index=self.navigation.current_index)
+        self.navigation.goto(grid, expected=expected)
 
         self.full_scan()
-        self.find_path_initial()
-        self.map.show_cost()
+        self.navigation.rebuild_paths()
+        self.map.pathfinder.show_cost()
         return self.battle_count >= battle_count
 
     def clear_chosen_mystery(self, grid: GridInfo) -> None:
         logger.info(f"Clear mystery: {grid}")
-        self.show_fleet()
-        self.goto(grid, expected="mystery")
-        self.map.show_cost()
+        self.navigation.show()
+        self.navigation.goto(grid, expected="mystery")
+        self.map.pathfinder.show_cost()
 
     def pick_up_ammo(self, grid: GridInfo | None = None) -> bool:
         if grid is None:
-            ammo_grids = self.map.select(may_ammo=True)
+            ammo_grids = self.map.layout.select(may_ammo=True)
             if not ammo_grids:
                 logger.info("Map has no ammo.")
                 return False
@@ -84,7 +87,7 @@ class Map(Fleet):
 
         if self.ammo_count > 0 and grid.is_accessible:
             logger.info(f"Pick up ammo: {grid}")
-            self.goto(grid, expected="")
+            self.navigation.goto(grid, expected="")
             self.ensure_no_info_bar()
 
             recover = 5 - self.fleet_ammo
@@ -102,15 +105,15 @@ class Map(Fleet):
             return False
 
         if not grids:
-            grids = self.map.select(is_mechanism_trigger=True, is_mechanism_block=False)
+            grids = self.map.layout.select(is_mechanism_trigger=True, is_mechanism_block=False)
         else:
             grids = grids.select(is_mechanism_trigger=True, is_mechanism_block=False)
         grids = self.select_grids(grids, GridSelection(is_accessible=True, sort=("weight", "cost")))
 
         for grid in grids:
             logger.info(f"Clear mechanism: {grid}")
-            self.goto(grid)
-            self.map.show_cost()
+            self.navigation.goto(grid)
+            self.map.pathfinder.show_cost()
             logger.info(f"Mechanism trigger release: {grid.mechanism_trigger}")
             logger.info(f"Mechanism block release: {grid.mechanism_block}")
             raise MapEnemyMoved
@@ -216,7 +219,7 @@ class Map(Fleet):
         """拾取全部神秘事件；因未清敌固定返回 False。"""
         kwargs = {**kwargs, "sort": ("cost",)}
         while 1:
-            grids = self.map.select(is_mystery=True)
+            grids = self.map.layout.select(is_mystery=True)
             grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
             if not grids:
@@ -230,7 +233,7 @@ class Map(Fleet):
 
     def clear_enemy(self, **kwargs: object) -> bool:
         """清理符合条件的敌人；没有目标时不操作，清敌后返回 True。"""
-        grids = self.map.select(is_enemy=True, is_boss=False)
+        grids = self.map.layout.select(is_enemy=True, is_boss=False)
 
         target = self.config.EnemyPriority_EnemyScaleBalanceWeight
         kwargs = self._selection_settings_with_enemy_priority(
@@ -317,17 +320,17 @@ class Map(Fleet):
 
     def clear_boss(self) -> bool:
         """已弃用的简单 Boss 清理方法；复杂地图应使用 brute_clear_boss。"""
-        grids = self.map.select(is_boss=True, is_accessible=True)
-        grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
+        grids = self.map.layout.select(is_boss=True, is_accessible=True)
+        grids = grids.add(self.map.layout.select(may_boss=True, is_caught_by_siren=True))
         logger.info(f"Is boss: {grids}")
         if not grids.count:
-            grids = grids.add(self.map.select(may_boss=True, is_enemy=True, is_accessible=True))
+            grids = grids.add(self.map.layout.select(may_boss=True, is_enemy=True, is_accessible=True))
             logger.warning("Boss not detected, using may_boss grids.")
-            logger.info(f"May boss: {self.map.select(may_boss=True)}")
-            logger.info(f"May boss and is enemy: {self.map.select(may_boss=True, is_enemy=True)}")
+            logger.info(f"May boss: {self.map.layout.select(may_boss=True)}")
+            logger.info(f"May boss and is enemy: {self.map.layout.select(may_boss=True, is_enemy=True)}")
 
         if grids:
-            self.submarine_move_near_boss(grids[0])
+            self.navigation.move_submarine_near(grids[0])
             logger.hr("Clear BOSS")
             grids = grids.sort("weight", "cost")
             logger.info(f"Grids: {grids}")
@@ -338,14 +341,14 @@ class Map(Fleet):
 
     def capture_clear_boss(self) -> None:
         """已弃用的简单 Boss 清理方法，仅用于旧的大世界占领地图。"""
-        grids = self.map.select(is_boss=True, is_accessible=True)
-        grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
+        grids = self.map.layout.select(is_boss=True, is_accessible=True)
+        grids = grids.add(self.map.layout.select(may_boss=True, is_caught_by_siren=True))
         logger.info(f"Is boss: {grids}")
         if not grids.count:
-            grids = grids.add(self.map.select(may_boss=True, is_enemy=True, is_accessible=True))
+            grids = grids.add(self.map.layout.select(may_boss=True, is_enemy=True, is_accessible=True))
             logger.warning("Boss not detected, using may_boss grids.")
-            logger.info(f"May boss: {self.map.select(may_boss=True)}")
-            logger.info(f"May boss and is enemy: {self.map.select(may_boss=True, is_enemy=True)}")
+            logger.info(f"May boss: {self.map.layout.select(may_boss=True)}")
+            logger.info(f"May boss and is enemy: {self.map.layout.select(may_boss=True, is_enemy=True)}")
 
         if grids:
             logger.hr("Clear BOSS")
@@ -358,40 +361,43 @@ class Map(Fleet):
 
     def clear_potential_boss(self) -> bool:
         """未检测到 Boss 时依次踏遍所有 Boss 刷新点。"""
-        grids = self.map.select(may_boss=True, is_accessible=True).sort("weight", "cost")
+        grids = self.map.layout.select(may_boss=True, is_accessible=True).sort("weight", "cost")
         logger.info(f"May boss: {grids}")
         battle_count = self.battle_count
-        is_single_boss = self.map.select(may_boss=True).count == 1
+        is_single_boss = self.map.layout.select(may_boss=True).count == 1
         expected = "boss" if is_single_boss else ""
 
+        if grids:
+            self.navigation.activate_boss()
         for grid in grids:
             logger.hr("Clear potential BOSS")
             logger.info(f"Grid: {grid}")
-            self.fleet_boss.clear_chosen_enemy(grid, expected=expected)
+            self.clear_chosen_enemy(grid, expected=expected)
             if self.battle_count > battle_count:
                 logger.info("Boss guessing correct.")
                 return True
             logger.info("Boss guessing incorrect.")
 
-        grids = self.map.select(may_boss=True, is_accessible=False).sort("weight", "cost")
+        grids = self.map.layout.select(may_boss=True, is_accessible=False).sort("weight", "cost")
         logger.info(f"May boss: {grids}")
 
         for grid in grids:
             logger.hr("Clear potential BOSS roadblocks")
-            roadblocks = self.brute_find_roadblocks(grid, fleet=self.fleet_boss_index)
+            roadblocks = self.navigation.find_roadblocks(grid, fleet=self.navigation.boss_index)
             roadblocks = roadblocks.sort("weight", "cost")
             logger.info(f"Grids: {roadblocks}")
-            self.fleet_1.clear_chosen_enemy(roadblocks[0], expected=expected)
+            self.navigation.activate(1)
+            self.clear_chosen_enemy(roadblocks[0], expected=expected)
             return True
 
         return False
 
     def brute_clear_boss(self) -> bool:
         """使用两支舰队暴力搜索并清理通往 Boss 的阻挡。"""
-        boss = self.map.select(is_boss=True)
+        boss = self.map.layout.select(is_boss=True)
         if boss:
             logger.info("Brute clear BOSS")
-            grids = self.brute_find_roadblocks(boss[0], fleet=self.fleet_boss_index)
+            grids = self.navigation.find_roadblocks(boss[0], fleet=self.navigation.boss_index)
             if grids:
                 if self.brute_fleet_meet():
                     return True
@@ -400,19 +406,21 @@ class Map(Fleet):
                 logger.info(f"Grids: {grids}")
                 self.clear_chosen_enemy(grids[0])
                 return True
-            return self.fleet_boss.clear_boss()
-        if self.map.select(may_boss=True, is_caught_by_siren=True):
+            self.navigation.activate_boss()
+            return self.clear_boss()
+        if self.map.layout.select(may_boss=True, is_caught_by_siren=True):
             logger.info("BOSS appear on fleet grid")
-            self.fleet_2.switch_to()
-            return self.clear_chosen_enemy(self.map.select(may_boss=True, is_caught_by_siren=True)[0])
+            self.navigation.activate(2)
+            return self.clear_chosen_enemy(self.map.layout.select(may_boss=True, is_caught_by_siren=True)[0])
         logger.warning("BOSS not detected, trying all boss spawn point.")
         return self.clear_potential_boss()
 
     def brute_fleet_meet(self) -> bool:
         """暴力搜索并清理两支舰队之间的阻挡。"""
-        if self.fleet_boss_index != 2 or not self.fleet_2_location:
+        snapshot = self.navigation.snapshot
+        if self.navigation.boss_index != 2 or not snapshot.fleet_2:
             return False
-        grids = self.brute_find_roadblocks(self.map[self.fleet_2_location], fleet=1)
+        grids = self.navigation.find_roadblocks(self.map[snapshot.fleet_2], fleet=1)
         if grids:
             logger.info("Brute clear roadblocks between fleets.")
             grids = grids.sort("weight", "cost")
@@ -427,9 +435,9 @@ class Map(Fleet):
 
         if self.config.fleet_2:
             kwargs = {**kwargs, "sort": ("weight", "cost_2")}
-        grids = self.map.select(is_siren=True)
+        grids = self.map.layout.select(is_siren=True)
         if self.config.MAP_HAS_FORTRESS:
-            grids = grids.add(self.map.select(is_fortress=True))
+            grids = grids.add(self.map.layout.select(is_fortress=True))
         grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
         if grids:
@@ -442,12 +450,12 @@ class Map(Fleet):
         return False
 
     def clear_any_enemy(self, **kwargs: object) -> bool:
-        grids = self.map.select(is_enemy=True, is_boss=False)
+        grids = self.map.layout.select(is_enemy=True, is_boss=False)
 
         if self.config.MAP_HAS_SIREN:
-            grids = grids.add(self.map.select(is_siren=True))
+            grids = grids.add(self.map.layout.select(is_siren=True))
         if self.config.MAP_HAS_FORTRESS:
-            grids = grids.add(self.map.select(is_fortress=True))
+            grids = grids.add(self.map.layout.select(is_fortress=True))
 
         grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
@@ -471,7 +479,7 @@ class Map(Fleet):
         if not self.config.fleet_2:
             return False
         for grid in grids:
-            if self.fleet_at(grid=grid, fleet=2):
+            if self.navigation.is_at(grid=grid, fleet=2):
                 return False
         all_cleared = grids.select(is_cleared=True).count == grids.count
 
@@ -479,76 +487,81 @@ class Map(Fleet):
         for grid in grids:
             if grid.is_enemy or (not all_cleared and grid.is_cleared):
                 continue
-            if self.check_accessibility(grid=grid, fleet=2):
+            if self.navigation.is_accessible(grid=grid, fleet=2):
                 logger.info(f"Fleet_2 step on {grid}")
-                self.fleet_2.goto(grid)
-                self.fleet_1.switch_to()
+                self.navigation.activate(2)
+                self.navigation.goto(grid)
+                self.navigation.activate(1)
                 return False
 
         logger.info("Fleet_2 step on got roadblocks.")
-        clear = self.fleet_1.clear_roadblocks(roadblocks)
-        self.fleet_1.clear_all_mystery()
+        self.navigation.activate(1)
+        clear = self.clear_roadblocks(roadblocks)
+        self.clear_all_mystery()
         return clear
 
     def fleet_2_break_siren_caught(self) -> bool:
-        if self.fleet_boss_index != 2:
+        if self.navigation.boss_index != 2:
             return False
         if not self.config.MAP_HAS_SIREN or not self.config.MAP_HAS_MOVABLE_ENEMY:
             return False
-        if not self.map.select(is_caught_by_siren=True):
+        if not self.map.layout.select(is_caught_by_siren=True):
             logger.info("No fleet caught by siren.")
             return False
-        if not self.fleet_2_location or not self.map[self.fleet_2_location].is_caught_by_siren:
+        fleet_2 = self.navigation.snapshot.fleet_2
+        if not fleet_2 or not self.map[fleet_2].is_caught_by_siren:
             logger.warning("Appear caught by siren, but not fleet_2.")
             for grid in self.map:
                 grid.is_caught_by_siren = False
             return False
 
-        logger.info(f"Break siren caught, fleet_2: {self.fleet_2_location}")
-        self.fleet_2.switch_to()
+        logger.info(f"Break siren caught, fleet_2: {fleet_2}")
+        self.navigation.activate(2)
         self.ensure_edge_insight()
-        self.clear_chosen_enemy(self.map[self.fleet_2_location])
-        self.fleet_1.switch_to()
+        self.clear_chosen_enemy(self.map[fleet_2])
+        self.navigation.activate(1)
         for grid in self.map:
             grid.is_caught_by_siren = False
         return True
 
     def fleet_2_push_forward(self) -> bool:
         """把二队推向更低权重格，降低 7～9 章单行道中 Boss 队被敌人堵住的概率。"""
-        if self.fleet_boss_index != 2:
+        if self.navigation.boss_index != 2:
             return False
-        if self.fleet_1_location is None or self.fleet_2_location is None:
+        snapshot = self.navigation.snapshot
+        if not snapshot.fleet_1 or not snapshot.fleet_2:
             logger.warning("Fleet location missing while pushing fleet 2")
             return False
 
         logger.info("Fleet_2 push forward")
-        grids = self.map.select(is_land=False).sort("weight", "cost")
-        if self.map[self.fleet_2_location].weight <= grids[0].weight:
+        grids = self.map.layout.select(is_land=False).sort("weight", "cost")
+        if self.map[snapshot.fleet_2].weight <= grids[0].weight:
             logger.info("Fleet_2 pushed to destination")
-            self.fleet_1.switch_to()
+            self.navigation.activate(1)
             return False
 
-        fleets = SelectedGrids([self.map[self.fleet_1_location], self.map[self.fleet_2_location]])
+        fleets = SelectedGrids([self.map[snapshot.fleet_1], self.map[snapshot.fleet_2]])
         grids = grids.select(is_accessible_2=True, is_sea=True).delete(fleets)
         if not grids:
             logger.info("Fleet_2 has no where to push")
             return False
-        if self.map[self.fleet_2_location].weight <= grids[0].weight:
+        if self.map[snapshot.fleet_2].weight <= grids[0].weight:
             logger.info("Fleet_2 pushed to closest grid")
             return False
 
         logger.info(f"Grids: {grids}")
         logger.info(f"Push forward: {grids[0]}")
-        self.fleet_2.goto(grids[0])
-        self.fleet_1.switch_to()
+        self.navigation.activate(2)
+        self.navigation.goto(grids[0])
+        self.navigation.activate(1)
         return True
 
     def fleet_2_rescue(self, grid: GridInfo) -> bool:
         """让道中队前往通常为 Boss 刷新点的目标格救援 Boss 队；清敌后返回 True。"""
-        if self.fleet_boss_index != 2:
+        if self.navigation.boss_index != 2:
             return False
 
-        grids = self.brute_find_roadblocks(grid, fleet=2)
+        grids = self.navigation.find_roadblocks(grid, fleet=2)
         if not grids:
             return False
         logger.info("Fleet_2 rescue")
@@ -566,10 +579,10 @@ class Map(Fleet):
 
         # 使用两支舰队时。
         for _n in range(20):
-            if not self.map.select(is_siren=True):
+            if not self.map.layout.select(is_siren=True):
                 return False
 
-            nearby = self.map.select(cost_2=1).add(self.map.select(cost_2=2))
+            nearby = self.map.layout.select(cost_2=1).add(self.map.layout.select(cost_2=2))
             approaching = SelectedGrids([])
             if self.config.MAP_HAS_MOVABLE_ENEMY:
                 approaching = approaching.add(nearby.select(is_siren=True))
@@ -579,9 +592,9 @@ class Map(Fleet):
                 grids = self.select_grids(approaching, GridSelection(sort=("cost_2", "cost_1")))
                 self.clear_chosen_enemy(grids[0], expected="siren")
                 return True
-            grids = nearby.delete(self.map.select(is_fleet=True))
+            grids = nearby.delete(self.map.layout.select(is_fleet=True))
             grids = self.select_grids(grids, GridSelection(sort=("cost_2", "cost_1")))
-            self.goto(grids[0])
+            self.navigation.goto(grids[0])
             continue
 
         logger.warning("fleet_2_protect no siren approaching")
@@ -599,7 +612,7 @@ class Map(Fleet):
             string = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
         ENEMY_FILTER.load(string)
-        grids = self.map.select(is_enemy=True, is_accessible=True)
+        grids = self.map.layout.select(is_enemy=True, is_accessible=True)
         if not grids:
             return False
 
@@ -630,19 +643,19 @@ class Map(Fleet):
 
         logger.hr("Clear bouncing enemy")
         logger.info(f"Clear bouncing enemy: {route}")
-        self.show_fleet()
+        self.navigation.show()
         prev = self.battle_count
         for n, grid in enumerate(itertools.cycle(route)):
             if self.emotion.is_calculate and self.config.Campaign_UseFleetLock:
-                self.emotion.wait(fleet_index=self.fleet_current_index)
-            self.goto(grid, expected="combat_nothing")
+                self.emotion.wait(fleet_index=self.navigation.current_index)
+            self.navigation.goto(grid, expected="combat_nothing")
 
             if self.battle_count > prev:
                 logger.info("Cleared an bouncing enemy")
                 route.select(may_bouncing_enemy=True).set(may_bouncing_enemy=False)
                 self.full_scan()
-                self.find_path_initial()
-                self.map.show_cost()
+                self.navigation.rebuild_paths()
+                self.map.pathfinder.show_cost()
                 return True
             if n >= 12:
                 logger.warning("Failed to clear bouncing enemy after 12 trial")

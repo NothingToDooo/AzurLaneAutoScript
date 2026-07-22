@@ -35,5 +35,5 @@ class CampaignEngine(CampaignUI, Map, AutoSearchCombat):
     def auto_search_execute_a_battle(self) -> None:
         logger.hr(f"{self.FUNCTION_NAME_BASE}{self.battle_count}", level=2)
         self.auto_search_moving()
-        self.auto_search_combat(fleet_index=self.fleet_show_index)
+        self.auto_search_combat(fleet_index=self.navigation.shown_index)
         self.battle_count += 1

@@ -1,6 +1,9 @@
 import datetime
 from typing import ClassVar, TypedDict
 
+from module.config.config_manual import (
+    FindPeaksParameter,  # ruff:ignore[typing-only-first-party-import] - get_type_hints 运行时解析。
+)
 from module.config.deep import MutableDeepValue
 
 # 本文件由 module/config/config_updater.py 自动生成。
@@ -44,10 +47,8 @@ class ConfigOverrides(TypedDict, total=False):
     MAP_HAS_MOVABLE_ENEMY: bool
     MAP_HAS_MOVABLE_NORMAL_ENEMY: bool
     MAP_HAS_SIREN: bool
-    MAP_HAS_DYNAMIC_RED_BORDER: bool
     MAP_HAS_MAP_STORY: bool
     MAP_HAS_WALL: bool
-    MAP_HAS_PT_BONUS: bool
     MAP_IS_ONE_TIME_STAGE: bool
     MAP_HAS_PORTAL: bool
     MAP_HAS_LAND_BASED: bool
@@ -59,10 +60,9 @@ class ConfigOverrides(TypedDict, total=False):
     MAP_FOCUS_ENEMY_AFTER_BATTLE: bool
     MAP_ENEMY_TEMPLATE: tuple[str, ...]
     MAP_SIREN_TEMPLATE: tuple[str, ...]
-    MAP_ENEMY_GENRE_DETECTION_SCALING: dict[str, MutableDeepValue]
+    MAP_ENEMY_GENRE_DETECTION_SCALING: dict[str, float | tuple[float, ...]]
     MAP_ENEMY_GENRE_SIMILARITY: float
     MAP_SIREN_MOVE_WAIT: float
-    MAP_SIREN_COUNT: int
     MAP_SIREN_HAS_BOSS_ICON: bool
     MAP_SIREN_HAS_BOSS_ICON_SMALL: bool
     MAP_HAS_MYSTERY: bool
@@ -81,7 +81,6 @@ class ConfigOverrides(TypedDict, total=False):
     MAP_SWIPE_PREDICT_WITH_SEA_GRIDS: bool
     MAP_ENSURE_EDGE_INSIGHT_CORNER: str
     MAP_WALK_USE_CURRENT_FLEET: bool
-    MAP_WALK_TURNING_OPTIMIZE: bool
     MAP_SWIPE_OPTIMIZE: bool
     MAP_BOSS_APPEAR_REFOCUS_SWIPE: tuple[int, ...]
     SCREEN_SIZE: tuple[int, ...]
@@ -91,7 +90,7 @@ class ConfigOverrides(TypedDict, total=False):
     GRID_IMAGE_A_MULTIPLY: float
     HOMO_TILE: tuple[int, ...]
     HOMO_CENTER_OFFSET: tuple[int, ...]
-    HOMO_CORNER_OFFSET_LIST: tuple[tuple[int, ...], ...]
+    HOMO_CORNER_OFFSET_LIST: tuple[tuple[int, int], ...]
     HOMO_CANNY_THRESHOLD: tuple[int, ...]
     HOMO_CENTER_GOOD_THRESHOLD: float
     HOMO_CENTER_THRESHOLD: float
@@ -101,8 +100,8 @@ class ConfigOverrides(TypedDict, total=False):
     HOMO_EDGE_HOUGHLINES_THRESHOLD: int
     HOMO_EDGE_COLOR_RANGE: tuple[int, ...]
     HOMO_STORAGE: MutableDeepValue
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: dict[str, tuple[int, ...] | tuple[float | int, ...] | int]
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: dict[str, tuple[int, ...] | int]
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: dict[str, FindPeaksParameter]
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: dict[str, FindPeaksParameter]
     INTERNAL_LINES_HOUGHLINES_THRESHOLD: int
     EDGE_LINES_HOUGHLINES_THRESHOLD: int
     HORIZONTAL_LINES_THETA_THRESHOLD: float
@@ -111,7 +110,7 @@ class ConfigOverrides(TypedDict, total=False):
     TRUST_EDGE_LINES_THRESHOLD: int
     VANISH_POINT_RANGE: tuple[tuple[int, ...], ...]
     DISTANCE_POINT_X_RANGE: tuple[tuple[int, ...], ...]
-    COINCIDENT_POINT_ENCOURAGE_DISTANCE: int
+    COINCIDENT_POINT_ENCOURAGE_DISTANCE: float
     ERROR_LINES_TOLERANCE: tuple[int, ...]
     MID_DIFF_RANGE_H: tuple[int, ...]
     MID_DIFF_RANGE_V: tuple[int, ...]
@@ -125,8 +124,8 @@ class ConfigOverrides(TypedDict, total=False):
     OS_GLOBE_DETECTING_AREA: tuple[int, ...]
     OS_GLOBE_IMAGE_PAD: int
     OS_GLOBE_IMAGE_RESIZE: float
-    OS_GLOBE_FIND_PEAKS_PARAMETERS: dict[str, int]
-    OS_LOCAL_FIND_PEAKS_PARAMETERS: dict[str, int]
+    OS_GLOBE_FIND_PEAKS_PARAMETERS: dict[str, FindPeaksParameter]
+    OS_LOCAL_FIND_PEAKS_PARAMETERS: dict[str, FindPeaksParameter]
     OS_GLOBE_SWIPE_MULTIPLY: tuple[float, ...]
     DOCK_FULL_TRIGGERED: bool
     GET_SHIP_TRIGGERED: bool

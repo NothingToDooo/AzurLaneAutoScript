@@ -7,7 +7,7 @@ from module.base.timer import Timer
 from module.combat.emotion import Emotion, FleetEmotion
 from module.equipment import assets as equipment_assets
 from module.equipment.fleet_equipment import FleetEquipment
-from module.exception import CampaignEnd, RequestHumanTakeover, ScriptError
+from module.exception import CampaignEnd, HumanTakeoverRequiredError, ScriptError
 from module.logger import logger
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 from module.retire.assets import (
@@ -207,8 +207,8 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         if self.appear(FLEET_PREPARATION, offset=(20, 50)):
             return
 
-        self.campaign.ensure_campaign_ui(name=self.config.Campaign_Name, mode="hard")
-        self.campaign.ENTRANCE.area = self.campaign.ENTRANCE.button
+        entrance = self.campaign.stage_navigator.select(self.config.Campaign_Name, mode="hard")
+        entrance.area = entrance.button
         campaign_timer = Timer(5)
         map_timer = Timer(5)
         for _ in self.loop():
@@ -224,7 +224,7 @@ class GemsFleetReplacement(FleetEquipment, Dock):
                 campaign_timer.reset()
             if self.campaign.handle_retirement():
                 continue
-            if campaign_timer.reached() and self.appear_then_click(self.campaign.ENTRANCE):
+            if campaign_timer.reached() and self.appear_then_click(entrance):
                 campaign_timer.reset()
 
     def _goto_fleet(self) -> None:
@@ -258,7 +258,7 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         success = self.code_apply() if take_on else self.code_clear()
         if not success:
             logger.critical(EQUIPMENT_CODE_CHANGE_FAILED_MESSAGE)
-            raise RequestHumanTakeover(EQUIPMENT_CODE_CHANGE_FAILED_MESSAGE)
+            raise HumanTakeoverRequiredError(EQUIPMENT_CODE_CHANGE_FAILED_MESSAGE)
 
         if self.is_hard_mode:
             self.ui_back(check_button=FLEET_PREPARATION)

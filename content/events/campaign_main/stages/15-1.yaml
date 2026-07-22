@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 6
 map:
   name: 15-1
   shape: H7
@@ -92,7 +92,6 @@ mechanics:
     target: B1
   pickups: []
   map_interactions: []
-  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []
@@ -104,8 +103,6 @@ mechanics:
     source: B3
     target: C3
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []
