@@ -1,44 +1,26 @@
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from module.base.decorator import cached_property, del_cached_property
 from module.config.deep import deep_get
-from module.device.mumu import mumu12_serial_to_id
-from module.device.platform.emulator_base import (
-    EmulatorInstanceBase,
-    EmulatorManagerBase,
-    remove_duplicated_path,
-)
+from module.device.mumu_instance import MuMuInstance, resolve_mumu_instance
 from module.device.service_retry import session_retry
 from module.exception import HumanTakeoverRequiredError
 from module.logger import logger
-from module.map.map_grids import SelectedGrids
 
 if TYPE_CHECKING:
     from module.device.contracts import MumuSession
-
-
-def serial_to_id(serial: str) -> int | None:
-    """MuMu 端口映射为实例 ID：16384 -> 0，16416 及其相邻端口 -> 1。
-
-    无法推算时返回 None。
-    """
-    return mumu12_serial_to_id(serial)
 
 
 class MumuRuntimeBase:
     """Windows MuMu 实例与运行时检查的基层。"""
 
     _serial_bound_cached_properties = (
-        "emulator_instance",
         "nemud_app_keep_alive",
         "nemud_player_version",
         "is_mumu_over_version_400",
         "is_mumu_over_version_356",
     )
-
-    emulator_manager: EmulatorManagerBase
 
     def __init__(self, session: MumuSession) -> None:
         self.session = session
@@ -61,8 +43,9 @@ class MumuRuntimeBase:
             del_cached_property(self, name)
 
     @cached_property
-    def emulator_instance(self) -> EmulatorInstanceBase | None:
-        return self.find_emulator_instance(serial=self.serial)
+    def emulator_instance(self) -> MuMuInstance:
+        config = self.session.config
+        return resolve_mumu_instance(config.Emulator_MuMuPath, config.Emulator_Serial)
 
     def check_after_connected(self) -> None:
         self.check_mumu_app_keep_alive()
@@ -104,13 +87,9 @@ class MumuRuntimeBase:
 
     def check_mumu_app_keep_alive_400(self) -> bool:
         instance = self.emulator_instance
-        if instance is None:
-            logger.warning("Failed to check check_mumu_app_keep_alive as emulator_instance is None")
-            return False
-
-        file = instance.mumu_vms_config("customer_config.json")
+        file = instance.config_path("customer_config.json")
         try:
-            data = json.loads(Path(file).read_text(encoding="utf-8"))
+            data = json.loads(file.read_text(encoding="utf-8"))
         except FileNotFoundError:
             logger.warning(f"Failed to check check_mumu_app_keep_alive, file {file} not exists")
             return False
@@ -147,14 +126,9 @@ class MumuRuntimeBase:
         if not self.is_mumu12_family:
             return True
 
-        instance = self.find_emulator_instance(serial=self.serial)
-        if instance is None:
-            logger.warning("Failed to check check_mumu_bridge_network, emulator instance not found")
-            return False
-
-        file = instance.mumu_vms_config("customer_config.json")
+        file = self.emulator_instance.config_path("customer_config.json")
         try:
-            data = json.loads(Path(file).read_text(encoding="utf-8"))
+            data = json.loads(file.read_text(encoding="utf-8"))
         except FileNotFoundError:
             logger.warning(f"Failed to check check_mumu_bridge_network, file {file} not exists")
             return False
@@ -166,77 +140,3 @@ class MumuRuntimeBase:
             logger.critical("请在MuMU模拟器设置中关闭 网络桥接")
             raise HumanTakeoverRequiredError
         return True
-
-    @staticmethod
-    def _log_emulator_instances(instances: SelectedGrids) -> None:
-        for instance in instances:
-            logger.info(instance)
-
-    @staticmethod
-    def _log_found_emulator_instance(instance: EmulatorInstanceBase) -> EmulatorInstanceBase:
-        logger.hr("Emulator instance", level=2)
-        logger.info(f"Found emulator instance: {instance}")
-        return instance
-
-    def _find_mumu12_instance_by_serial_id(self, instances: SelectedGrids) -> EmulatorInstanceBase | None:
-        """serial 对应多个候选时，用 MuMu12 实例 ID 消歧。"""
-        instance_id = serial_to_id(self.serial)
-        if instance_id is None:
-            return None
-
-        select = instances.select(mumu_player_12_id=instance_id)
-        # 这里只是试探，因此 select.count == 1 时不单独记录日志。
-        if select.count == 1:
-            return self._log_found_emulator_instance(select[0])
-        return None
-
-    def _narrow_emulator_instance_by_running_path(
-        self, instances: SelectedGrids, search_args: dict[str, str], path: str
-    ) -> EmulatorInstanceBase | None:
-        search_args["path"] = path
-        select = instances.select(**search_args)
-        if select.count == 0:
-            logger.warning(f"No emulator instances with {search_args}, running path invalid")
-            search_args.pop("path")
-            return None
-        if select.count == 1:
-            return self._log_found_emulator_instance(select[0])
-        return None
-
-    def _find_single_running_emulator_instance(
-        self, instances: SelectedGrids, search_args: dict[str, str]
-    ) -> EmulatorInstanceBase | None:
-        """只剩一个运行实例时，用其路径作为最终消歧条件。"""
-        running = remove_duplicated_path(list(self.emulator_manager.iter_running_emulator()))
-        logger.info("Running emulators")
-        for exe in running:
-            logger.info(exe)
-        if len(running) != 1:
-            return None
-
-        logger.info("Only one running emulator")
-        return self._narrow_emulator_instance_by_running_path(instances, search_args, running[0])
-
-    def find_emulator_instance(self, serial: str) -> EmulatorInstanceBase | None:
-        logger.hr("Find emulator instance", level=2)
-        instances = SelectedGrids(self.emulator_manager.all_emulator_instances)
-        self._log_emulator_instances(instances)
-        search_args = {"serial": serial}
-
-        select = instances.select(**search_args)
-        if select.count == 0:
-            logger.warning(f"No emulator instance with {search_args}, serial invalid")
-            return None
-        if select.count == 1:
-            return self._log_found_emulator_instance(select[0])
-
-        instance = self._find_mumu12_instance_by_serial_id(instances)
-        if instance is not None:
-            return instance
-
-        instance = self._find_single_running_emulator_instance(instances, search_args)
-        if instance is not None:
-            return instance
-
-        logger.warning(f"Found multiple emulator instances with {search_args}")
-        return None

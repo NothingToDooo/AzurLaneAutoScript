@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from module.base.type_alias import Area, ImageArray, Point
     from module.device.control_options import Duration
     from module.device.minitouch_service import CommandBuilder
-    from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase
+    from module.device.mumu_instance import MuMuInstance
     from module.map.map_grids import SelectedGrids
 
 type AdbCommand = str | Iterable[str | int]
@@ -71,6 +71,7 @@ class MinitouchConfig(Protocol):
 
 
 class DeviceConfig(MinitouchConfig, Protocol):
+    Emulator_Serial: str
     Emulator_MuMuPath: str
 
 
@@ -97,6 +98,9 @@ class MinitouchSession(AdbShellSession, Protocol):
 
 class MumuSession(RetrySession, Protocol):
     @property
+    def config(self) -> DeviceConfig: ...
+
+    @property
     def serial(self) -> str: ...
 
     @property
@@ -122,17 +126,12 @@ class DeviceSession(MinitouchSession, MumuSession, Protocol):
 
 class CaptureRuntime(Protocol):
     @property
-    def emulator_instance(self) -> EmulatorInstanceBase | None: ...
+    def emulator_instance(self) -> MuMuInstance: ...
 
 
 class MumuRuntimeService(CaptureRuntime, Protocol):
     @property
     def session(self) -> MumuSession: ...
-
-    @property
-    def emulator_manager(self) -> EmulatorManagerBase: ...
-
-    def find_emulator_instance(self, serial: str) -> EmulatorInstanceBase | None: ...
 
     def emulator_start(self) -> bool: ...
 

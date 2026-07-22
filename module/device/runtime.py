@@ -1,7 +1,6 @@
 import ctypes
 from dataclasses import dataclass
-from functools import cached_property
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import psutil
 from adbutils.errors import AdbError
@@ -10,7 +9,6 @@ from module.base.decorator import run_once
 from module.base.failure import raise_cleanup_errors
 from module.base.timer import Timer
 from module.device.mumu_runtime_base import MumuRuntimeBase
-from module.device.platform.emulator_windows import Emulator, EmulatorInstance, EmulatorManager
 from module.device.services import AppController, MinitouchController, NemuIpcCapture
 from module.logger import logger
 
@@ -25,10 +23,7 @@ if TYPE_CHECKING:
         DeviceSession,
         MumuRuntimeService,
     )
-
-
-class UnknownEmulatorError(Exception):
-    pass
+    from module.device.mumu_instance import MuMuInstance
 
 
 def get_focused_window() -> int:
@@ -59,50 +54,23 @@ def flash_window(hwnd: int, *, flash: bool = True) -> None:
 class MumuRuntime(MumuRuntimeBase):
     """依赖同一 ADB session 的 MuMu 实例与生命周期服务。"""
 
-    @cached_property
-    def emulator_manager(self) -> EmulatorManager:
-        session = cast("DeviceSession", self.session)
-        return EmulatorManager(session.config.Emulator_MuMuPath)
-
     @classmethod
     def execute(cls, command: Sequence[str]) -> psutil.Popen:
         logger.info(f"Execute: {command}")
         # 让模拟器进程脱离 ALAS，避免 ALAS 退出时连带结束模拟器。
         return psutil.Popen(command, close_fds=True, start_new_session=True)
 
-    def _emulator_start(self, instance: EmulatorInstance) -> None:
-        exe: str = instance.emulator.path
-        if instance.type != Emulator.MuMuPlayer12:
-            message = f"Cannot start an unknown emulator instance: {instance}"
-            raise UnknownEmulatorError(message)
+    def _emulator_start(self, instance: MuMuInstance) -> None:
         # 通过 MuMuManager 启动，避免多个 MuMuNxMain.exe 同时启动时请求被吞掉。
-        instance_id = self._require_mumu_player_12_id(instance)
-        self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance_id), "launch_player"])
+        self.execute([instance.manager_executable.as_posix(), "api", "-v", str(instance.instance_id), "launch_player"])
 
-    def _emulator_stop(self, instance: EmulatorInstance) -> None:
-        exe: str = instance.emulator.path
-        if instance.type != Emulator.MuMuPlayer12:
-            message = f"Cannot stop an unknown emulator instance: {instance}"
-            raise UnknownEmulatorError(message)
-        instance_id = self._require_mumu_player_12_id(instance)
-        self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance_id), "shutdown_player"])
+    def _emulator_stop(self, instance: MuMuInstance) -> None:
+        self.execute(
+            [instance.manager_executable.as_posix(), "api", "-v", str(instance.instance_id), "shutdown_player"]
+        )
 
-    @staticmethod
-    def _require_mumu_player_12_id(instance: EmulatorInstance) -> int:
-        instance_id = instance.mumu_player_12_id
-        if instance_id is None:
-            message = f"Cannot get MuMu instance index from name {instance.name!r}"
-            raise UnknownEmulatorError(message)
-        return instance_id
-
-    def _emulator_function_wrapper(self, func: Callable[[EmulatorInstance], None]) -> bool:
+    def _emulator_function_wrapper(self, func: Callable[[MuMuInstance], None]) -> bool:
         instance = self.emulator_instance
-        if instance is None:
-            logger.error("未找到可启动或停止的模拟器实例")
-            return False
-        if not isinstance(instance, EmulatorInstance):
-            logger.error(f"不支持的模拟器实例类型：{instance}")
-            return False
 
         try:
             func(instance)
@@ -113,7 +81,7 @@ class MumuRuntime(MumuRuntimeBase):
                 logger.error("To start/stop MuMuPlayer, ALAS needs to be run as administrator")
             else:
                 logger.error(e)
-        except (UnknownEmulatorError, psutil.Error) as e:
+        except psutil.Error as e:
             logger.error(e)
         else:
             return True
@@ -200,11 +168,7 @@ class MumuRuntime(MumuRuntimeBase):
         """模拟器启动完成返回 True，180 秒超时返回 False。"""
         logger.hr("Emulator start", level=2)
         current_window = get_focused_window()
-        instance = self.emulator_instance
-        if instance is None:
-            logger.error("未找到可监听启动状态的模拟器实例")
-            return False
-        serial = instance.serial
+        serial = self.serial
         logger.info(f"Current window: {current_window}")
 
         show_online = run_once(self._log_emulator_online)

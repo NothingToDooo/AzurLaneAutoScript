@@ -1,41 +1,31 @@
 from typing import TYPE_CHECKING
 
-import pytest
-
-from module.device.platform.emulator_windows import EmulatorInstance
-from module.device.runtime import MumuRuntime, UnknownEmulatorError
+from module.device.mumu_instance import MuMuInstance
+from module.device.runtime import MumuRuntime
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 
 class _Runtime(MumuRuntime):
-    def start_instance(self, instance: EmulatorInstance) -> None:
+    def start_instance(self, instance: MuMuInstance) -> None:
         self._emulator_start(instance)
 
-    def stop_instance(self, instance: EmulatorInstance) -> None:
+    def stop_instance(self, instance: MuMuInstance) -> None:
         self._emulator_stop(instance)
 
 
-def _mumu12_instance(tmp_path: Path, *, name: str = "MuMuPlayer-12.0-1") -> EmulatorInstance:
+def _mumu12_instance(tmp_path: Path) -> MuMuInstance:
     executable = tmp_path / "MuMu Player 12" / "nx_main" / "MuMuNxMain.exe"
     executable.parent.mkdir(parents=True)
     executable.touch()
-    return EmulatorInstance(
-        serial="127.0.0.1:16416",
-        name=name,
-        path=executable.as_posix(),
-    )
-
-
-def _legacy_instance(tmp_path: Path) -> EmulatorInstance:
-    executable = tmp_path / "nemu" / "EmulatorShell" / "NemuPlayer.exe"
-    executable.parent.mkdir(parents=True)
-    executable.touch()
-    return EmulatorInstance(
-        serial="127.0.0.1:7555",
-        name="",
-        path=executable.as_posix(),
+    return MuMuInstance(
+        executable=executable,
+        instance_id=1,
+        name="MuMuPlayer-15.0-1",
+        config_dir=tmp_path / "MuMu Player 12" / "vms" / "MuMuPlayer-15.0-1" / "configs",
     )
 
 
@@ -73,30 +63,3 @@ def test_emulator_stop_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, 
             "shutdown_player",
         ]
     ]
-
-
-def test_legacy_emulator_instance_cannot_start_or_stop(tmp_path: Path) -> None:
-    runtime = object.__new__(_Runtime)
-    instance = _legacy_instance(tmp_path)
-
-    with pytest.raises(UnknownEmulatorError):
-        runtime.start_instance(instance)
-    with pytest.raises(UnknownEmulatorError):
-        runtime.stop_instance(instance)
-
-
-@pytest.mark.parametrize("method_name", ["start_instance", "stop_instance"])
-def test_mumu12_instance_without_numeric_id_never_executes_manager_command(
-    method_name: str,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    commands: list[list[str]] = []
-    monkeypatch.setattr(MumuRuntime, "execute", classmethod(lambda _cls, command: commands.append(command)))
-    runtime = object.__new__(_Runtime)
-    instance = _mumu12_instance(tmp_path, name="unexpected-name")
-
-    with pytest.raises(UnknownEmulatorError, match="Cannot get MuMu instance index"):
-        getattr(runtime, method_name)(instance)
-
-    assert commands == []

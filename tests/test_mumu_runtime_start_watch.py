@@ -5,7 +5,6 @@ import pytest
 from adbutils import AdbClient
 
 from module.device import runtime as runtime_module
-from module.device.platform.emulator_base import EmulatorInstanceBase
 from module.device.runtime import MumuRuntime
 from module.map.map_grids import SelectedGrids
 
@@ -68,6 +67,13 @@ class _Device:
     status: str
 
 
+@dataclass(slots=True)
+class _Config:
+    Emulator_Serial: str
+    Emulator_MuMuPath: str = "C:/MuMu/nx_main/MuMuNxMain.exe"
+    MINITOUCH_FILEPATH_REMOTE: str = "/data/local/tmp/minitouch"
+
+
 type _ShellResult = str | BaseException
 
 
@@ -82,6 +88,7 @@ class _Session:
         connect_messages: list[str] | None,
     ) -> None:
         self.serial = serial
+        self.config = _Config(Emulator_Serial=serial)
         self.is_mumu_family = True
         self.is_mumu12_family = True
         self.package = "com.bilibili.azurlane"
@@ -197,9 +204,7 @@ def _make_runtime(
         package_results=package_results or [["com.bilibili.azurlane"]],
         connect_messages=connect_messages,
     )
-    runtime = _Runtime(session)
-    runtime.__dict__["emulator_instance"] = EmulatorInstanceBase(serial=serial, name="test", path="test")
-    return runtime
+    return _Runtime(session)
 
 
 @pytest.fixture(autouse=True)
