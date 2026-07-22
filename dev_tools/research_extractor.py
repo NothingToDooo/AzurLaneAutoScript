@@ -3,7 +3,6 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-import module.logger
 from dev_tools.utils import LuaLoader, require_lua_int, require_lua_str, require_lua_table
 
 if TYPE_CHECKING:
@@ -15,9 +14,6 @@ if TYPE_CHECKING:
 
 type InputKeyword = Literal["need_coin", "need_cube", "need_part"]
 type EncodedValue = str | int | bool
-
-# 导入 module.logger 会切换到项目根目录。
-_ = module.logger
 
 
 class Item:
