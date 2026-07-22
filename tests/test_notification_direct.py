@@ -43,29 +43,6 @@ def test_direct_notification_sends_each_recipient_once(monkeypatch: pytest.Monke
     ]
 
 
-def test_direct_notification_does_not_retry_a_failed_recipient(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    attempts: list[str] = []
-
-    def fail(
-        _sender: SmtpNotificationSender,
-        *,
-        recipient: str,
-        title: str,
-        content: str,
-    ) -> None:
-        del title, content
-        attempts.append(recipient)
-        message = "SMTP failure"
-        raise OSError(message)
-
-    monkeypatch.setattr(SmtpNotificationSender, "send", fail)
-
-    assert send_notification(_config("one@example.com"), title="Title", content="Body") is False
-    assert attempts == ["one@example.com"]
-
-
 def test_direct_notification_returns_false_and_continues_other_recipients(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

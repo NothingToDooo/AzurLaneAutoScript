@@ -11,10 +11,7 @@ from module.adapters.campaign_map_observer import (
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
-from module.adapters.campaign_runtime_profile import (
-    CampaignRuntimeProfileError,
-    CampaignRuntimeProfileManager,
-)
+from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
 from module.content.manifest import load_default_event_manifests
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -287,16 +284,3 @@ def test_real_20240521_profiles_wire_fixed_fleet_locator(stage_id: str) -> None:
     assert len(bindings) == 1
     assert dict(bindings[0].options) == {"fleet_1": "D5", "fleet_2": "F5"}
     assert result == SurfaceFleetLocations(fleet_1=(3, 4), fleet_2=(5, 4))
-
-
-def test_fixed_fleet_profile_rejects_obsolete_string_operation() -> None:
-    profile = _fixed_profile(
-        {
-            "fleet_1": "D5",
-            "fleet_2": "F5",
-            "operations": ["find_current_fleet"],
-        }
-    )
-
-    with pytest.raises(CampaignRuntimeProfileError, match=r"unknown option: operations"):
-        CampaignRuntimeProfileManager(profile, load_default_campaign_runtime_executor_registry())

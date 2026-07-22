@@ -26,11 +26,14 @@ from module.runtime.recovery import GameErrorRecovery
 NOW = datetime(2026, 7, 22, 4, tzinfo=UTC)
 
 
-def _context() -> TaskContext:
+def _context(
+    task_id: str = "research",
+    mode: ExecutionMode = ExecutionMode.SCHEDULED_JOB,
+) -> TaskContext:
     return TaskContext(
-        task_id=TaskId("research"),
+        task_id=TaskId(task_id),
         started_at=NOW - timedelta(hours=1),
-        mode=ExecutionMode.SCHEDULED_JOB,
+        mode=mode,
         metadata=RunMetadata(settings_revision=1, content_revision="content-test"),
         abort=AbortToken(),
     )
@@ -63,36 +66,26 @@ def test_game_error_recovery_wakes_restart_and_advances_the_failed_task(
     )
 
 
-def test_game_error_recovery_respects_disabled_error_handling() -> None:
-    recovery = GameErrorRecovery(lambda: False, lambda: NOW)
+@pytest.mark.parametrize(
+    ("enabled", "error", "task_id", "mode"),
+    [
+        (False, GameStuckError("disabled"), "research", ExecutionMode.SCHEDULED_JOB),
+        (True, ValueError("invalid task state"), "research", ExecutionMode.SCHEDULED_JOB),
+        (True, GamePageUnknownError("unknown page"), "research", ExecutionMode.SCHEDULED_JOB),
+        (True, GameStuckError("restart stuck"), "restart", ExecutionMode.SCHEDULED_JOB),
+        (True, GameStuckError("direct command"), "research", ExecutionMode.DIRECT_COMMAND),
+    ],
+)
+def test_game_error_recovery_declines_ineligible_faults(
+    *,
+    enabled: bool,
+    error: Exception,
+    task_id: str,
+    mode: ExecutionMode,
+) -> None:
+    recovery = GameErrorRecovery(lambda: enabled, lambda: NOW)
 
-    assert recovery.recover(_context(), GameStuckError("stuck")) is None
-
-
-def test_game_error_recovery_declines_unknown_exceptions() -> None:
-    recovery = GameErrorRecovery(lambda: True, lambda: NOW)
-
-    assert recovery.recover(_context(), ValueError("invalid task state")) is None
-
-
-def test_game_page_unknown_stays_terminal_without_a_server_status_source() -> None:
-    recovery = GameErrorRecovery(lambda: True, lambda: NOW)
-
-    assert recovery.recover(_context(), GamePageUnknownError("unknown page")) is None
-
-
-def test_restart_task_cannot_recursively_recover_itself() -> None:
-    recovery = GameErrorRecovery(lambda: True, lambda: NOW)
-    context = _context()
-    restart_context = TaskContext(
-        task_id=TaskId("restart"),
-        started_at=context.started_at,
-        mode=context.mode,
-        metadata=context.metadata,
-        abort=context.abort,
-    )
-
-    assert recovery.recover(restart_context, GameStuckError("restart stuck")) is None
+    assert recovery.recover(_context(task_id, mode), error) is None
 
 
 def test_game_error_recovery_requires_a_boolean_live_setting() -> None:

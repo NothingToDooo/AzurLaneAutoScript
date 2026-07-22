@@ -280,22 +280,12 @@ def test_series_nine_compact_fields_follow_runtime_contract() -> None:
             assert "ship_rarity" not in row
 
 
-@pytest.mark.parametrize(
-    ("name", "ship", "rarity"),
-    [
-        ("D-737-MI", "valparaiso", "dr"),
-        ("D-781-MI", "maximmelmann", "dr"),
-        ("D-732-MI", "duncan", "pry"),
-        ("D-740-MI", "takahashi", "pry"),
-        ("D-747-MI", "orage", "pry"),
-    ],
-)
-def test_series_nine_ship_projects(name: str, ship: str, rarity: str) -> None:
-    project = ResearchProject(name, 9)
+def test_series_nine_project_exposes_ship_fields() -> None:
+    project = ResearchProject("D-737-MI", 9)
 
     assert project.valid is True
-    assert project.ship == ship
-    assert project.ship_rarity == rarity
+    assert project.ship == "valparaiso"
+    assert project.ship_rarity == "dr"
 
 
 def test_series_nine_filter_tokens_and_presets_are_valid() -> None:

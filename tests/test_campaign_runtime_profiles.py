@@ -97,20 +97,7 @@ def test_catalog_rejects_unknown_executor_kind(tmp_path: Path) -> None:
         compile_campaign_runtime_profile_registry(path)
 
 
-@pytest.mark.parametrize(
-    "obsolete_key",
-    [
-        "map_walk_turning_optimize",
-        "map_has_dynamic_red_border",
-        "map_has_pt_bonus",
-        "map_siren_count",
-        "map_air_strike_overlay_transparency_threshold",
-    ],
-)
-def test_catalog_rejects_removed_runtime_tuning_keys(
-    obsolete_key: str,
-    tmp_path: Path,
-) -> None:
+def test_catalog_rejects_unknown_runtime_tuning_key(tmp_path: Path) -> None:
     path = tmp_path / "profiles.json"
     path.write_text(
         json.dumps(
@@ -121,7 +108,7 @@ def test_catalog_rejects_removed_runtime_tuning_keys(
                     {
                         "id": "core",
                         "extensions": [],
-                        "tunings": [{"key": obsolete_key, "value": 1}],
+                        "tunings": [{"key": "unknown_tuning", "value": 1}],
                     }
                 ],
             }

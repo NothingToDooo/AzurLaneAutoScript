@@ -52,7 +52,6 @@ if TYPE_CHECKING:
 _SUPPORT_ID = "map_mechanic/support_fleet"
 _POPUP_ID = "map_mechanic/submarine_support_popup"
 _FRESH_COMBAT_ID = "map_mechanic/submarine_fresh_combat"
-_OLD_ID = "map_mechanic/submarine_fresh_entry"
 
 
 class _SubmarineRuntime:
@@ -419,4 +418,3 @@ def test_real_chapter_16_profiles_wire_only_the_early_submarine_services(
 
     assert (_POPUP_ID in implementation_ids) is expected_submarine
     assert (_FRESH_COMBAT_ID in implementation_ids) is expected_submarine
-    assert _OLD_ID not in implementation_ids

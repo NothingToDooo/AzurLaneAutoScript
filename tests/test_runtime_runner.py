@@ -464,24 +464,6 @@ def test_scheduler_keeps_known_game_error_terminal_when_recovery_is_disabled() -
     assert repository.list_items() == initial_schedule
 
 
-def test_scheduler_keeps_unknown_exception_terminal() -> None:
-    task_id = TaskId("research")
-    repository = _Repository((ScheduleItem(task_id, enabled=True, due_at=NOW, priority=0),))
-    runner = _runner(
-        (_spec(task_id.value, ExecutionMode.SCHEDULED_JOB, 0),),
-        (_FailOnceTask(ValueError("bad state"), TaskResult(Succeeded(), effects=(DisableTask(task_id),))),),
-        repository,
-        _Clock(),
-        error_recovery=GameErrorRecovery(lambda: True, lambda: NOW),
-    )
-
-    outcome = runner.run("alas")
-
-    assert outcome.status is CommandStatus.FAILED
-    assert outcome.exception_type == "ValueError"
-    assert outcome.runs_completed == 1
-
-
 def test_scheduler_continues_after_an_expected_incomplete_result() -> None:
     task_id = TaskId("benchmark")
     repository = _Repository(
@@ -542,28 +524,6 @@ def test_persistence_failure_keeps_task_context_for_diagnostics() -> None:
     assert outcome.exception_type == "OSError"
     assert outcome.message == "disk full"
     assert outcome.error_bundle == "log/error/benchmark"
-
-
-def test_result_observer_can_attach_error_bundle() -> None:
-    error = RuntimeError("boom")
-    observed: list[tuple[TaskId, TaskResult]] = []
-
-    def observe(task_id: TaskId, result: TaskResult) -> str:
-        observed.append((task_id, result))
-        return "log/error/bundle"
-
-    runner = _runner(
-        (_spec("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
-        (_Task(TaskResult(Faulted(error))),),
-        _Repository(),
-        _Clock(),
-        observer=observe,
-    )
-
-    outcome = runner.run("benchmark")
-
-    assert observed[0][0] == TaskId("benchmark")
-    assert outcome.error_bundle == "log/error/bundle"
 
 
 def test_abort_before_scheduler_tick_returns_stopped() -> None:

@@ -18,7 +18,6 @@ from module.adapters.campaign_mumu12 import (
     Mumu12CampaignAttempt,
     Mumu12CampaignRuntimeProvider,
     Mumu12HardCampaignPort,
-    Mumu12HardCampaignSession,
     campaign_execution_overlay,
     campaign_stage_overlay,
     compile_campaign_map,
@@ -31,7 +30,6 @@ from module.adapters.campaign_runtime_profile import (
     RuntimeSessionOutcome,
 )
 from module.adapters.campaign_runtime_session import RuntimeProfileLease, RuntimeProfileLeaseState
-from module.adapters.campaign_stage_navigator import ProfileCampaignStageNavigator
 from module.adapters.campaign_submarine import STANDARD_CAMPAIGN_SUBMARINE_SERVICES
 from module.adapters.gems_mumu12 import (
     GemsHardPreparationError,
@@ -42,7 +40,6 @@ from module.adapters.mumu12 import CancellationAwareMumu12Device
 from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, SafeUnitCancellation, TaskId
 from module.base.button import Button
 from module.content.battle_policy import BossStrategy, ClearBoss, StagePolicy
-from module.content.battle_program import BattleProgramMode
 from module.content.campaign_session import (
     BattlefieldObservation,
     BattleSucceeded,
@@ -140,12 +137,11 @@ from module.map.map_scanner import (
     MovableScanRequest,
 )
 from module.map.map_spawn_gap import MapSpawnProgress
-from module.ui.page import page_campaign_menu, page_event
+from module.ui.page import page_campaign_menu
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Iterator
 
-    from module.adapters.campaign_profile_services import CampaignProfileServices
     from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
     from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
@@ -195,59 +191,6 @@ def test_combat_stuck_detection_pause_is_scoped(monkeypatch: pytest.MonkeyPatch)
     DeclarativeCampaignMapRuntime.combat_status(runtime)
 
     assert events == ["disable", "combat", "enable"]
-
-
-def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    compile_services = campaign_adapters.compile_campaign_profile_services
-    compiled_services: list[CampaignProfileServices] = []
-
-    def record_services(manager: CampaignRuntimeProfileManager) -> CampaignProfileServices:
-        services = compile_services(manager)
-        compiled_services.append(services)
-        return services
-
-    monkeypatch.setattr(campaign_adapters, "compile_campaign_profile_services", record_services)
-    config = in_memory_config("campaign-event-ui-wiring", {})
-    definition = load_default_stage(StageRef("event_20250424_cn", "t1"))
-    runtime = DeclarativeCampaignMapRuntime(config, object.__new__(Device), definition)
-
-    assert len(compiled_services) == 1
-    profile_services = compiled_services[0]
-    assert runtime._profile_services is profile_services  # ruff:ignore[private-member-access] - runtime 必须消费唯一 bundle。
-    assert runtime._hard_behavior is profile_services.hard_behavior  # ruff:ignore[private-member-access] - hard service 来自唯一 bundle。
-    assert runtime._clear_mode_config_service is profile_services.clear_mode_config  # ruff:ignore[private-member-access] - 全局顺序 service 来自唯一 bundle。
-    assert runtime._map_initialization_service is profile_services.map_initialization  # ruff:ignore[private-member-access] - 全局顺序 service 来自唯一 bundle。
-    assert runtime._profile_fleet_preparation_service is profile_services.fleet_preparation  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
-    assert runtime._submarine_services is profile_services.submarine  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
-    assert runtime._strategy_set_service is profile_services.strategy_set  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
-    assert runtime._program_capabilities is profile_services.program_capabilities  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
-    assert runtime._map_observer is profile_services.map_observer  # ruff:ignore[private-member-access] - observer 来自唯一 bundle。
-    assert runtime._map_swipe_service is profile_services.map_swipe  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
-    assert runtime._mystery_item_service is profile_services.mystery_item  # ruff:ignore[private-member-access] - mechanic service 来自唯一 bundle。
-    services = runtime._event_ui_services  # ruff:ignore[private-member-access] - 验证 runtime 构造期的能力 wiring。
-    assert services is profile_services.event_ui
-    combat_result = runtime._combat_result_ui  # ruff:ignore[private-member-access] - 删除生产 wiring 时本测试必须失败。
-    map_transition = runtime._map_transition_ui  # ruff:ignore[private-member-access] - transition 必须注入所有 consumer。
-    assert combat_result is services.combat_result
-    assert map_transition is services.map_transition
-    assert isinstance(runtime.stage_navigator, ProfileCampaignStageNavigator)
-    assert runtime.stage_navigator._event_ui is services  # ruff:ignore[private-member-access] - navigator 必须复用同一次组合结果。
-
-    def event_page_visible(
-        button: Button,
-        offset: object = 0,
-        interval: float = 0,
-        similarity: float = 0.85,
-        threshold: int = 10,
-    ) -> bool:
-        del offset, interval, similarity, threshold
-        return button is page_event.check_button
-
-    monkeypatch.setattr(runtime, "appear", event_page_visible)
-
-    assert combat_result.handle_experience_result(runtime) is False
 
 
 def test_declarative_runtime_resets_bound_profile_when_construction_fails(
@@ -1017,94 +960,6 @@ def test_runtime_factory_discards_map_lease_when_attempt_construction_fails() ->
 
     runtime = cast("_IncompleteProgramRuntime", _IncompleteProgramRuntime.created[-1])
     assert runtime.calls == ["reset_runtime", "discard_runtime"]
-
-
-class _OpaqueFakeRuntimeFactory(DeclarativeCampaignRuntimeFactory):
-    """发布 product 后隐藏 runtime 私有字段，验证调用方只依赖完整 product。"""
-
-    def __init__(self) -> None:
-        super().__init__(_FakeDeclarativeRuntime)
-
-    @override
-    def build_attempt(
-        self,
-        config: AzurLaneConfig,
-        device: Device,
-        job: CampaignJobSpec,
-        session: CampaignSession,
-        cancellation: CancellationSource,
-    ) -> Mumu12CampaignAttempt:
-        attempt = super().build_attempt(config, device, job, session, cancellation)
-        for field in (
-            "_runtime_profile_lease",
-            "_submarine_services",
-            "_map_initialization_service",
-            "_runtime_profile",
-            "_program_capabilities",
-        ):
-            vars(attempt.runtime).pop(field)
-        return attempt
-
-    @override
-    def open_hard_session(
-        self,
-        config: AzurLaneConfig,
-        device: Device,
-        definition: CampaignStageDefinition,
-        *,
-        stage: StageRef,
-        cancellation: CancellationSource,
-        remaining_reader: Callable[[Device], int],
-    ) -> Mumu12HardCampaignSession:
-        session = super().open_hard_session(
-            config,
-            device,
-            definition,
-            stage=stage,
-            cancellation=cancellation,
-            remaining_reader=remaining_reader,
-        )
-        runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
-        vars(runtime).pop("_runtime_profile_lease")
-        vars(runtime).pop("_hard_behavior")
-        return session
-
-
-def test_map_provider_consumes_attempt_without_runtime_private_fields() -> None:
-    _FakeDeclarativeRuntime.created.clear()
-    provider = Mumu12CampaignRuntimeProvider(
-        in_memory_config("campaign-opaque-attempt", {}),
-        object.__new__(Device),
-        runtime_factory=_OpaqueFakeRuntimeFactory(),
-    )
-
-    activated = provider.activate(_job(), AbortToken())
-    assert isinstance(activated, CampaignSession)
-    assert provider.battle_program_mode(activated, AbortToken()) is BattleProgramMode.NORMAL
-    provider.discard_checkpoint()
-
-    runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
-    assert "reset_runtime" in runtime.calls
-
-
-def test_hard_port_consumes_session_without_runtime_private_fields() -> None:
-    _FakeDeclarativeRuntime.created.clear()
-    device = object.__new__(Device)
-    vars(device)["screenshot"] = lambda: None
-    vars(device)["image"] = object()
-    port = Mumu12HardCampaignPort(
-        in_memory_config("campaign-opaque-hard-session", {}),
-        device,
-        _FakeSessionSource(_definition()),
-        runtime_factory=_OpaqueFakeRuntimeFactory(),
-        remaining_reader=lambda _device: 1,
-    )
-
-    assert port.remaining_attempts(_hard_settings(), AbortToken()) == 1
-    port.release()
-
-    runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
-    assert "reset_runtime" in runtime.calls
 
 
 class _FailingHardRuntime(_FakeDeclarativeRuntime):

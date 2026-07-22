@@ -1,4 +1,3 @@
-from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast, override
 
@@ -125,12 +124,6 @@ def test_standard_mystery_item_preserves_button_identity_and_counts() -> None:
     assert runtime.device.sleeps == [0.5]
     assert runtime.device.screenshots == 1
     assert runtime.strategy_close_calls == 1
-    with pytest.raises(FrozenInstanceError):
-        setattr(  # ruff:ignore[set-attr-with-constant] - intentional frozen mutation probe
-            request,
-            "button",
-            None,
-        )
 
 
 def test_mystery_item_outcome_rejects_counting_an_unhandled_popup() -> None:

@@ -1,6 +1,5 @@
 import subprocess
 import sys
-from ipaddress import IPv4Address
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -132,29 +131,3 @@ def test_main_forwards_auto_run_to_the_webui_app(monkeypatch: pytest.MonkeyPatch
     gui.main()
 
     assert starts == ["alas"]
-
-
-@pytest.mark.parametrize(
-    "options",
-    [
-        ["--ssl-key", "key.pem"],
-        ["--host", str(IPv4Address(0))],
-        ["-k", "local-password"],
-        ["--run", "alas"],
-    ],
-)
-def test_main_rejects_removed_remote_options(
-    monkeypatch: pytest.MonkeyPatch,
-    options: list[str],
-) -> None:
-    def fail_if_started(*_args: object, **_kwargs: object) -> None:
-        message = "WebUI must not start after an invalid option"
-        raise AssertionError(message)
-
-    monkeypatch.setattr(sys, "argv", ["gui.py", *options])
-    monkeypatch.setattr(gui.uvicorn, "run", fail_if_started)
-
-    with pytest.raises(SystemExit) as error:
-        gui.main()
-
-    assert error.value.code == 2

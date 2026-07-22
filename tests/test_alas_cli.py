@@ -150,13 +150,3 @@ def test_cli_logs_failed_command_and_error_bundle(monkeypatch: pytest.MonkeyPatc
         "Command 'benchmark' failed: boom",
         "Error bundle: log/error/benchmark.zip",
     ]
-
-
-def test_cli_rejects_removed_instance_option() -> None:
-    with pytest.raises(SystemExit, match="2"):
-        alas_module.main(["--instance", "port-one"])
-
-
-def test_cli_rejects_removed_project_root_option() -> None:
-    with pytest.raises(SystemExit, match="2"):
-        alas_module.main(["--project-root", "."])

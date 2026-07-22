@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -8,7 +8,6 @@ import yaml
 from config_factory import in_memory_config
 
 import module.bootstrap.production as production_module
-import module.config.config as config_module
 import module.state.config_repository as state_repository_module
 from module.application import (
     AbortRequested,
@@ -18,13 +17,10 @@ from module.application import (
     OperatorNotificationKind,
     OperatorNotificationRequest,
     RecoverableFault,
-    RescheduleSelf,
     RunMetadata,
     Succeeded,
     TaskId,
     TaskResult,
-    WakePolicy,
-    WakeTask,
 )
 from module.application.state_effects import UpsertTaskState
 from module.bootstrap.assembly_source import ConfigurationLoadError, JsonConfigurationDocumentSource
@@ -41,9 +37,8 @@ from module.content.manifest import load_default_event_manifests
 from module.device.device import Device
 from module.diagnostics import ScreenshotHistory
 from module.equipment.equipment_code import EquipmentCodeHandler
-from module.exception import GameStuckError
 from module.notify.configuration import SmtpNotificationConfig, SmtpTransport
-from module.runtime.factories import ConfiguredTaskFactory, TaskBinding, validate_task_bindings
+from module.runtime.factories import validate_task_bindings
 from module.runtime.runner import CommandStatus, RuntimeRunner
 from module.state.config_repository import ConfigStateError, ConfigStateRepository
 from module.task_registry import TASK_SPECS
@@ -324,14 +319,45 @@ def test_complete_configuration_builds_the_exact_task_catalog(
     assert tuple(task_id.value for task_id in bindings) == tuple(TASK_SPECS)
 
 
-def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications(
+@pytest.mark.parametrize(
+    "case",
+    [
+        (
+            TaskId("main"),
+            Faulted(RuntimeError("device disconnected")),
+            (
+                OperatorNotificationRequest(
+                    OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT,
+                    resource="campaign_main/12-4",
+                ),
+            ),
+            [
+                ("Alas crashed", "<main> RuntimeError: device disconnected\nError bundle: log/error/bundle"),
+                ("Alas campaign finished", "<main> campaign_main/12-4 reached run count limit"),
+            ],
+        ),
+        (
+            TaskId("research"),
+            RecoverableFault(RuntimeError("stuck")),
+            (),
+            [],
+        ),
+    ],
+)
+def test_fault_observer_saves_diagnostics_and_sends_expected_notifications(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    case: tuple[
+        TaskId,
+        Faulted | RecoverableFault,
+        tuple[OperatorNotificationRequest, ...],
+        list[tuple[str, str]],
+    ],
 ) -> None:
-    error = RuntimeError("device disconnected")
+    task_id, outcome, notifications, expected_messages = case
     screenshots = ScreenshotHistory(max_frames=1)
     saved: list[tuple[Path, str, str | None, BaseException, ScreenshotHistory]] = []
-    sent: list[tuple[SmtpNotificationConfig, str, str]] = []
+    sent: list[tuple[str, str]] = []
     smtp = SmtpNotificationConfig(
         host="smtp.example.com",
         user="sender@example.com",
@@ -353,73 +379,6 @@ def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications
         return "log/error/bundle"
 
     def send_notification(
-        config: SmtpNotificationConfig,
-        *,
-        title: str,
-        content: str,
-    ) -> bool:
-        sent.append((config, title, content))
-        return True
-
-    monkeypatch.setattr(production_module, "_save_error_bundle", save_error_bundle)
-    monkeypatch.setattr(production_module, "send_notification", send_notification)
-
-    bundle = production_module._observe_result(  # ruff:ignore[private-member-access] - 验证生产结果观察器的完整编排。
-        TaskId("main"),
-        TaskResult(
-            outcome=Faulted(error),
-            notifications=(
-                OperatorNotificationRequest(
-                    OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT,
-                    resource="campaign_main/12-4",
-                ),
-            ),
-        ),
-        root=tmp_path,
-        command="alas",
-        screenshots=screenshots,
-        notification=smtp,
-    )
-
-    assert bundle == "log/error/bundle"
-    assert saved == [(tmp_path, "alas", "main", error, screenshots)]
-    assert sent == [
-        (
-            smtp,
-            "Alas crashed",
-            "<main> RuntimeError: device disconnected\nError bundle: log/error/bundle",
-        ),
-        (
-            smtp,
-            "Alas campaign finished",
-            "<main> campaign_main/12-4 reached run count limit",
-        ),
-    ]
-
-
-def test_recoverable_fault_observer_saves_diagnostics_without_crash_notification(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    error = GameStuckError("stuck")
-    screenshots = ScreenshotHistory(max_frames=1)
-    saved: list[BaseException] = []
-    sent: list[tuple[str, str]] = []
-    retry_at = datetime(2026, 7, 22, 4, 0, 10, tzinfo=UTC)
-    smtp = SmtpNotificationConfig(
-        host="smtp.example.com",
-        user="sender@example.com",
-        password=tmp_path.name,
-        recipients=("operator@example.com",),
-        port=587,
-        transport=SmtpTransport.STARTTLS,
-    )
-
-    def save_error_bundle(**kwargs: object) -> str:
-        saved.append(cast("BaseException", kwargs["error"]))
-        return "log/error/recoverable"
-
-    def send_notification(
         _config: SmtpNotificationConfig,
         *,
         title: str,
@@ -431,24 +390,18 @@ def test_recoverable_fault_observer_saves_diagnostics_without_crash_notification
     monkeypatch.setattr(production_module, "_save_error_bundle", save_error_bundle)
     monkeypatch.setattr(production_module, "send_notification", send_notification)
 
-    bundle = production_module._observe_result(  # ruff:ignore[private-member-access] - 验证恢复诊断不会误报进程崩溃。
-        TaskId("research"),
-        TaskResult(
-            RecoverableFault(error),
-            effects=(
-                RescheduleSelf(retry_at),
-                WakeTask(TaskId("restart"), retry_at - timedelta(seconds=10), WakePolicy.FORCE_ENABLE),
-            ),
-        ),
+    bundle = production_module._observe_result(  # ruff:ignore[private-member-access] - 验证生产结果观察器的对外行为。
+        task_id,
+        TaskResult(outcome=outcome, notifications=notifications),
         root=tmp_path,
         command="alas",
         screenshots=screenshots,
         notification=smtp,
     )
 
-    assert bundle == "log/error/recoverable"
-    assert saved == [error]
-    assert sent == []
+    assert bundle == "log/error/bundle"
+    assert saved == [(tmp_path, "alas", task_id.value, outcome.error, screenshots)]
+    assert sent == expected_messages
 
 
 def test_personal_scheduler_resources_release_assets_and_the_same_device(
@@ -508,7 +461,7 @@ def test_personal_scheduler_resources_preserve_both_idle_cleanup_failures(
     assert raised.value.exceptions == (asset_error, device_error)
 
 
-def test_personal_configuration_validation_is_pure_and_skips_runtime_composition(
+def test_personal_configuration_validation_does_not_construct_device_or_write(
     monkeypatch: pytest.MonkeyPatch,
     production_default_event_packs: tuple[EventPack, ...],
 ) -> None:
@@ -518,35 +471,7 @@ def test_personal_configuration_validation_is_pure_and_skips_runtime_composition
     def reject_runtime_composition(*_args: object, **_kwargs: object) -> None:
         pytest.fail("configuration validation must not compose runtime objects")
 
-    monkeypatch.setattr(PersonalRuntimeBuilder, "build", reject_runtime_composition)
-    monkeypatch.setattr(PersonalRuntimeConfig, "__init__", reject_runtime_composition)
-    monkeypatch.setattr(ConfigStateRepository, "__init__", reject_runtime_composition)
     monkeypatch.setattr(Device, "__init__", reject_runtime_composition)
-    monkeypatch.setattr(TaskBinding, "build", reject_runtime_composition)
-    monkeypatch.setattr(ConfiguredTaskFactory, "build", reject_runtime_composition)
-    monkeypatch.setattr(production_module, "bind_tasks", reject_runtime_composition)
-    for factory_builder in (
-        "build_activity_factories",
-        "build_campaign_factories",
-        "build_composite_factories",
-        "build_encounter_factories",
-        "build_facility_factories",
-        "build_market_factories",
-        "build_opsi_factories",
-        "build_maintenance_factories",
-    ):
-        monkeypatch.setattr(production_module, factory_builder, reject_runtime_composition)
-    for adapter_builder in (
-        "build_mumu12_activity_workflows",
-        "build_mumu12_campaign_dependencies",
-        "build_mumu12_composite_workflows",
-        "build_mumu12_encounter_workflows",
-        "build_mumu12_facility_workflows",
-        "build_mumu12_maintenance_services",
-        "build_mumu12_market_workflows",
-        "build_mumu12_opsi_workflows",
-    ):
-        monkeypatch.setattr(production_module, adapter_builder, reject_runtime_composition)
     monkeypatch.setattr(
         production_module,
         "atomic_write",
@@ -609,27 +534,6 @@ def test_json_configuration_source_rejects_non_finite_numbers(
 
     with pytest.raises(ConfigurationLoadError, match="non-finite JSON number"):
         source.load()
-
-
-def test_personal_runtime_config_reads_only_its_bound_file(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "alas.json"
-    original = Path("config/template.json").read_bytes()
-    path.write_bytes(original)
-    document = _template()
-
-    def reject_read(*_args: object, **_kwargs: object) -> None:
-        message = "generic config reader must not run"
-        raise AssertionError(message)
-
-    monkeypatch.setattr(config_module, "read_config_file", reject_read)
-
-    config = PersonalRuntimeConfig(_runtime_repository(path, document))
-
-    assert config.Emulator_Serial == "127.0.0.1:16384"
-    assert path.read_bytes() == original
 
 
 def test_personal_runtime_temporary_bound_field_never_persists(

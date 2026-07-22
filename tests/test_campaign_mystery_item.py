@@ -16,7 +16,6 @@ from module.adapters.campaign_runtime_implementations import (
 from module.adapters.campaign_runtime_mystery import mystery_runtime_executor_descriptors
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
-    CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
 )
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_1_RYZA
@@ -211,21 +210,6 @@ def test_ryza_returns_unhandled_when_neither_popup_is_visible() -> None:
 
     assert outcome == MysteryItemOutcome(handled=False, counts_toward_mystery=False)
     assert runtime.device.clicks == []
-
-
-@pytest.mark.parametrize(
-    ("implementation", "options"),
-    [
-        (_NON_COUNTING, {"count_as_mystery": False, "operations": ["handle_mystery_items"]}),
-        (_RYZA, {"operations": ["handle_mystery_items"]}),
-    ],
-)
-def test_typed_mystery_executors_reject_the_obsolete_operations_schema(
-    implementation: str,
-    options: dict[str, object],
-) -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match="unknown option: operations"):
-        _manager(_binding(implementation, options))
 
 
 @pytest.fixture(scope="module")

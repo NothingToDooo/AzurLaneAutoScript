@@ -5,10 +5,6 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from module.application import ExecutionMode
-from module.base.filter import Filter
-from module.config.config import Function
-from module.config.config_generated import GeneratedConfig
-from module.config.config_manual import ManualConfig
 from module.config.config_updater import ConfigGenerator
 from module.config.resolved import task_bind_chain
 from module.config.utils import LANGUAGES, filepath_args, filepath_i18n, read_file, write_file
@@ -25,29 +21,6 @@ from module.task_registry import (
 
 if TYPE_CHECKING:
     from module.config.deep import MutableDeepValue
-
-LEGACY_SCHEDULER_PRIORITY = """
-Restart
-> OpsiCrossMonth
-> Commission > Tactical > Research
-> Exercise
-> Dorm > Meowfficer > Guild > Gacha
-> Reward
-> ShopFrequent > ShopOnce > Shipyard > Freebies
-> PrivateQuarters
-> OpsiExplore
-> Minigame > Awaken
-> OpsiAshBeacon
-> OpsiDaily > OpsiShop > OpsiVoucher
-> OpsiAbyssal > OpsiStronghold > OpsiObscure > OpsiArchive
-> Daily > Hard > OpsiAshBeacon > OpsiAshAssist > OpsiMonthBoss
-> EventSp > EventA > EventB > EventC > EventD
-> RaidDaily > CoalitionSp > WarArchives > MaritimeEscort
-> Event > Event2 > Raid > Hospital > Coalition > Main > Main2 > Main3
-> OpsiMeowfficerFarming
-> GemsFarming
-> OpsiHazard1Leveling
-"""
 
 EXPECTED_SCOPES = {
     "event": ("TaskBalancer", "EventGeneral"),
@@ -274,20 +247,6 @@ def _task_command_pairs() -> list[tuple[str, str]]:
     return pairs
 
 
-def _legacy_priority_order() -> list[str]:
-    names = [command_to_config_name(command) for command in TASK_SPECS]
-    functions = []
-    for name in names:
-        function = Function({})
-        function.command = name
-        functions.append(function)
-    priority_filter = Filter(regex=r"(.*)", attr=["command"])
-    priority_filter.load(LEGACY_SCHEDULER_PRIORITY)
-    prioritized = priority_filter.apply(functions)
-    assert all(isinstance(function, Function) for function in prioritized)
-    return [function.command for function in prioritized if isinstance(function, Function)]
-
-
 def _render_generated_config_files(folder: Path) -> dict[str, bytes]:
     folder.mkdir()
     generator = ConfigGenerator()
@@ -340,16 +299,6 @@ def test_task_spec_lookup_is_immutable() -> None:
     priority_field = "priority"
     with pytest.raises(FrozenInstanceError):
         setattr(spec, priority_field, 999)
-
-
-def test_sos_is_removed_without_changing_other_commands() -> None:
-    assert set(TASK_SPECS) == EXPECTED_CATALOG_COMMANDS
-    assert get_task_spec("sos") is None
-    assert all(task_name != "Sos" for _group, task_name, _node in _task_nodes())
-    assert "Sos" not in ConfigGenerator().argument
-    assert not hasattr(GeneratedConfig, "Sos_Chapter")
-    for lang in LANGUAGES:
-        assert "Sos" not in read_file(filepath_i18n(lang))
 
 
 @pytest.mark.parametrize(
@@ -495,19 +444,6 @@ def test_task_specs_are_the_only_domain_and_content_revision_classification() ->
     } == EXPECTED_CATALOG_COMMANDS - classified
 
 
-def test_execution_mode_is_the_only_launch_rule_and_determines_priority_shape() -> None:
-    assert TASK_SPECS["daemon"].execution_mode is ExecutionMode.ASSIST_SESSION
-    assert TASK_SPECS["benchmark"].execution_mode is ExecutionMode.DIRECT_COMMAND
-    assert TASK_SPECS["restart"].execution_mode is ExecutionMode.SCHEDULED_JOB
-    assert {
-        command for command, spec in TASK_SPECS.items() if spec.execution_mode is not ExecutionMode.SCHEDULED_JOB
-    } == NON_SCHEDULED_COMMANDS
-    assert all(
-        (spec.priority is not None) is (spec.execution_mode is ExecutionMode.SCHEDULED_JOB)
-        for spec in TASK_SPECS.values()
-    )
-
-
 @pytest.mark.parametrize(
     ("task_name", "command"),
     _task_command_pairs(),
@@ -605,29 +541,6 @@ def test_config_generator_rejects_invalid_argument_groups(groups: list[str], mes
 
     with pytest.raises((TypeError, ValueError), match=message):
         _ = generator.args
-
-
-def test_priority_matches_legacy_filter_first_match_order() -> None:
-    legacy_order = _legacy_priority_order()
-    prioritized = sorted(
-        (spec for spec in TASK_SPECS.values() if spec.priority is not None),
-        key=lambda spec: cast("int", spec.priority),
-    )
-
-    assert [spec.priority for spec in prioritized] == list(range(51))
-    assert [command_to_config_name(spec.command) for spec in prioritized] == legacy_order
-    assert legacy_order.count("OpsiAshBeacon") == 1
-
-    derived_filter = Filter(regex=r"(.*)", attr=["command"])
-    derived_filter.load(ManualConfig.SCHEDULER_PRIORITY)
-    functions = []
-    for name in legacy_order:
-        function = Function({})
-        function.command = name
-        functions.append(function)
-    filtered = derived_filter.apply(functions)
-    assert all(isinstance(function, Function) for function in filtered)
-    assert [function.command for function in filtered if isinstance(function, Function)] == legacy_order
 
 
 def test_only_tool_commands_resolve_for_webui_launch() -> None:

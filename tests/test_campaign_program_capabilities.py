@@ -2,14 +2,12 @@ from dataclasses import FrozenInstanceError
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from config_factory import in_memory_config
 
 from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
 from module.adapters.campaign_map_initialization import (
     CampaignMapInitializationRuntime,
     build_campaign_map_initialization_service,
 )
-from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
 from module.adapters.campaign_program_capabilities import (
     CampaignProgramCapabilities,
     CampaignProgramCapabilityContribution,
@@ -28,7 +26,6 @@ from module.application import AbortToken
 from module.content.models import StageRef
 from module.content.runtime_profile import RuntimeExecutorKind
 from module.content.stage_loader import load_default_stage
-from module.device.device import Device
 from module.map.map_base import CampaignMap
 
 if TYPE_CHECKING:
@@ -197,25 +194,6 @@ def test_real_late_chapter_16_profiles_start_with_explicit_false_override(stage_
     assert reader.static_capabilities.map_has_mob_move is True
     assert reader.override_source is not None
     assert reader.map_has_mob_move(AbortToken()) is False
-
-
-@pytest.mark.parametrize(
-    ("stage_id", "expected"),
-    [("14-4", False), ("15-1", True), ("16-3", False)],
-)
-def test_declarative_runtime_installs_real_program_capabilities(
-    stage_id: str,
-    *,
-    expected: bool,
-) -> None:
-    runtime = DeclarativeCampaignMapRuntime(
-        in_memory_config(f"program-capability-wiring-{stage_id}", {}),
-        object.__new__(Device),
-        load_default_stage(StageRef("campaign_main", stage_id)),
-    )
-
-    assert runtime._program_capabilities.map_has_mob_move(AbortToken()) is expected  # ruff:ignore[private-member-access] - deleting production wiring must fail.
-    assert "strategy_set_execute" not in DeclarativeCampaignMapRuntime.__dict__
 
 
 @pytest.mark.parametrize(

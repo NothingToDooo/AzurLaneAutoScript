@@ -12,7 +12,6 @@ from module.adapters.campaign_program_capabilities import build_campaign_program
 from module.adapters.campaign_runtime_mechanics import mechanic_runtime_executor_descriptors
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
-    CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeSessionOutcome,
 )
@@ -203,31 +202,6 @@ def test_mob_move_feature_logs_strategy_fact_without_mutating_capability(
     assert capabilities.map_has_mob_move(AbortToken()) is True
 
 
-def test_removed_mob_move_strategy_state_implementation_is_rejected() -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match="unregistered runtime executor"):
-        _manager(
-            _binding(
-                "map_mechanic/mob_move_strategy_state",
-                RuntimeExecutorKind.MAP_MECHANIC,
-                {},
-            )
-        )
-
-
-@pytest.mark.parametrize("obsolete_option", ["operations", "state"])
-def test_mob_move_feature_rejects_obsolete_operation_and_state_options(
-    obsolete_option: str,
-) -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match=rf"unknown option: {obsolete_option}"):
-        _manager(
-            _binding(
-                "map_mechanic/mob_move_feature",
-                RuntimeExecutorKind.MAP_MECHANIC,
-                {obsolete_option: []},
-            )
-        )
-
-
 def test_chapter16_session_state_projects_stage_specific_fleet_order() -> None:
     manager = _manager(
         _support_binding(),
@@ -251,15 +225,3 @@ def test_chapter16_session_state_projects_stage_specific_fleet_order() -> None:
 
     assert capabilities.map_has_mob_move(AbortToken())
     assert manager.use_single_fleet_override(AbortToken()) is True
-
-
-@pytest.mark.parametrize("obsolete_option", ["operations", "rules", "state"])
-def test_chapter16_session_state_rejects_obsolete_options(obsolete_option: str) -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match=rf"unknown option: {obsolete_option}"):
-        _manager(
-            _binding(
-                "map_mechanic/chapter16_session_state",
-                RuntimeExecutorKind.MAP_MECHANIC,
-                {obsolete_option: []},
-            )
-        )

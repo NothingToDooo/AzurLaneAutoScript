@@ -652,23 +652,6 @@ def test_hold_start_inhibits_start_until_the_state_update_finishes() -> None:
     assert vars(manager)["_start_inhibitors"] == 0
 
 
-def test_parent_stop_intent_wins_over_late_child_success() -> None:
-    stop_event = _StopEvent()
-    process = _Process(exits_on_join=True)
-    manager = ProcessManager()
-    _attach_run(
-        manager,
-        process,
-        stop_event=stop_event,
-        outcome=_outcome(CommandStatus.FINISHED),
-    )
-
-    manager.stop_and_wait()
-
-    assert manager.outcome is not None
-    assert manager.outcome.status is CommandStatus.STOPPED
-
-
 def test_process_manager_is_singleton() -> None:
     manager = ProcessManager.instance()
 

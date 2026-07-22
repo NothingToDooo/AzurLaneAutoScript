@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, cast
 import pytest
 import yaml
 
-from module.content import stage_behavior_codec
 from module.content.battle_policy import (
     BossStrategy,
     ClearBoss,
@@ -166,13 +165,6 @@ def test_default_loader_returns_typed_definition_for_every_native_stage(stage_id
     assert definition.map.name == stage_id.upper()
 
 
-def test_load_and_load_definition_share_the_same_typed_contract() -> None:
-    loader = StageSpecLoader()
-    spec = _native_stage_spec("t3")
-
-    assert loader.load(spec) == loader.load_definition(spec)
-
-
 @pytest.mark.parametrize(
     ("stage_id", "shape", "wave_count", "boss_battles", "policy_battles"),
     [(stage_id, *expected) for stage_id, expected in NATIVE_STAGE_EXPECTATIONS.items()],
@@ -300,27 +292,6 @@ def test_loader_rejects_invalid_stage_contract_at_load_time(
     loader, spec = _write_stage(tmp_path / "events", _minimal_stage(**{replacement: value}))
 
     with pytest.raises(ContentValidationError, match=message):
-        loader.load(spec)
-
-
-def test_loader_rejects_registered_but_undecoded_battle_step_at_its_tag(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setitem(
-        stage_behavior_codec._STEP_FIELDS,  # ruff:ignore[private-member-access] - 测试验证 schema 与唯一解码入口必须同步。
-        "future_step",
-        ({"tag"}, set()),
-    )
-    loader, spec = _write_stage(
-        tmp_path / "events",
-        _minimal_stage(battles="0:\n  steps:\n  - tag: future_step"),
-    )
-
-    with pytest.raises(
-        ContentValidationError,
-        match=r"battles\.0\.steps\[0\]\.tag contains an unknown tag: 'future_step'",
-    ):
         loader.load(spec)
 
 

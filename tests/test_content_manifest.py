@@ -234,24 +234,6 @@ def test_manifest_rejects_unknown_fields(tmp_path: Path, body: str) -> None:
         load_event_manifests(root)
 
 
-@pytest.mark.parametrize(
-    ("field", "extra"),
-    [
-        ("ui_profile", "ui_profile: campaign_v1"),
-        (
-            "assets",
-            "stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n    assets: []",
-        ),
-    ],
-)
-def test_manifest_rejects_removed_extension_fields(tmp_path: Path, field: str, extra: str) -> None:
-    root = tmp_path / "content" / "events"
-    _write_manifest(root, "event_20260625_cn.yaml", _manifest_with(extra))
-
-    with pytest.raises(ContentValidationError, match=rf"unknown fields.*{field}"):
-        load_event_manifests(root)
-
-
 def test_manifest_rejects_duplicate_release_order_across_packs(tmp_path: Path) -> None:
     root = tmp_path / "content" / "events"
     _write_manifest(root, "event_20260625_cn.yaml", _minimal_manifest(order="10"))
@@ -441,26 +423,6 @@ def test_manifest_rejects_pack_root_junction_outside_events_directory(tmp_path: 
         body = _manifest_with("stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core")
         _write_manifest(root, "event_20260625_cn.yaml", body)
         with pytest.raises(ContentValidationError, match="pack content directory"):
-            load_event_manifests(root)
-    finally:
-        link.rmdir()
-
-
-def test_manifest_does_not_resolve_stage_targets_from_legacy_campaign_directory(tmp_path: Path) -> None:
-    root = tmp_path / "content" / "events"
-    campaign_root = tmp_path / "campaign"
-    root.mkdir(parents=True)
-    campaign_root.mkdir()
-    outside = tmp_path / "outside_campaign"
-    outside.mkdir()
-    (outside / "a1.py").write_text("", encoding="utf-8")
-    link = campaign_root / "event_20260625_cn"
-    _create_directory_link(link, outside)
-
-    try:
-        body = _manifest_with("policy:\n  aliases:\n    shortcut: a1")
-        _write_manifest(root, "event_20260625_cn.yaml", body)
-        with pytest.raises(ContentValidationError, match="dangling stage targets"):
             load_event_manifests(root)
     finally:
         link.rmdir()

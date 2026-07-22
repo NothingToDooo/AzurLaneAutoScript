@@ -1271,7 +1271,7 @@ class StageSpecLoader:
             message = "native stage loader runtime_profile_registry must be a CampaignRuntimeProfileRegistry"
             raise TypeError(message)
 
-    def load_definition(self, spec: StageSpec) -> CampaignStageDefinition:
+    def load(self, spec: StageSpec) -> CampaignStageDefinition:
         if not isinstance(spec, StageSpec):
             message = "native stage loader requires a StageSpec"
             raise TypeError(message)
@@ -1316,9 +1316,6 @@ class StageSpecLoader:
             )
         except ContentValidationError as error:
             raise _fail(path, "$", str(error)) from error
-
-    def load(self, spec: StageSpec) -> CampaignStageDefinition:
-        return self.load_definition(spec)
 
 
 @lru_cache(maxsize=1)

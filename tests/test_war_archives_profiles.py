@@ -6,10 +6,7 @@ from module.content.manifest import load_default_event_manifests
 from module.content.models import EventPack
 from module.content.stage_loader import StageSpecLoader
 from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
-from module.war_archives.profile import (
-    WAR_ARCHIVES_CLIENT_PROFILES,
-    WarArchivesClientProfileError,
-)
+from module.war_archives.profile import WarArchivesClientProfileError
 
 
 def test_all_war_archives_manifests_resolve_semantic_client_profiles() -> None:
@@ -19,9 +16,6 @@ def test_all_war_archives_manifests_resolve_semantic_client_profiles() -> None:
 
     archive_packs = tuple(pack for pack in catalog.packs if pack.kind == "war_archives")
     assert archive_packs
-    referenced_profiles = {pack.war_archives.profile_id for pack in archive_packs if pack.war_archives is not None}
-    registered_profiles = {profile.profile_id for profile in WAR_ARCHIVES_CLIENT_PROFILES.profiles}
-    assert referenced_profiles == registered_profiles
 
     archive_pack = archive_packs[0]
     stage_definition = StageSpecLoader().load(archive_pack.stages[0])

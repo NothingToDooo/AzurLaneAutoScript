@@ -21,6 +21,7 @@ def test_put_input_preserves_custom_attrs_scope_and_position(monkeypatch: pytest
 
     spec = put_input(
         "contract_input",
+        input_type="password",
         value="value",
         data_contract="preserved",
         scope="contract-scope",
@@ -29,6 +30,8 @@ def test_put_input_preserves_custom_attrs_scope_and_position(monkeypatch: pytest
 
     assert spec["type"] == "pin"
     assert spec["input"]["name"] == "contract_input"
+    assert spec["input"]["type"] == "password"
+    assert spec["input"]["value"] == "value"
     assert spec["input"]["data_contract"] == "preserved"
     assert spec["scope"] == "#pywebio-scope-contract-scope"
     assert spec["position"] == OutputPosition.TOP

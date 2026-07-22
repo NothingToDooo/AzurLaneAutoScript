@@ -14,7 +14,6 @@ from module.adapters.campaign_runtime_observation import (
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
-    CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
 )
 from module.content.runtime_profile import (
@@ -232,17 +231,3 @@ def test_preserve_reset_restores_and_clears_pending_state() -> None:
 
     assert runtime.events[-1] == ("after_reset", True, _GENRE)
     _assert_no_later_scan_leak(runtime)
-
-
-@pytest.mark.parametrize(
-    "obsolete_options",
-    [
-        {"operations": ["full_scan", "full_scan_movable"]},
-        {"state": ["dace"]},
-    ],
-)
-def test_preserve_rejects_obsolete_string_operations_and_state(
-    obsolete_options: dict[str, object],
-) -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match="unknown option"):
-        _manager(**obsolete_options)

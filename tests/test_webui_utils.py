@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     import pytest
 
 import module.webui.utils as webui_utils
-from module.webui.utils import Switch, Task, _read, get_generator
+from module.webui.utils import Switch, Task, get_generator
 
 
 def test_add_css_reads_utf8_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -18,13 +18,6 @@ def test_add_css_reads_utf8_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     webui_utils.add_css(css_file)
 
     assert scripts == ["$('head').append('<style>/* 中文主题 */body { color: red; }</style>')"]
-
-
-def test_read_reads_utf8_text(tmp_path: Path) -> None:
-    text_file = tmp_path / "icon.svg"
-    text_file.write_text("<svg><text>舰队</text></svg>", encoding="utf-8")
-
-    assert _read(text_file) == "<svg><text>舰队</text></svg>"
 
 
 def test_task_generator_runs_callback_after_priming() -> None:

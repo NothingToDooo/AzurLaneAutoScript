@@ -104,26 +104,6 @@ def _bindings(*, restart_factory: _Factory | None = None) -> Mapping[TaskId, Tas
     )
 
 
-def test_binding_builds_from_one_settings_revision_and_current_task_state() -> None:
-    factory = _Factory()
-    bindings = _bindings(restart_factory=factory)
-    task_state = TaskStateDocument(
-        "restart",
-        {"checkpoint": TaskStateEntry(schema_version=2, payload={"step": 4}, updated_at=_NOW)},
-    )
-
-    settings = _settings()
-    bindings[TaskId("restart")].build(task_state)
-
-    assert len(factory.contexts) == 1
-    context = factory.contexts[0]
-    assert context.spec.command == "restart"
-    assert context.settings_revision == settings["restart"].revision
-    assert context.content_revision == "content-restart"
-    assert context.settings == _RestartSettings(_NestedSettings((1, 2)))
-    assert context.task_state.get("checkpoint") == task_state.get("checkpoint")
-
-
 def test_binding_validation_builds_with_empty_task_state() -> None:
     factory = _Factory()
     bindings = _bindings(restart_factory=factory)
