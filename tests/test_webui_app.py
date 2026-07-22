@@ -153,6 +153,48 @@ def test_home_view_hides_header_status_without_releasing_the_process_manager() -
     assert aside_names == ["Home"]
 
 
+def test_app_manage_presents_and_exports_the_personal_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "alas.json"
+    config_path.write_bytes(b'{"personal": true}')
+    headings: list[str] = []
+    button_groups: list[list[dict[str, str]]] = []
+    callbacks: list[Callable[[], None]] = []
+    downloads: list[tuple[str, bytes]] = []
+
+    def personal_config_path(name: str) -> Path:
+        assert name == "alas"
+        return config_path
+
+    def capture_buttons(
+        *,
+        buttons: list[dict[str, str]],
+        onclick: list[Callable[[], None]],
+    ) -> None:
+        button_groups.append(buttons)
+        callbacks.extend(onclick)
+
+    webui_app.lang.reload()
+    monkeypatch.setattr(webui_app, "set_env", lambda **_kwargs: None)
+    monkeypatch.setattr(webui_app, "run_js", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(webui_app, "put_html", headings.append)
+    monkeypatch.setattr(webui_app, "put_buttons", capture_buttons)
+    monkeypatch.setattr(webui_app, "filepath_config", personal_config_path)
+    monkeypatch.setattr(webui_app, "download", lambda name, content: downloads.append((name, content)))
+
+    webui_app.app_manage()
+
+    assert headings == ["<h2>alas.json 导入/导出</h2>"]
+    assert [[button["label"] for button in group] for group in button_groups] == [["导入", "导出", "返回"]]
+    assert [[button["value"] for button in group] for group in button_groups] == [["import", "export", "back"]]
+
+    callbacks[1]()
+
+    assert downloads == [("alas.json", b'{"personal": true}')]
+
+
 def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.ALAS_ARGS = {}

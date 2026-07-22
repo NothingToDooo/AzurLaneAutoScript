@@ -34,33 +34,13 @@ Overview:
   Waiting:
   NoTask:
 
-AddAlas:
-  PopupTitle:
-  NewName:
-  CopyFrom:
-  Confirm:
-  FileExist:
-  InvalidChar:
-  InvalidPrefixTemplate:
-  Manage:
-
 AppManage:
   PageTitle:
-  TitleNew:
-  NewName:
-  CopyFrom:
-  NameExist:
-  InvalidChar:
-  InvalidPrefixTemplate:
   Back:
-  New:
   Import:
   Export:
   OverrideWarning:
   ImportSuccess:
-  NewSuccess:
-  Name:
-  Actions:
 
 Text:
   InvalidFeedBack:

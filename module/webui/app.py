@@ -149,8 +149,8 @@ class AlasGUI(Frame):
             Icon.SETTING,
             buttons=[
                 {
-                    "label": t("Gui.AddAlas.Manage"),
-                    "value": "AddAlas",
+                    "label": t("Gui.AppManage.PageTitle"),
+                    "value": "AppManage",
                     "color": "aside",
                 }
             ],
