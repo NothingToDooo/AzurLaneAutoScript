@@ -941,6 +941,25 @@ def test_runtime_factory_builds_complete_attempt_before_publication() -> None:
     assert runtime.calls.count("discard_runtime") == 1
 
 
+def test_runtime_factory_transfers_profile_lease_to_attempt_once() -> None:
+    factory = DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
+    job = _job()
+    session = job.sessions[0]
+
+    attempt = factory.build_attempt(
+        in_memory_config("campaign-attempt-lease-transfer", {}),
+        object.__new__(Device),
+        job,
+        session,
+        AbortToken(),
+    )
+
+    with pytest.raises(CampaignRuntimeEvidenceError, match="already claimed"):
+        attempt.runtime.take_profile_lease()
+
+    attempt.release(RuntimeSessionOutcome.INTERRUPTED)
+
+
 def test_runtime_factory_opens_complete_hard_session_before_publication() -> None:
     _FakeDeclarativeRuntime.created.clear()
     factory = DeclarativeCampaignRuntimeFactory(_FakeDeclarativeRuntime)
@@ -962,6 +981,8 @@ def test_runtime_factory_opens_complete_hard_session_before_publication() -> Non
     runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
     assert session.stage == stage
     assert session.remaining == 1
+    with pytest.raises(CampaignRuntimeEvidenceError, match="already claimed"):
+        runtime.take_profile_lease()
     session.close()
     session.close()
     assert runtime.calls.count("reset_runtime") == 1
@@ -1464,7 +1485,7 @@ def test_campaign_attempt_is_poisoned_before_session_cleanup_can_fail() -> None:
         session.definition,
     )
     runtime._runtime_profile_lease = lease  # ruff:ignore[private-member-access] - 注入关闭失败的真实 lease。
-    attempt = Mumu12CampaignAttempt(runtime, job, session, device, AbortToken())
+    attempt = Mumu12CampaignAttempt(runtime, runtime.take_profile_lease(), job, session, device, AbortToken())
     lease.start()
 
     with pytest.raises(RuntimeError) as raised:
@@ -1515,10 +1536,9 @@ def test_campaign_attempt_preserves_initialization_and_cleanup_failures() -> Non
         device,
         session.definition,
     )
-    runtime._runtime_profile_lease = RuntimeProfileLease(  # ruff:ignore[private-member-access] - 注入双失败 lease。
-        _CleanupFailingProfile()
-    )
-    attempt = Mumu12CampaignAttempt(runtime, job, session, device, AbortToken())
+    lease = RuntimeProfileLease(_CleanupFailingProfile())
+    runtime._runtime_profile_lease = lease  # ruff:ignore[private-member-access] - 注入双失败 lease。
+    attempt = Mumu12CampaignAttempt(runtime, runtime.take_profile_lease(), job, session, device, AbortToken())
     with pytest.raises(BaseExceptionGroup) as raised:
         attempt.initialize(CampaignRunVariant.NORMAL)
 
@@ -1550,7 +1570,7 @@ def test_campaign_attempt_maps_map_initialization_abort_to_interrupted() -> None
     )
     job = _job()
     session = CampaignSession(runtime.definition, CampaignRunVariant.NORMAL)
-    attempt = Mumu12CampaignAttempt(runtime, job, session, device, AbortToken())
+    attempt = Mumu12CampaignAttempt(runtime, runtime.take_profile_lease(), job, session, device, AbortToken())
 
     with pytest.raises(AbortRequested) as raised:
         attempt.initialize(session.variant)
@@ -2820,7 +2840,8 @@ def test_hard_port_preserves_attempt_discovery_and_cleanup_failures() -> None:
     assert raised.value.exceptions == (discovery_error, cleanup_error)
     assert port._session is None  # ruff:ignore[private-member-access] - discovery 失败不得发布半初始化 session。
     runtime = cast("_CleanupFailingRuntime", _CleanupFailingRuntime.created[0])
-    assert runtime._runtime_profile_lease.state is RuntimeProfileLeaseState.CLOSED  # ruff:ignore[private-member-access] - session 即使 cleanup 失败也必须关闭唯一 lease。
+    with pytest.raises(CampaignRuntimeEvidenceError, match="already claimed"):
+        runtime.take_profile_lease()
     assert runtime.calls.count("discard_runtime") == 1
     assert runtime.calls[-1] == "discard_runtime"
 

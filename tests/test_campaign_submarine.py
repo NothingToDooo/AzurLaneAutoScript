@@ -257,7 +257,7 @@ class _SessionManager:
         self.events.append("reset")
 
 
-class _SessionRuntime:
+class _SessionRuntime(DeclarativeCampaignMapRuntime):
     FUNCTION_NAME_BASE = "SESSION_TEST_"
     _map_initialization_service: CampaignMapInitializationService
     _program_capabilities: CampaignProgramCapabilityReader
@@ -282,14 +282,16 @@ class _SessionRuntime:
     def map_control_init(self) -> None:
         self.events.append("map_control_init")
 
-    @staticmethod
     def combat(
+        self,
         *,
-        balance_hp: bool,
-        emotion_reduce: bool,
-        expected_end: CombatEnd | None,
-    ) -> object:
-        del balance_hp, emotion_reduce, expected_end
+        balance_hp: bool | None = None,
+        emotion_reduce: bool | None = None,
+        submarine_mode: str | None = None,
+        expected_end: CombatEnd | None = None,
+        fleet_index: int = 1,
+    ) -> None:
+        del self, balance_hp, emotion_reduce, submarine_mode, expected_end, fleet_index
         message = "campaign attempt test injects its fresh combat handler"
         raise AssertionError(message)
 
@@ -309,6 +311,7 @@ def _attempt(
     device = object.__new__(Device)
     attempt = Mumu12CampaignAttempt(
         cast("DeclarativeCampaignMapRuntime", runtime),
+        runtime.take_profile_lease(),
         cast("CampaignJobSpec", SimpleNamespace(kind=CampaignJobKind.STANDARD)),
         cast("CampaignSession", SimpleNamespace()),
         device,
@@ -407,11 +410,12 @@ def test_real_chapter_16_profiles_wire_only_the_early_submarine_services(
 
     assert runtime.handle_submarine_support_popup() is expected_submarine
     assert popup_calls == (["SUBMARINE_SUPPORT"] if expected_submarine else [])
-    runtime._runtime_profile_lease.start()  # ruff:ignore[private-member-access] - direct hard-style lease boundary must not execute owner hooks.
+    lease = runtime.take_profile_lease()
+    lease.start()
     assert combat_calls == []
-    runtime._submarine_services.fresh_combat.start(runtime)  # ruff:ignore[private-member-access] - 验证生产 profile 编译出的 typed hook。
+    runtime.fresh_combat_service.start(runtime)
     assert combat_calls == (["combat"] if expected_submarine else [])
-    runtime._runtime_profile_lease.close(RuntimeSessionOutcome.COMPLETED)  # ruff:ignore[private-member-access] - 完整关闭纯内存 session。
+    lease.close(RuntimeSessionOutcome.COMPLETED)
 
     assert (_POPUP_ID in implementation_ids) is expected_submarine
     assert (_FRESH_COMBAT_ID in implementation_ids) is expected_submarine

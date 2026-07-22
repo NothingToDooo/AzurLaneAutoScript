@@ -11,7 +11,7 @@ from module.adapters.campaign_map_initialization import (
     CampaignMapInitializationService,
     build_campaign_map_initialization_service,
 )
-from module.adapters.campaign_mumu12 import Mumu12CampaignAttempt
+from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime, Mumu12CampaignAttempt
 from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
 from module.adapters.campaign_runtime_implementations import load_default_campaign_runtime_executor_registry
 from module.adapters.campaign_runtime_profile import (
@@ -43,7 +43,6 @@ from module.map_detection.utils_assets import ASSETS
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
     from module.combat.combat import CombatEnd
     from module.content.campaign_session import CampaignSession
     from module.gameplay.campaign import CampaignJobSpec
@@ -162,7 +161,7 @@ def test_manager_accessor_preserves_cross_kind_profile_order_for_initialization(
     ]
 
 
-class _Runtime:
+class _Runtime(DeclarativeCampaignMapRuntime):
     FUNCTION_NAME_BASE = "INITIALIZATION_TEST_"
     _map_initialization_service: CampaignMapInitializationService
     _program_capabilities: CampaignProgramCapabilityReader
@@ -193,15 +192,16 @@ class _Runtime:
             message = "control failed"
             raise RuntimeError(message)
 
-    @staticmethod
     def combat(
+        self,
         *,
-        balance_hp: bool,
-        emotion_reduce: bool,
-        expected_end: CombatEnd | None,
-    ) -> object:
-        del balance_hp, emotion_reduce, expected_end
-        return None
+        balance_hp: bool | None = None,
+        emotion_reduce: bool | None = None,
+        submarine_mode: str | None = None,
+        expected_end: CombatEnd | None = None,
+        fleet_index: int = 1,
+    ) -> None:
+        del self, balance_hp, emotion_reduce, submarine_mode, expected_end, fleet_index
 
     @staticmethod
     def assert_mask_installed() -> None:
@@ -260,6 +260,7 @@ def _attempt(
     device = object.__new__(Device)
     return Mumu12CampaignAttempt(
         cast("DeclarativeCampaignMapRuntime", runtime),
+        runtime.take_profile_lease(),
         cast("CampaignJobSpec", SimpleNamespace(kind=CampaignJobKind.STANDARD)),
         cast("CampaignSession", SimpleNamespace()),
         device,

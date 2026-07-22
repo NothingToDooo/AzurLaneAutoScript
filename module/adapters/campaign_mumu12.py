@@ -105,7 +105,7 @@ if TYPE_CHECKING:
     from module.adapters.campaign_map_initialization import CampaignMapInitializationService
     from module.adapters.campaign_profile_services import CampaignProfileServices
     from module.adapters.campaign_program_capabilities import CampaignProgramCapabilityReader
-    from module.adapters.campaign_submarine import CampaignSubmarineServices
+    from module.adapters.campaign_submarine import CampaignSubmarineFreshCombatService, CampaignSubmarineServices
     from module.application import CancellationSource
     from module.base.button import Button
     from module.combat.combat import CombatEnd
@@ -437,7 +437,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     _profile_services: CampaignProfileServices
     _submarine_services: CampaignSubmarineServices
     _runtime_profile: CampaignRuntimeProfileManager
-    _runtime_profile_lease: RuntimeProfileLease
+    _runtime_profile_lease: RuntimeProfileLease | None
     grid_class: type[Grid]
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD: float
     MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD: float
@@ -512,6 +512,36 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     @property
     def configured_boss_fleet(self) -> int:
         return self._configured_boss_fleet
+
+    @property
+    def supports_hard_clear_mode(self) -> bool:
+        return isinstance(self._hard_behavior, CampaignClearModeExecutor)
+
+    @property
+    def map_initialization_service(self) -> CampaignMapInitializationService:
+        return self._map_initialization_service
+
+    @property
+    def fresh_combat_service(self) -> CampaignSubmarineFreshCombatService:
+        return self._submarine_services.fresh_combat
+
+    @property
+    def program_state(self) -> RuntimeProgramState:
+        return self._runtime_profile
+
+    @property
+    def program_capabilities(self) -> CampaignProgramCapabilityReader:
+        return self._program_capabilities
+
+    def take_profile_lease(self) -> RuntimeProfileLease:
+        """把唯一 profile lease 一次性交给 attempt 或 hard session。"""
+
+        lease = self._runtime_profile_lease
+        if lease is None:
+            message = "campaign runtime profile lease already claimed"
+            raise CampaignRuntimeEvidenceError(message)
+        self._runtime_profile_lease = None
+        return lease
 
     def _map_transition_expected_end(self, expected: str) -> CombatEnd | None:
         transition_override = self._map_transition_ui.combat_end_override(self)
@@ -639,9 +669,10 @@ class Mumu12CampaignAttempt:
         "runtime",
     )
 
-    def __init__(
+    def __init__(  # ruff:ignore[too-many-arguments,too-many-positional-arguments] - attempt 直接接收唯一 lease 与完整运行事实，不再包装 assembly。
         self,
         runtime: DeclarativeCampaignMapRuntime,
+        lease: RuntimeProfileLease,
         job: CampaignJobSpec,
         session: CampaignSession,
         device: Device,
@@ -654,11 +685,11 @@ class Mumu12CampaignAttempt:
         self._at_boundary = False
         self._entrance: Button | None = None
         self._device = device
-        self._lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - attempt 接管 runtime 的唯一 lease。
-        self._fresh_combat = runtime._submarine_services.fresh_combat  # ruff:ignore[private-member-access] - attempt 固化 profile hook。
-        self._initialization = runtime._map_initialization_service  # ruff:ignore[private-member-access] - attempt 固化初始化服务。
-        self._program_state = runtime._runtime_profile  # ruff:ignore[private-member-access] - attempt 只暴露窄 program state。
-        self._program_capabilities = runtime._program_capabilities  # ruff:ignore[private-member-access] - attempt 只暴露已编译能力。
+        self._lease = lease
+        self._fresh_combat = runtime.fresh_combat_service
+        self._initialization = runtime.map_initialization_service
+        self._program_state = runtime.program_state
+        self._program_capabilities = runtime.program_capabilities
         self.refresh_cancellation(cancellation)
 
     @property
@@ -799,9 +830,9 @@ class Mumu12HardCampaignSession:
         cancellation: CancellationSource,
         remaining_reader: Callable[[Device], int],
     ) -> Mumu12HardCampaignSession:
-        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - session 接管 runtime 的唯一 lease。
+        lease = runtime.take_profile_lease()
         try:
-            cls._require_hard_behavior(runtime)
+            cls._require_hard_behavior(supported=runtime.supports_hard_clear_mode)
             cls._require_cancellation(cancellation)
             runtime.device = cast(
                 "Device",
@@ -830,11 +861,8 @@ class Mumu12HardCampaignSession:
         return self._remaining
 
     @staticmethod
-    def _require_hard_behavior(runtime: DeclarativeCampaignMapRuntime) -> None:
-        if not isinstance(
-            runtime._hard_behavior,  # ruff:ignore[private-member-access] - capability 必须在任何交互前验证。
-            CampaignClearModeExecutor,
-        ):
+    def _require_hard_behavior(*, supported: bool) -> None:
+        if not supported:
             message = "hard campaign session requires the typed clear-mode behavior"
             raise CampaignRuntimeProfileError(message)
 
@@ -957,10 +985,11 @@ class DeclarativeCampaignRuntimeFactory:
     ) -> Mumu12CampaignAttempt:
         definition = compose_campaign_attempt_definition(session.definition, job.difficulty)
         runtime = self._build_runtime(config, device, definition)
-        lease = runtime._runtime_profile_lease  # ruff:ignore[private-member-access] - factory 接管 runtime 构造的唯一 lease。
+        lease = runtime.take_profile_lease()
         try:
             return Mumu12CampaignAttempt(
                 runtime,
+                lease,
                 job,
                 session,
                 device,
