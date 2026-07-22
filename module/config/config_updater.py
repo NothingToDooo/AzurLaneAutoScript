@@ -28,7 +28,7 @@ from module.content.activity_profile import CoalitionDefinition, CoalitionFleetR
 from module.content.manifest import load_default_event_manifests, render_campaign_readme
 from module.content.models import EventPack, EventRelease
 from module.project_paths import PROJECT_ROOT
-from module.task_registry import TASK_CATALOG, command_to_config_name, get_task_definition
+from module.task_registry import TASK_SPECS, get_task_by_config_name, get_task_spec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -69,7 +69,7 @@ COALITIONS = ["Coalition", "CoalitionSp"]
 MARITIME_ESCORTS = ["MaritimeEscort"]
 HOSPITAL = ["Hospital"]
 CONFIG_SCOPE_TASKS = frozenset(
-    {"Alas", "General"} | {scope for definition in TASK_CATALOG.values() for scope in definition.config_scopes}
+    {"Alas", "General"} | {scope for spec in TASK_SPECS.values() for scope in spec.config_scopes}
 )
 INTERVAL_ARGUMENTS = frozenset({"SuccessInterval", "FailureInterval"})
 OVERRIDE_METADATA_FIELDS = frozenset(
@@ -259,7 +259,7 @@ class ConfigGenerator:
 
     @cached_property
     def task(self) -> MutableDeepData:
-        """读取 task.yaml 的 `<task_group>.<task>.{command, groups}` 结构。"""
+        """读取 task.yaml 的 `<task_group>.<task>.groups` 结构。"""
         return read_file(self._task_path)
 
     @cached_property
@@ -299,21 +299,12 @@ class ConfigGenerator:
             message = f"task node must be a mapping: {task}"
             raise TypeError(message)
         node_data = cast("dict[str, DeepValue]", node)
-        if set(node_data) - {"command", "groups"}:
+        if set(node_data) - {"groups"}:
             message = f"invalid task node: {task}"
             raise ValueError(message)
         groups = self._parse_task_groups(task, node_data.get("groups"))
-
-        command = node_data.get("command")
-        if command is None:
-            return None, groups
-        if not isinstance(command, str) or get_task_definition(command) is None:
-            message = f"unknown task command: {command}"
-            raise ValueError(message)
-        if command_to_config_name(command) != task:
-            message = f"task command does not match config node: {command} != {task}"
-            raise ValueError(message)
-        return command, groups
+        spec = get_task_by_config_name(task)
+        return (None if spec is None else spec.command), groups
 
     @staticmethod
     def _validate_task_placement(task: str, command: str | None, groups: tuple[str, ...], *, is_tool: bool) -> None:
@@ -329,18 +320,18 @@ class ConfigGenerator:
                 raise ValueError(message)
             return
 
-        definition = get_task_definition(command)
-        if definition is None:
+        spec = get_task_spec(command)
+        if spec is None:
             message = f"unknown task command: {command}"
             raise ValueError(message)
         is_scheduled = "Scheduler" in groups
         if is_scheduled:
-            if is_tool or definition.execution_mode is not ExecutionMode.SCHEDULED_JOB:
+            if is_tool or spec.execution_mode is not ExecutionMode.SCHEDULED_JOB:
                 message = f"task execution mode does not allow Scheduler: {task}"
                 raise ValueError(message)
             return
         if is_tool:
-            if definition.execution_mode is ExecutionMode.SCHEDULED_JOB:
+            if spec.execution_mode is ExecutionMode.SCHEDULED_JOB:
                 message = f"task execution mode does not allow tool page: {task}"
                 raise ValueError(message)
             return

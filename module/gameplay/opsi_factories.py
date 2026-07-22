@@ -263,7 +263,7 @@ class _OpsiTaskFactory:
         if not isinstance(context, TaskBuildContext):
             message = "context must be a TaskBuildContext"
             raise TypeError(message)
-        if context.definition.command != self._operation.value:
+        if context.spec.command != self._operation.value:
             message = "TaskBuildContext definition does not match Operation Siren factory"
             raise ValueError(message)
         decoder = SettingsDecoder(context.settings, path=f"$.tasks.{self._operation.value}")

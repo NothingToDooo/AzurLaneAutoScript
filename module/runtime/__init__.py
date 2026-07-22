@@ -8,7 +8,14 @@ from module.runtime.errors import (
     TaskStateDocumentError,
     UnknownTaskError,
 )
-from module.runtime.factories import TaskBuildContext, TaskFactory, TaskFactoryRegistry
+from module.runtime.factories import (
+    TaskBinding,
+    TaskBuildContext,
+    TaskBuilder,
+    TaskFactory,
+    bind_tasks,
+    validate_task_bindings,
+)
 from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner
 from module.runtime.settings import (
     FrozenJsonValue,
@@ -31,12 +38,15 @@ __all__ = [
     "RuntimeRunner",
     "SettingsDecoder",
     "SettingsDocumentError",
+    "TaskBinding",
     "TaskBuildContext",
+    "TaskBuilder",
     "TaskFactory",
-    "TaskFactoryRegistry",
     "TaskStateDocument",
     "TaskStateDocumentError",
     "TaskStateEntry",
     "TypedTaskFactory",
     "UnknownTaskError",
+    "bind_tasks",
+    "validate_task_bindings",
 ]

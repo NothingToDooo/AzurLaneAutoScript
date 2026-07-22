@@ -1,11 +1,12 @@
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol
 
-from module.runtime.errors import FactoryCoverageError, InvalidTaskFactoryError, UnknownTaskError
+from module.application import TaskId
+from module.runtime.errors import FactoryCoverageError, InvalidTaskFactoryError
 from module.runtime.task_state import TaskStateDocument
-from module.task_registry import TaskDefinition
+from module.task_registry import TaskSpec
 
 if TYPE_CHECKING:
     from module.application import Task
@@ -16,17 +17,27 @@ class TaskFactory(Protocol):
     def build(self, context: TaskBuildContext) -> Task: ...
 
 
+class TaskBuilder(Protocol):
+    def __call__(
+        self,
+        spec: TaskSpec,
+        settings_revision: int,
+        content_revision: str,
+        task_state: TaskStateDocument,
+    ) -> Task: ...
+
+
 @dataclass(frozen=True, slots=True)
 class TaskBuildContext:
-    definition: TaskDefinition
+    spec: TaskSpec
     settings_revision: int
     content_revision: str
     settings: FrozenTaskSettings
     task_state: TaskStateDocument
 
     def __post_init__(self) -> None:
-        if not isinstance(self.definition, TaskDefinition):
-            message = "definition must be a TaskDefinition"
+        if not isinstance(self.spec, TaskSpec):
+            message = "spec must be a TaskSpec"
             raise TypeError(message)
         if type(self.settings_revision) is not int or self.settings_revision <= 0:
             message = "settings_revision must be a positive integer"
@@ -38,8 +49,8 @@ class TaskBuildContext:
         if not isinstance(self.task_state, TaskStateDocument):
             message = "task_state must be a TaskStateDocument"
             raise TypeError(message)
-        if self.task_state.namespace != self.definition.command:
-            message = "task_state namespace must match definition command"
+        if self.task_state.namespace != self.spec.command:
+            message = "task_state namespace must match spec command"
             raise ValueError(message)
 
 
@@ -52,189 +63,152 @@ def _validate_revision(value: str, *, field_name: str) -> None:
         raise ValueError(message)
 
 
-def _validated_content_revisions(
-    content_revisions: Mapping[str, str],
-    *,
-    catalog: Mapping[str, TaskDefinition],
-) -> dict[str, str]:
-    if not isinstance(content_revisions, Mapping):
-        message = "content_revisions must be a mapping"
-        raise TypeError(message)
-    revision_copy = dict(content_revisions)
-    if any(not isinstance(key, str) for key in revision_copy):
-        message = "content_revisions must use task id strings"
-        raise TypeError(message)
-    if set(revision_copy) != set(catalog):
-        missing = sorted(set(catalog) - set(revision_copy))
-        unknown = sorted(set(revision_copy) - set(catalog))
-        message = f"content revision coverage mismatch: missing={missing}, unknown={unknown}"
-        raise FactoryCoverageError(message)
-    for task_id, revision in revision_copy.items():
-        _validate_revision(revision, field_name=f"content_revisions[{task_id!r}]")
-    return revision_copy
+@dataclass(frozen=True, slots=True)
+class TaskBinding:
+    """持有一次运行构造 Task 所需的全部不可变输入。"""
 
+    spec: TaskSpec
+    settings_revision: int
+    content_revision: str
+    builder: TaskBuilder
 
-def _selected_task_ids(
-    task_ids: Iterable[str] | None,
-    *,
-    catalog: Mapping[str, TaskDefinition],
-) -> tuple[str, ...]:
-    if isinstance(task_ids, str):
-        message = "task_ids must be an iterable of task id strings"
-        raise TypeError(message)
-    selected = tuple(catalog) if task_ids is None else tuple(task_ids)
-    if any(not isinstance(task_id, str) for task_id in selected):
-        message = "task_ids must contain strings"
-        raise TypeError(message)
-    if len(set(selected)) != len(selected):
-        message = "task_ids must not contain duplicates"
-        raise ValueError(message)
-    unknown = sorted(set(selected) - set(catalog))
-    if unknown:
-        message = f"task_ids contain unknown tasks: {unknown}"
-        raise UnknownTaskError(message)
-    return selected
-
-
-class TaskFactoryRegistry:
-    """绑定各 task 内容 revision，并精确覆盖 catalog 的不可变 factory 集。"""
-
-    __slots__ = ("_catalog", "_content_revisions", "_factories")
-
-    def __init__(
-        self,
-        *,
-        catalog: Mapping[str, TaskDefinition],
-        factories: Mapping[str, TaskFactory],
-        content_revisions: Mapping[str, str],
-    ) -> None:
-        if not isinstance(catalog, Mapping):
-            message = "catalog must be a mapping"
+    def __post_init__(self) -> None:
+        if not isinstance(self.spec, TaskSpec):
+            message = "binding spec must be a TaskSpec"
             raise TypeError(message)
-        if not isinstance(factories, Mapping):
-            message = "factories must be a mapping"
+        if type(self.settings_revision) is not int or self.settings_revision <= 0:
+            message = "binding settings_revision must be a positive integer"
+            raise ValueError(message)
+        _validate_revision(self.content_revision, field_name="binding content_revision")
+        if not callable(self.builder):
+            message = "binding builder must be callable"
             raise TypeError(message)
 
-        catalog_copy = dict(catalog)
-        if any(
-            not isinstance(key, str) or not isinstance(value, TaskDefinition) for key, value in catalog_copy.items()
-        ):
-            message = "catalog must map task id strings to TaskDefinition values"
-            raise TypeError(message)
-        incoherent = sorted(key for key, definition in catalog_copy.items() if definition.command != key)
-        if incoherent:
-            message = f"catalog keys must match definition commands: {incoherent}"
-            raise FactoryCoverageError(message)
-
-        factory_copy = dict(factories)
-        invalid = sorted(
-            key
-            for key, factory in factory_copy.items()
-            if not isinstance(key, str) or isinstance(factory, type) or not callable(getattr(factory, "build", None))
-        )
-        if invalid:
-            message = f"factories must implement build(): {invalid}"
-            raise TypeError(message)
-        if set(factory_copy) != set(catalog_copy):
-            missing = sorted(set(catalog_copy) - set(factory_copy))
-            unknown = sorted(set(factory_copy) - set(catalog_copy))
-            message = f"factory coverage mismatch: missing={missing}, unknown={unknown}"
-            raise FactoryCoverageError(message)
-
-        revision_copy = _validated_content_revisions(content_revisions, catalog=catalog_copy)
-
-        self._catalog = MappingProxyType(catalog_copy)
-        self._factories = MappingProxyType(factory_copy)
-        self._content_revisions = MappingProxyType(revision_copy)
-
-    @property
-    def task_ids(self) -> tuple[str, ...]:
-        return tuple(self._catalog)
-
-    @property
-    def catalog(self) -> Mapping[str, TaskDefinition]:
-        return self._catalog
-
-    def definition(self, task_id: str) -> TaskDefinition:
-        try:
-            return self._catalog[task_id]
-        except KeyError:
-            message = f"unknown task: {task_id}"
-            raise UnknownTaskError(message) from None
-
-    def factory(self, task_id: str) -> TaskFactory:
-        try:
-            return self._factories[task_id]
-        except KeyError:
-            message = f"unknown task: {task_id}"
-            raise UnknownTaskError(message) from None
-
-    def content_revision_for(self, task_id: str) -> str:
-        try:
-            return self._content_revisions[task_id]
-        except KeyError:
-            message = f"unknown task: {task_id}"
-            raise UnknownTaskError(message) from None
-
-    def build(
-        self,
-        task_id: str,
-        settings: FrozenTaskSettings,
-        settings_revision: int,
-        task_state: TaskStateDocument,
-    ) -> Task:
+    def build(self, task_state: TaskStateDocument) -> Task:
         if not isinstance(task_state, TaskStateDocument):
             message = "task_state must be a TaskStateDocument"
             raise TypeError(message)
-        if task_state.namespace != task_id:
-            message = "task_state namespace must match task_id"
+        if task_state.namespace != self.spec.command:
+            message = "task_state namespace must match binding spec"
             raise ValueError(message)
-        definition = self.definition(task_id)
-        context = TaskBuildContext(
-            definition=definition,
-            settings_revision=settings_revision,
-            content_revision=self.content_revision_for(task_id),
-            settings=settings,
-            task_state=task_state,
+        task = self.builder(
+            self.spec,
+            self.settings_revision,
+            self.content_revision,
+            task_state,
         )
-        task = self.factory(task_id).build(context)
         if isinstance(task, type) or not callable(getattr(task, "run", None)):
-            message = f"factory for {task_id!r} must return a Task"
+            message = f"factory for {self.spec.command!r} must return a Task"
             raise InvalidTaskFactoryError(message)
         return task
 
-    def validate_settings(
+
+@dataclass(frozen=True, slots=True)
+class _FrozenSettingsTaskBuilder:
+    factory: TaskFactory
+    settings: FrozenTaskSettings
+
+    def __call__(
         self,
-        settings: Mapping[str, FrozenTaskSettings],
-        settings_revisions: Mapping[str, int],
-        *,
-        task_ids: Iterable[str] | None = None,
-    ) -> None:
-        if not isinstance(settings, Mapping):
-            message = "settings must be a mapping"
-            raise TypeError(message)
-        if not isinstance(settings_revisions, Mapping):
-            message = "settings_revisions must be a mapping"
-            raise TypeError(message)
-        if any(not isinstance(task_id, str) for task_id in settings):
-            message = "settings must use task id strings"
-            raise TypeError(message)
-        if any(not isinstance(task_id, str) for task_id in settings_revisions):
-            message = "settings_revisions must use task id strings"
-            raise TypeError(message)
-        selected = _selected_task_ids(task_ids, catalog=self._catalog)
-        missing_settings = sorted(set(selected) - set(settings))
-        missing_revisions = sorted(set(selected) - set(settings_revisions))
-        if missing_settings or missing_revisions:
-            message = (
-                "selected settings coverage mismatch: "
-                f"missing_settings={missing_settings}, missing_revisions={missing_revisions}"
+        spec: TaskSpec,
+        settings_revision: int,
+        content_revision: str,
+        task_state: TaskStateDocument,
+    ) -> Task:
+        return self.factory.build(
+            TaskBuildContext(
+                spec=spec,
+                settings_revision=settings_revision,
+                content_revision=content_revision,
+                settings=self.settings,
+                task_state=task_state,
             )
+        )
+
+
+def bind_tasks(
+    *,
+    specs: Mapping[str, TaskSpec],
+    factories: Mapping[str, TaskFactory],
+    settings: Mapping[str, FrozenTaskSettings],
+    settings_revisions: Mapping[str, int],
+    content_revisions: Mapping[str, str],
+) -> Mapping[TaskId, TaskBinding]:
+    """把静态 spec、运行依赖和已编译配置收敛成唯一 binding 表。"""
+
+    for field_name, value in (
+        ("specs", specs),
+        ("factories", factories),
+        ("settings", settings),
+        ("settings_revisions", settings_revisions),
+        ("content_revisions", content_revisions),
+    ):
+        if not isinstance(value, Mapping):
+            message = f"{field_name} must be a mapping"
+            raise TypeError(message)
+
+    spec_copy = dict(specs)
+    if any(not isinstance(key, str) or not isinstance(spec, TaskSpec) for key, spec in spec_copy.items()):
+        message = "specs must map task id strings to TaskSpec values"
+        raise TypeError(message)
+    incoherent = sorted(key for key, spec in spec_copy.items() if key != spec.command)
+    if incoherent:
+        message = f"spec keys must match commands: {incoherent}"
+        raise FactoryCoverageError(message)
+
+    factory_copy = dict(factories)
+    invalid_factories = sorted(
+        key
+        for key, factory in factory_copy.items()
+        if not isinstance(key, str) or isinstance(factory, type) or not callable(getattr(factory, "build", None))
+    )
+    if invalid_factories:
+        message = f"factories must implement build(): {invalid_factories}"
+        raise TypeError(message)
+
+    required = set(spec_copy)
+    for field_name, keys in (
+        ("factory", set(factory_copy)),
+        ("content revision", set(content_revisions)),
+    ):
+        if keys != required:
+            missing = sorted(required - keys)
+            unknown = sorted(keys - required)
+            message = f"{field_name} coverage mismatch: missing={missing}, unknown={unknown}"
             raise FactoryCoverageError(message)
-        for task_id in selected:
-            self.build(
-                task_id,
-                settings[task_id],
-                settings_revisions[task_id],
-                TaskStateDocument.empty(task_id),
-            )
+    missing_settings = sorted(required - set(settings))
+    missing_revisions = sorted(required - set(settings_revisions))
+    if missing_settings or missing_revisions:
+        message = (
+            "task settings coverage mismatch: "
+            f"missing_settings={missing_settings}, missing_revisions={missing_revisions}"
+        )
+        raise FactoryCoverageError(message)
+
+    bindings = {
+        TaskId(task_id): TaskBinding(
+            spec=spec,
+            settings_revision=settings_revisions[task_id],
+            content_revision=content_revisions[task_id],
+            builder=_FrozenSettingsTaskBuilder(
+                factory=factory_copy[task_id],
+                settings=settings[task_id],
+            ),
+        )
+        for task_id, spec in spec_copy.items()
+    }
+    return MappingProxyType(bindings)
+
+
+def validate_task_bindings(bindings: Mapping[TaskId, TaskBinding]) -> None:
+    if not isinstance(bindings, Mapping):
+        message = "bindings must be a mapping"
+        raise TypeError(message)
+    for task_id, binding in bindings.items():
+        if not isinstance(task_id, TaskId) or not isinstance(binding, TaskBinding):
+            message = "bindings must map TaskId values to TaskBinding values"
+            raise TypeError(message)
+        if binding.spec.command != task_id.value:
+            message = f"binding key must match spec command: {task_id.value}"
+            raise FactoryCoverageError(message)
+        binding.build(TaskStateDocument.empty(task_id.value))

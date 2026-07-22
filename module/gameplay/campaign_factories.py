@@ -542,7 +542,7 @@ class _CampaignTaskFactory:
         if not isinstance(context, TaskBuildContext):
             message = "context must be a TaskBuildContext"
             raise TypeError(message)
-        if context.definition.command != self._command:
+        if context.spec.command != self._command:
             message = f"campaign factory requires the {self._command!r} task definition"
             raise ValueError(message)
         decoder = SettingsDecoder(context.settings, path=f"$.tasks.{self._command}")

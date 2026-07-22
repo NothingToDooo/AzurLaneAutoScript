@@ -145,7 +145,7 @@ class _ExerciseFactory:
         self._workflow = workflow
 
     def build(self, context: TaskBuildContext) -> ExerciseTask:
-        decoder = SettingsDecoder(context.settings, path=f"$.tasks.{context.definition.command}")
+        decoder = SettingsDecoder(context.settings, path=f"$.tasks.{context.spec.command}")
         settings = _exercise_settings(decoder)
         decoder.finish()
         return ExerciseTask(self._workflow, settings, _exercise_progress(context))

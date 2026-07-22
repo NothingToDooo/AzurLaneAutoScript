@@ -56,7 +56,7 @@ from module.runtime import (
     TaskStateDocumentError,
     TaskStateEntry,
 )
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from module.application import CancellationSource
@@ -280,7 +280,7 @@ def _context(
     task_state: TaskStateDocument | None = None,
 ) -> TaskBuildContext:
     return TaskBuildContext(
-        definition=TASK_CATALOG[command],
+        spec=TASK_SPECS[command],
         settings_revision=3,
         content_revision=content_revision,
         settings=MappingProxyType(settings),

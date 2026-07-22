@@ -16,7 +16,7 @@ from module.notify.configuration import (
     SmtpNotificationConfig,
     SmtpTransport,
 )
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from module.config.deep import MutableDeepData
@@ -41,8 +41,8 @@ def test_current_schema_rejects_duplicate_json_fields(tmp_path: Path) -> None:
 def test_template_compiles_to_exact_runtime_task_and_schedule_coverage() -> None:
     compiled = WebConfigurationCompiler().compile(_template())
 
-    assert set(compiled.tasks) == set(TASK_CATALOG)
-    assert set(compiled.task_revisions) == set(TASK_CATALOG)
+    assert set(compiled.tasks) == set(TASK_SPECS)
+    assert set(compiled.task_revisions) == set(TASK_SPECS)
     assert all(revision > 0 for revision in compiled.task_revisions.values())
     assert compiled.device_serial == "127.0.0.1:16384"
     assert compiled.notification == DisabledNotificationConfig()

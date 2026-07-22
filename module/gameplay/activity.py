@@ -33,7 +33,7 @@ from module.gameplay.validation import (
     validate_positive_duration,
     validate_positive_integer,
 )
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -75,7 +75,7 @@ def _require_method(value: object, method_name: str, *, field_name: str) -> None
 
 
 def _validate_context(context: TaskContext, command: str) -> None:
-    expected_mode = TASK_CATALOG[command].execution_mode
+    expected_mode = TASK_SPECS[command].execution_mode
     if context.task_id != TaskId(command):
         message = f"task context id must be {command!r}"
         raise ValueError(message)

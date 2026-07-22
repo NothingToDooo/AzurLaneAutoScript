@@ -37,9 +37,10 @@ from module.device.device import Device
 from module.diagnostics import ScreenshotHistory
 from module.equipment.equipment_code import EquipmentCodeHandler
 from module.notify.configuration import SmtpNotificationConfig, SmtpTransport
+from module.runtime.factories import validate_task_bindings
 from module.runtime.runner import CommandStatus, RuntimeRunner
 from module.state.config_repository import ConfigStateError, ConfigStateRepository
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -207,14 +208,14 @@ def test_scheduler_builder_builds_every_domain_from_personal_configuration(
     document = _template()
     config_factory, configs = _personal_config_factory(document)
 
-    compiled, registry, _repository, screenshots = _builder(config_factory=config_factory).build(
+    compiled, bindings, _repository, screenshots = _builder(config_factory=config_factory).build(
         document,
         clock=SystemLoopClock(),
     )
 
-    assert registry.content_revision_for("event_story") == "event-test"
-    assert registry.content_revision_for("main") == "campaign-test"
-    assert registry.content_revision_for("benchmark") == "builtin-content-v1"
+    assert bindings[TaskId("event_story")].content_revision == "event-test"
+    assert bindings[TaskId("main")].content_revision == "campaign-test"
+    assert bindings[TaskId("benchmark")].content_revision == "builtin-content-v1"
     assert isinstance(screenshots, ScreenshotHistory)
     assert configs[0].config_name == "alas"
     assert configs[0].Emulator_Serial == compiled.device_serial
@@ -239,7 +240,7 @@ def test_direct_benchmark_skips_campaign_content_and_builds_its_factory_once(
         lambda _services: {"benchmark": factory},
     )
 
-    compiled, registry, repository, _screenshots = PersonalRuntimeBuilder(
+    _compiled, bindings, repository, _screenshots = PersonalRuntimeBuilder(
         Path(),
         "benchmark",
         config_factory=config_factory,
@@ -248,9 +249,7 @@ def test_direct_benchmark_skips_campaign_content_and_builds_its_factory_once(
         campaign_revision=_ForbiddenRevision(),
     ).build(document, clock=SystemLoopClock())
     runner = RuntimeRunner(
-        factories=registry,
-        settings=compiled.tasks,
-        settings_revisions=compiled.task_revisions,
+        bindings=bindings,
         repository=repository,
         clock=SystemLoopClock(),
     )
@@ -259,7 +258,7 @@ def test_direct_benchmark_skips_campaign_content_and_builds_its_factory_once(
 
     assert outcome.status is CommandStatus.FINISHED
     assert outcome.last_task == "benchmark"
-    assert registry.task_ids == ("benchmark",)
+    assert tuple(bindings) == (TaskId("benchmark"),)
     assert factory.builds == 1
 
 
@@ -311,10 +310,10 @@ def test_complete_configuration_builds_the_exact_task_catalog(
         event_revision=_Revision("event-test"),
         campaign_revision=_Revision("campaign-test"),
     )
-    compiled, registry, _repository, _screenshots = builder.build(document, clock=SystemLoopClock())
+    _compiled, bindings, _repository, _screenshots = builder.build(document, clock=SystemLoopClock())
 
-    registry.validate_settings(compiled.tasks, compiled.task_revisions)
-    assert registry.task_ids == tuple(TASK_CATALOG)
+    validate_task_bindings(bindings)
+    assert tuple(task_id.value for task_id in bindings) == tuple(TASK_SPECS)
 
 
 def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications(

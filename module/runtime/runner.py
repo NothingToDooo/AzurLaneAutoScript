@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import Protocol, cast
 
 from module.application import (
     AbortRequested,
@@ -24,11 +24,9 @@ from module.application import (
     TaskId,
     TaskResult,
 )
-from module.runtime.factories import TaskFactoryRegistry
+from module.runtime.errors import UnknownTaskError
+from module.runtime.factories import TaskBinding
 from module.runtime.task_state import TaskStateDocument
-
-if TYPE_CHECKING:
-    from module.runtime.settings import FrozenTaskSettings
 
 
 class CommandStatus(StrEnum):
@@ -118,35 +116,34 @@ class RuntimeRunner:
     """串行执行一个固定配置的调度任务或调试命令。"""
 
     __slots__ = (
+        "_bindings",
         "_clock",
         "_coordinator",
-        "_factories",
         "_observer",
         "_repository",
         "_scheduler",
-        "_settings",
-        "_settings_revisions",
     )
 
-    def __init__(  # ruff:ignore[too-many-arguments] - runner 依赖在唯一 composition root 显式组装。
+    def __init__(
         self,
         *,
-        factories: TaskFactoryRegistry,
-        settings: Mapping[str, FrozenTaskSettings],
-        settings_revisions: Mapping[str, int],
+        bindings: Mapping[TaskId, TaskBinding],
         repository: RuntimeRepository,
         clock: RunnerClock,
         hoard_window: timedelta = timedelta(seconds=30),
         observer: ResultObserver | None = None,
     ) -> None:
-        if not isinstance(factories, TaskFactoryRegistry):
-            message = "factories must be a TaskFactoryRegistry"
+        if not isinstance(bindings, Mapping):
+            message = "bindings must be a mapping"
             raise TypeError(message)
-        if not isinstance(settings, Mapping):
-            message = "settings must be a mapping"
-            raise TypeError(message)
-        if not isinstance(settings_revisions, Mapping):
-            message = "settings_revisions must be a mapping"
+        binding_copy = dict(bindings)
+        if any(
+            not isinstance(task_id, TaskId)
+            or not isinstance(binding, TaskBinding)
+            or binding.spec.command != task_id.value
+            for task_id, binding in binding_copy.items()
+        ):
+            message = "bindings must map task ids to coherent TaskBinding values"
             raise TypeError(message)
         if isinstance(repository, type) or not all(
             callable(getattr(repository, method, None))
@@ -160,9 +157,7 @@ class RuntimeRunner:
         if observer is not None and not callable(observer):
             message = "observer must be callable or None"
             raise TypeError(message)
-        self._factories = factories
-        self._settings = MappingProxyType(dict(settings))
-        self._settings_revisions = MappingProxyType(dict(settings_revisions))
+        self._bindings = MappingProxyType(binding_copy)
         self._repository = repository
         self._clock = _require_clock(clock)
         self._observer = observer
@@ -182,8 +177,9 @@ class RuntimeRunner:
         return self._run_direct(command, active_abort)
 
     def _run_direct(self, command: str, abort: AbortToken) -> CommandOutcome:
-        definition = self._factories.definition(command)
-        result, bundle = self._execute(TaskId(command), definition.execution_mode, abort)
+        task_id = TaskId(command)
+        binding = self._binding(task_id)
+        result, bundle = self._execute(task_id, binding.spec.execution_mode, abort)
         return self._outcome(
             command,
             result,
@@ -248,20 +244,14 @@ class RuntimeRunner:
     ) -> tuple[TaskResult, str | None]:
         try:
             task_state = _require_task_state(self._repository.task_state(task_id))
-            task_id_value = task_id.value
-            settings_revision = self._settings_revisions[task_id_value]
-            task = self._factories.build(
-                task_id_value,
-                self._settings[task_id_value],
-                settings_revision,
-                task_state,
-            )
+            binding = self._binding(task_id)
+            task = binding.build(task_state)
             result = self._coordinator.execute(
                 task_id,
                 mode,
                 RunMetadata(
-                    settings_revision=settings_revision,
-                    content_revision=self._factories.content_revision_for(task_id_value),
+                    settings_revision=binding.settings_revision,
+                    content_revision=binding.content_revision,
                 ),
                 task,
                 abort=abort,
@@ -273,6 +263,13 @@ class RuntimeRunner:
             message = "result observer must return a string or None"
             raise TypeError(message)
         return result, bundle
+
+    def _binding(self, task_id: TaskId) -> TaskBinding:
+        try:
+            return self._bindings[task_id]
+        except KeyError:
+            message = f"unknown task: {task_id.value}"
+            raise UnknownTaskError(message) from None
 
     def _outcome(
         self,

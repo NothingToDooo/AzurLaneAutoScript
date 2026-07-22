@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
-from module.application import ExecutionMode, Succeeded, Task, TaskContext, TaskResult
+from module.application import ExecutionMode, Succeeded, Task, TaskContext, TaskId, TaskResult
 from module.runtime import (
     FactoryCoverageError,
     FrozenJsonValue,
@@ -12,16 +12,17 @@ from module.runtime import (
     InvalidTaskFactoryError,
     JsonValue,
     SettingsDocumentError,
+    TaskBinding,
     TaskBuildContext,
     TaskFactory,
-    TaskFactoryRegistry,
     TaskStateDocument,
     TaskStateDocumentError,
     TaskStateEntry,
-    UnknownTaskError,
+    bind_tasks,
+    validate_task_bindings,
 )
 from module.runtime.settings import freeze_task_settings
-from module.task_registry import TaskDefinition
+from module.task_registry import ContentRevisionPolicy, TaskDomain, TaskSpec
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -53,19 +54,21 @@ class _InvalidFactory:
         return object()
 
 
-def _definition(command: str, mode: ExecutionMode, *, priority: int | None) -> TaskDefinition:
-    return TaskDefinition(
+def _spec(command: str, mode: ExecutionMode, *, priority: int | None) -> TaskSpec:
+    return TaskSpec(
         command=command,
         config_scopes=(),
         priority=priority,
         execution_mode=mode,
+        domain=TaskDomain.MAINTENANCE,
+        content_revision_policy=ContentRevisionPolicy.BUILTIN,
     )
 
 
-def _catalog() -> dict[str, TaskDefinition]:
+def _specs() -> dict[str, TaskSpec]:
     return {
-        "restart": _definition("restart", ExecutionMode.SCHEDULED_JOB, priority=0),
-        "benchmark": _definition("benchmark", ExecutionMode.DIRECT_COMMAND, priority=None),
+        "restart": _spec("restart", ExecutionMode.SCHEDULED_JOB, priority=0),
+        "benchmark": _spec("benchmark", ExecutionMode.DIRECT_COMMAND, priority=None),
     }
 
 
@@ -88,33 +91,31 @@ def _settings(
     )
 
 
-def _registry(*, restart_factory: _Factory | None = None) -> TaskFactoryRegistry:
-    return TaskFactoryRegistry(
-        catalog=_catalog(),
+def _bindings(*, restart_factory: _Factory | None = None) -> Mapping[TaskId, TaskBinding]:
+    settings, revisions = _settings()
+    return bind_tasks(
+        specs=_specs(),
         factories={"restart": restart_factory or _Factory(), "benchmark": _Factory()},
+        settings=settings,
+        settings_revisions=revisions,
         content_revisions={"restart": "content-restart", "benchmark": "content-benchmark"},
     )
 
 
-def test_registry_builds_from_one_settings_revision_and_current_task_state() -> None:
+def test_binding_builds_from_one_settings_revision_and_current_task_state() -> None:
     factory = _Factory()
-    registry = _registry(restart_factory=factory)
+    bindings = _bindings(restart_factory=factory)
     task_state = TaskStateDocument(
         "restart",
         {"checkpoint": TaskStateEntry(schema_version=2, payload={"step": 4}, updated_at=_NOW)},
     )
 
-    settings, revisions = _settings()
-    registry.build(
-        "restart",
-        settings["restart"],
-        revisions["restart"],
-        task_state,
-    )
+    _settings_value, revisions = _settings()
+    bindings[TaskId("restart")].build(task_state)
 
     assert len(factory.contexts) == 1
     context = factory.contexts[0]
-    assert context.definition.command == "restart"
+    assert context.spec.command == "restart"
     assert context.settings_revision == revisions["restart"]
     assert context.content_revision == "content-restart"
     nested = cast("dict[str, FrozenJsonValue]", context.settings["nested"])
@@ -122,12 +123,11 @@ def test_registry_builds_from_one_settings_revision_and_current_task_state() -> 
     assert context.task_state.get("checkpoint") == task_state.get("checkpoint")
 
 
-def test_registry_settings_validation_builds_with_empty_task_state() -> None:
+def test_binding_validation_builds_with_empty_task_state() -> None:
     factory = _Factory()
-    registry = _registry(restart_factory=factory)
+    bindings = _bindings(restart_factory=factory)
 
-    settings, revisions = _settings()
-    registry.validate_settings(settings, revisions)
+    validate_task_bindings(bindings)
 
     assert len(factory.contexts) == 1
     assert factory.contexts[0].task_state == TaskStateDocument.empty("restart")
@@ -201,46 +201,46 @@ def test_task_settings_revisions_change_only_with_their_task_settings() -> None:
     assert changed_revisions["benchmark"] != baseline_revisions["benchmark"]
 
 
-def test_registry_requires_exact_factory_coverage_and_coherent_catalog_keys() -> None:
+def test_bind_tasks_requires_exact_factory_coverage_and_coherent_spec_keys() -> None:
+    settings, revisions = _settings()
     with pytest.raises(FactoryCoverageError, match="coverage mismatch"):
-        TaskFactoryRegistry(
-            catalog=_catalog(),
+        bind_tasks(
+            specs=_specs(),
             factories={"restart": _Factory()},
+            settings=settings,
+            settings_revisions=revisions,
             content_revisions={"restart": "content:1", "benchmark": "content:1"},
         )
     with pytest.raises(FactoryCoverageError, match="keys must match"):
-        TaskFactoryRegistry(
-            catalog={"renamed": _definition("restart", ExecutionMode.SCHEDULED_JOB, priority=0)},
+        bind_tasks(
+            specs={"renamed": _spec("restart", ExecutionMode.SCHEDULED_JOB, priority=0)},
             factories={"renamed": _Factory()},
+            settings={"renamed": settings["restart"]},
+            settings_revisions={"renamed": revisions["restart"]},
             content_revisions={"renamed": "content:1"},
         )
 
     with pytest.raises(FactoryCoverageError, match="content revision coverage mismatch"):
-        TaskFactoryRegistry(
-            catalog=_catalog(),
+        bind_tasks(
+            specs=_specs(),
             factories={"restart": _Factory(), "benchmark": _Factory()},
+            settings=settings,
+            settings_revisions=revisions,
             content_revisions={"restart": "content:1"},
         )
 
 
-def test_registry_rejects_unknown_task_and_invalid_factory_result() -> None:
-    registry = _registry()
-    with pytest.raises(UnknownTaskError, match="unknown task"):
-        registry.definition("removed")
-
-    invalid_registry = TaskFactoryRegistry(
-        catalog=_catalog(),
+def test_binding_rejects_invalid_factory_result() -> None:
+    settings, revisions = _settings()
+    bindings = bind_tasks(
+        specs=_specs(),
         factories={
             "restart": cast("TaskFactory", _InvalidFactory()),
-            "benchmark": registry.factory("benchmark"),
+            "benchmark": _Factory(),
         },
+        settings=settings,
+        settings_revisions=revisions,
         content_revisions={"restart": "content-restart", "benchmark": "content-benchmark"},
     )
-    settings, revisions = _settings()
     with pytest.raises(InvalidTaskFactoryError, match="must return a Task"):
-        invalid_registry.build(
-            "restart",
-            settings["restart"],
-            revisions["restart"],
-            TaskStateDocument.empty("restart"),
-        )
+        bindings[TaskId("restart")].build(TaskStateDocument.empty("restart"))

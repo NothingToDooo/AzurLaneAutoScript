@@ -43,7 +43,7 @@ from module.config.utils import (
 from module.logger import logger
 from module.project_paths import PROJECT_ROOT
 from module.state.config_repository import read_schedule_items
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 from module.webui import lang
 from module.webui.base import Frame
 from module.webui.fastapi import AsgiAppOptions, asgi_app
@@ -529,8 +529,8 @@ class AlasGUI(Frame):
             )
 
     def put_overview_task(self, item: ScheduleItem) -> None:
-        definition = TASK_CATALOG[item.task_id.value]
-        command = definition.config_name
+        spec = TASK_SPECS[item.task_id.value]
+        command = spec.config_name
         due_at = item.due_at
         if due_at is None:
             message = f"enabled schedule has no due_at: {item.task_id.value}"

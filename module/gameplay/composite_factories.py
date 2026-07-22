@@ -237,7 +237,7 @@ class _DormTaskFactory:
         if not isinstance(context, TaskBuildContext):
             message = "context must be a TaskBuildContext"
             raise TypeError(message)
-        if context.definition.command != "dorm":
+        if context.spec.command != "dorm":
             message = "dorm factory requires the 'dorm' task definition"
             raise ValueError(message)
         decoder = SettingsDecoder(context.settings, path="$.tasks.dorm")

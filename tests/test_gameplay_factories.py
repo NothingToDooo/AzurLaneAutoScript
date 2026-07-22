@@ -38,7 +38,7 @@ from module.gameplay.market import (
 )
 from module.gameplay.market_factories import MarketWorkflows, build_market_factories
 from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskFactory, TaskStateDocument
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -133,7 +133,7 @@ def _encounter_factories(exercise: _RecordingPort[ExerciseReport] | None = None)
 
 def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
     return TaskBuildContext(
-        definition=TASK_CATALOG[command],
+        spec=TASK_SPECS[command],
         settings_revision=2,
         content_revision="content-1",
         settings=MappingProxyType(settings),

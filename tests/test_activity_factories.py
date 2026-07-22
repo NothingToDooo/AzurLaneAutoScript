@@ -71,7 +71,7 @@ from module.runtime import (
     TaskStateDocumentError,
     TaskStateEntry,
 )
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -274,7 +274,7 @@ def _build_context(
     task_state: TaskStateDocument | None = None,
 ) -> TaskBuildContext:
     return TaskBuildContext(
-        definition=TASK_CATALOG[command],
+        spec=TASK_SPECS[command],
         settings_revision=3,
         content_revision="content-1",
         settings=MappingProxyType(settings),
@@ -290,7 +290,7 @@ def _task_context(
     return TaskContext(
         task_id=TaskId(command),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
-        mode=TASK_CATALOG[command].execution_mode,
+        mode=TASK_SPECS[command].execution_mode,
         metadata=RunMetadata(settings_revision=3, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
     )

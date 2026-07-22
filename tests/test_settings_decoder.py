@@ -15,7 +15,7 @@ from module.runtime import (
     TaskStateDocument,
     TypedTaskFactory,
 )
-from module.task_registry import TaskDefinition
+from module.task_registry import ContentRevisionPolicy, TaskDomain, TaskSpec
 
 
 class _Mode(StrEnum):
@@ -47,14 +47,16 @@ class _Task(Task):
 
 
 def _context(settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
-    definition = TaskDefinition(
+    spec = TaskSpec(
         command="restart",
         config_scopes=(),
         priority=0,
         execution_mode=ExecutionMode.SCHEDULED_JOB,
+        domain=TaskDomain.MAINTENANCE,
+        content_revision_policy=ContentRevisionPolicy.BUILTIN,
     )
     return TaskBuildContext(
-        definition=definition,
+        spec=spec,
         settings_revision=3,
         content_revision="content-1",
         settings=MappingProxyType(settings),

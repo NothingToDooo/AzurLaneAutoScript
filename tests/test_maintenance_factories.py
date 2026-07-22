@@ -25,7 +25,7 @@ from module.maintenance import (
     build_maintenance_factories,
 )
 from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskStateDocument
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 _STARTED_AT = datetime(2026, 7, 15, 8, tzinfo=UTC)
 
@@ -92,7 +92,7 @@ def _services(shared: _Services) -> MaintenanceServices:
 
 def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
     return TaskBuildContext(
-        definition=TASK_CATALOG[command],
+        spec=TASK_SPECS[command],
         settings_revision=5,
         content_revision="content-1",
         settings=MappingProxyType(settings),

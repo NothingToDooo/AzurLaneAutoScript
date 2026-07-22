@@ -32,7 +32,7 @@ class TypedTaskFactory[SettingsT]:
         if not isinstance(context, TaskBuildContext):
             message = "context must be a TaskBuildContext"
             raise TypeError(message)
-        decoder = SettingsDecoder(context.settings, path=f"$.tasks.{context.definition.command}")
+        decoder = SettingsDecoder(context.settings, path=f"$.tasks.{context.spec.command}")
         settings = self._decode(decoder)
         decoder.finish()
         task = self._build_task(settings)

@@ -20,7 +20,6 @@ Alas:
         - Enhance
         - OldRetire
     Restart:
-      command: restart
       groups:
         - Scheduler
 
@@ -31,7 +30,6 @@ Farm:
   page: 'setting'
   tasks:
     Main:
-      command: main
       groups:
         - Scheduler
         - Campaign
@@ -42,7 +40,6 @@ Farm:
         - HpControl
         - EnemyPriority
     Main2:
-      command: main2
       groups:
         - Scheduler
         - Campaign
@@ -53,7 +50,6 @@ Farm:
         - HpControl
         - EnemyPriority
     Main3:
-      command: main3
       groups:
         - Scheduler
         - Campaign
@@ -64,7 +60,6 @@ Farm:
         - HpControl
         - EnemyPriority
     GemsFarming:
-      command: gems_farming
       groups:
         - Scheduler
         - GemsFarming
@@ -86,7 +81,6 @@ Event:
         - EventGeneral
         - TaskBalancer
     Event:
-      command: event
       groups:
         - Scheduler
         - Campaign
@@ -97,7 +91,6 @@ Event:
         - HpControl
         - EnemyPriority
     Event2:
-      command: event2
       groups:
         - Scheduler
         - Campaign
@@ -108,7 +101,6 @@ Event:
         - HpControl
         - EnemyPriority
     Raid:
-      command: raid
       groups:
         - Scheduler
         - Raid
@@ -116,14 +108,12 @@ Event:
         - StopCondition
         - Emotion
     Hospital:
-      command: hospital
       groups:
         - Scheduler
         - Hospital
         - StopCondition
         - Emotion
     Coalition:
-      command: coalition
       groups:
         - Scheduler
         - Campaign
@@ -131,12 +121,10 @@ Event:
         - StopCondition
         - Emotion
     MaritimeEscort:
-      command: maritime_escort
       groups:
         - Scheduler
         - MaritimeEscort
     WarArchives:
-      command: war_archives
       groups:
         - Scheduler
         - Campaign
@@ -155,7 +143,6 @@ EventDaily:
   page: 'setting'
   tasks:
     EventA:
-      command: event_a
       groups:
         - Scheduler
         - EventDaily
@@ -167,7 +154,6 @@ EventDaily:
         - HpControl
         - EnemyPriority
     EventB:
-      command: event_b
       groups:
         - Scheduler
         - EventDaily
@@ -179,7 +165,6 @@ EventDaily:
         - HpControl
         - EnemyPriority
     EventC:
-      command: event_c
       groups:
         - Scheduler
         - EventDaily
@@ -191,7 +176,6 @@ EventDaily:
         - HpControl
         - EnemyPriority
     EventD:
-      command: event_d
       groups:
         - Scheduler
         - EventDaily
@@ -203,7 +187,6 @@ EventDaily:
         - HpControl
         - EnemyPriority
     EventSp:
-      command: event_sp
       groups:
         - Scheduler
         - Campaign
@@ -214,7 +197,6 @@ EventDaily:
         - HpControl
         - EnemyPriority
     RaidDaily:
-      command: raid_daily
       groups:
         - Scheduler
         - RaidDaily
@@ -222,7 +204,6 @@ EventDaily:
         - StopCondition
         - Emotion
     CoalitionSp:
-      command: coalition_sp
       groups:
         - Scheduler
         - Campaign
@@ -237,47 +218,39 @@ Reward:
   page: 'setting'
   tasks:
     Commission:
-      command: commission
       groups:
         - Scheduler
         - Commission
     Tactical:
-      command: tactical
       groups:
         - Scheduler
         - Tactical
         - ControlExpOverflow
         - AddNewStudent
     Research:
-      command: research
       groups:
         - Scheduler
         - Research
     Dorm:
-      command: dorm
       groups:
         - Scheduler
         - Dorm
         - BuyFurniture
     Meowfficer:
-      command: meowfficer
       groups:
         - Scheduler
         - Meowfficer
         - MeowfficerTrain
     Guild:
-      command: guild
       groups:
         - Scheduler
         - GuildLogistics
         - GuildOperation
     Reward:
-      command: reward
       groups:
         - Scheduler
         - Reward
     Awaken:
-      command: awaken
       groups:
         - Scheduler
         - Awaken
@@ -289,27 +262,22 @@ DailyMission:
   page: 'setting'
   tasks:
     Daily:
-      command: daily
       groups:
         - Scheduler
         - Daily
     Hard:
-      command: hard
       groups:
         - Scheduler
         - Hard
     Exercise:
-      command: exercise
       groups:
         - Scheduler
         - Exercise
     ShopFrequent:
-      command: shop_frequent
       groups:
         - Scheduler
         - GeneralShop
     ShopOnce:
-      command: shop_once
       groups:
         - Scheduler
         - GuildShop
@@ -317,18 +285,15 @@ DailyMission:
         - MeritShop
         - CoreShop
     Shipyard:
-      command: shipyard
       groups:
         - Scheduler
         - ShipyardDr
         - Shipyard
     Gacha:
-      command: gacha
       groups:
         - Scheduler
         - Gacha
     Freebies:
-      command: freebies
       groups:
         - Scheduler
         - BattlePass
@@ -336,11 +301,9 @@ DailyMission:
         - Mail
         - SupplyPack
     Minigame:
-      command: minigame
       groups:
         - Scheduler
     PrivateQuarters:
-      command: private_quarters
       groups:
         - Scheduler
         - PrivateQuarters
@@ -355,80 +318,66 @@ Opsi:
       groups:
         - OpsiGeneral
     OpsiAshBeacon:
-      command: opsi_ash_beacon
       groups:
         - Scheduler
         - OpsiAshBeacon
     OpsiAshAssist:
-      command: opsi_ash_assist
       groups:
         - Scheduler
         - OpsiAshAssist
     OpsiExplore:
-      command: opsi_explore
       groups:
         - Scheduler
         - OpsiExplore
         - OpsiFleet
     OpsiShop:
-      command: opsi_shop
       groups:
         - Scheduler
         - OpsiShop
     OpsiVoucher:
-      command: opsi_voucher
       groups:
         - Scheduler
         - OpsiVoucher
     OpsiDaily:
-      command: opsi_daily
       groups:
         - Scheduler
         - OpsiDaily
         - OpsiFleet
     OpsiObscure:
-      command: opsi_obscure
       groups:
         - Scheduler
         - OpsiObscure
         - OpsiFleet
     OpsiAbyssal:
-      command: opsi_abyssal
       groups:
         - Scheduler
         - OpsiAbyssal
         - OpsiFleetFilter
     OpsiArchive:
-      command: opsi_archive
       groups:
         - Scheduler
         - OpsiFleet
     OpsiStronghold:
-      command: opsi_stronghold
       groups:
         - Scheduler
         - OpsiStronghold
         - OpsiFleetFilter
     OpsiMonthBoss:
-      command: opsi_month_boss
       groups:
         - Scheduler
         - OpsiMonthBoss
         - OpsiFleetFilter
     OpsiMeowfficerFarming:
-      command: opsi_meowfficer_farming
       groups:
         - Scheduler
         - OpsiMeowfficerFarming
         - OpsiFleet
     OpsiHazard1Leveling:
-      command: opsi_hazard1_leveling
       groups:
         - Scheduler
         - OpsiHazard1Leveling
         - OpsiFleet
     OpsiCrossMonth:
-      command: opsi_cross_month
       groups:
         - Scheduler
 
@@ -439,25 +388,19 @@ Tool:
   page: 'tool'
   tasks:
     Daemon:
-      command: daemon
       groups:
         - Daemon
     OpsiDaemon:
-      command: opsi_daemon
       groups:
         - OpsiDaemon
     EventStory:
-      command: event_story
       groups:
         - EventStory
     Benchmark:
-      command: benchmark
       groups:
         - Benchmark
     AzurLaneUncensored:
-      command: azur_lane_uncensored
       groups: []
     GameManager:
-      command: game_manager
       groups:
         - GameManager

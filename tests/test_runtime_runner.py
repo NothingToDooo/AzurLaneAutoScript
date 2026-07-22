@@ -22,11 +22,11 @@ from module.application import (
     TaskId,
     TaskResult,
 )
-from module.runtime.factories import TaskBuildContext, TaskFactoryRegistry
+from module.runtime.factories import TaskBuildContext, bind_tasks
 from module.runtime.runner import CommandStatus, ResultObserver, RuntimeRunner
 from module.runtime.settings import freeze_task_settings
 from module.runtime.task_state import TaskStateDocument
-from module.task_registry import TaskDefinition
+from module.task_registry import ContentRevisionPolicy, TaskDomain, TaskSpec
 
 NOW = datetime(2026, 7, 15, 6, tzinfo=UTC)
 
@@ -107,37 +107,39 @@ class _Repository:
         return TaskStateDocument.empty(task_id.value)
 
 
-def _definition(command: str, mode: ExecutionMode, priority: int | None) -> TaskDefinition:
-    return TaskDefinition(
+def _spec(command: str, mode: ExecutionMode, priority: int | None) -> TaskSpec:
+    return TaskSpec(
         command=command,
         config_scopes=(),
         priority=priority,
         execution_mode=mode,
+        domain=TaskDomain.MAINTENANCE,
+        content_revision_policy=ContentRevisionPolicy.BUILTIN,
     )
 
 
 def _runner(
-    definitions: tuple[TaskDefinition, ...],
+    specs: tuple[TaskSpec, ...],
     tasks: tuple[_Task, ...],
     repository: _Repository,
     clock: _Clock,
     *,
     observer: ResultObserver | None = None,
 ) -> RuntimeRunner:
-    catalog = {definition.command: definition for definition in definitions}
-    registry = TaskFactoryRegistry(
-        catalog=catalog,
-        factories={definition.command: _Factory(task) for definition, task in zip(definitions, tasks, strict=True)},
-        content_revisions={definition.command: f"content-{definition.command}" for definition in definitions},
-    )
+    spec_map = {spec.command: spec for spec in specs}
     settings, settings_revisions = freeze_task_settings(
-        {definition.command: {} for definition in definitions},
-        task_ids=catalog,
+        {spec.command: {} for spec in specs},
+        task_ids=spec_map,
     )
-    return RuntimeRunner(
-        factories=registry,
+    bindings = bind_tasks(
+        specs=spec_map,
+        factories={spec.command: _Factory(task) for spec, task in zip(specs, tasks, strict=True)},
         settings=settings,
         settings_revisions=settings_revisions,
+        content_revisions={spec.command: f"content-{spec.command}" for spec in specs},
+    )
+    return RuntimeRunner(
+        bindings=bindings,
         repository=repository,
         clock=clock,
         observer=observer,
@@ -147,7 +149,7 @@ def _runner(
 def test_direct_command_runs_once() -> None:
     task = _Task(TaskResult(Succeeded()))
     runner = _runner(
-        (_definition("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
+        (_spec("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
         (task,),
         _Repository(),
         _Clock(),
@@ -185,8 +187,8 @@ def test_scheduler_runs_all_due_tasks_then_finishes_when_empty() -> None:
     clock = _Clock()
     runner = _runner(
         (
-            _definition("reward", ExecutionMode.SCHEDULED_JOB, 1),
-            _definition("tactical", ExecutionMode.SCHEDULED_JOB, 0),
+            _spec("reward", ExecutionMode.SCHEDULED_JOB, 1),
+            _spec("tactical", ExecutionMode.SCHEDULED_JOB, 0),
         ),
         (reward_task, tactical_task),
         repository,
@@ -215,7 +217,7 @@ def test_scheduler_runs_all_due_tasks_then_finishes_when_empty() -> None:
 )
 def test_direct_command_maps_terminal_result(result: TaskResult, status: CommandStatus) -> None:
     runner = _runner(
-        (_definition("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
+        (_spec("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
         (_Task(result),),
         _Repository(),
         _Clock(),
@@ -238,7 +240,7 @@ def test_direct_command_maps_terminal_result(result: TaskResult, status: Command
 )
 def test_direct_command_rejects_incomplete_result(result: TaskResult, reason: str) -> None:
     runner = _runner(
-        (_definition("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
+        (_spec("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
         (_Task(result),),
         _Repository(),
         _Clock(),
@@ -263,7 +265,7 @@ def test_scheduler_continues_after_an_expected_incomplete_result() -> None:
         )
     )
     runner = _runner(
-        (_definition(task_id.value, ExecutionMode.SCHEDULED_JOB, 0),),
+        (_spec(task_id.value, ExecutionMode.SCHEDULED_JOB, 0),),
         (_Task(TaskResult(Deferred("try later"), effects=(DisableTask(task_id),))),),
         repository,
         _Clock(),
@@ -292,7 +294,7 @@ def test_persistence_failure_keeps_task_context_for_diagnostics() -> None:
 
     task = _Task(TaskResult(Succeeded()))
     runner = _runner(
-        (_definition("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
+        (_spec("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
         (task,),
         _FailingRepository(),
         _Clock(),
@@ -321,7 +323,7 @@ def test_result_observer_can_attach_error_bundle() -> None:
         return "log/error/bundle"
 
     runner = _runner(
-        (_definition("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
+        (_spec("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
         (_Task(TaskResult(Faulted(error))),),
         _Repository(),
         _Clock(),
@@ -366,7 +368,7 @@ def test_abort_during_scheduler_sleep_returns_stopped() -> None:
     )
     clock = _AbortingClock()
     runner = _runner(
-        (_definition("reward", ExecutionMode.SCHEDULED_JOB, 0),),
+        (_spec("reward", ExecutionMode.SCHEDULED_JOB, 0),),
         (task,),
         repository,
         clock,
@@ -384,7 +386,7 @@ def test_abort_during_scheduler_sleep_returns_stopped() -> None:
 def test_scheduled_task_can_be_launched_once_for_debugging() -> None:
     task = _Task(TaskResult(Succeeded(), effects=(RescheduleSelf(NOW + timedelta(hours=1)),)))
     runner = _runner(
-        (_definition("reward", ExecutionMode.SCHEDULED_JOB, 0),),
+        (_spec("reward", ExecutionMode.SCHEDULED_JOB, 0),),
         (task,),
         _Repository(),
         _Clock(),

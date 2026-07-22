@@ -23,7 +23,7 @@ from module.application import (
 from module.application.state_effects import DeleteTaskState, UpsertTaskState
 from module.state import config_repository
 from module.state.config_repository import ConfigStateError, ConfigStateRepository, read_schedule_items
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 _NOW = datetime(2026, 7, 15, 8, 0, tzinfo=UTC)
 _METADATA = RunMetadata(settings_revision=1, content_revision="content")
@@ -42,7 +42,7 @@ def _document() -> dict[str, object]:
         "dict[str, object]",
         json.loads(Path("config/template.json").read_text(encoding="utf-8")),
     )
-    for definition in TASK_CATALOG.values():
+    for definition in TASK_SPECS.values():
         if definition.priority is None:
             continue
         section = cast("dict[str, object]", document[definition.config_name])
@@ -62,7 +62,7 @@ def _load(path: Path) -> dict[str, object]:
 
 
 def _task_section(document: dict[str, object], task_id: str) -> dict[str, object]:
-    config_name = TASK_CATALOG[task_id].config_name
+    config_name = TASK_SPECS[task_id].config_name
     return cast("dict[str, object]", document[config_name])
 
 
@@ -91,7 +91,7 @@ def test_schedule_source_reads_every_catalog_schedule_in_priority_order(tmp_path
 
     items = _repository(path).list_items()
 
-    expected_count = sum(definition.priority is not None for definition in TASK_CATALOG.values())
+    expected_count = sum(definition.priority is not None for definition in TASK_SPECS.values())
     assert len(items) == expected_count
     assert [item.priority for item in items] == list(range(expected_count))
     assert items[0].task_id == TaskId("restart")

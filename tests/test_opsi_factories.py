@@ -51,7 +51,7 @@ from module.runtime import (
     TaskStateDocumentError,
     TaskStateEntry,
 )
-from module.task_registry import TASK_CATALOG
+from module.task_registry import TASK_SPECS
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -266,7 +266,7 @@ def _build_context(
     task_state: TaskStateDocument | None = None,
 ) -> TaskBuildContext:
     return TaskBuildContext(
-        definition=TASK_CATALOG[command],
+        spec=TASK_SPECS[command],
         settings_revision=7,
         content_revision="content-1",
         settings=MappingProxyType(settings),

@@ -51,13 +51,13 @@ def _generator(
 
 
 def test_args_adds_storage_without_mutating_task_groups() -> None:
-    task = {"Main": {"tasks": {"Main": {"command": "main", "groups": ["Scheduler"]}}}}
+    task = {"Main": {"tasks": {"Restart": {"groups": ["Scheduler"]}}}}
     original_task = deepcopy(task)
     generator = _generator(
         task=task,
         argument={
             "Scheduler": {
-                "Command": _arg("", option=["Main"]),
+                "Command": _arg("", option=["Restart"]),
                 "Enable": _arg(value=False, typ="checkbox"),
             },
             "Storage": _storage_group(),
@@ -67,9 +67,9 @@ def test_args_adds_storage_without_mutating_task_groups() -> None:
     args = generator.args
 
     assert task == original_task
-    assert deep_get(args, keys="Main.Storage") is not None
-    assert deep_get(args, keys="Main.Scheduler.Command.value") == "Main"
-    assert deep_get(args, keys="Main.Scheduler.Command.display") == "hide"
+    assert deep_get(args, keys="Restart.Storage") is not None
+    assert deep_get(args, keys="Restart.Scheduler.Command.value") == "Restart"
+    assert deep_get(args, keys="Restart.Scheduler.Command.display") == "hide"
 
 
 def test_args_applies_default_and_plain_override_values() -> None:
@@ -178,17 +178,17 @@ def test_args_rejects_invalid_dict_override_metadata_or_value(
 
 def _interval_generator(field: str, value: DeepValue) -> ConfigGenerator:
     return _generator(
-        task={"Main": {"tasks": {"Main": {"command": "main", "groups": ["Scheduler"]}}}},
+        task={"Main": {"tasks": {"Restart": {"groups": ["Scheduler"]}}}},
         argument={
             "Scheduler": {
-                "Command": _arg("", option=["Main"]),
+                "Command": _arg("", option=["Restart"]),
                 "Enable": _arg(value=False, typ="checkbox", option=[True, False]),
                 "SuccessInterval": _arg(0),
                 "FailureInterval": _arg(120),
             },
             "Storage": _storage_group(),
         },
-        override={"Main": {"Scheduler": {field: value}}},
+        override={"Restart": {"Scheduler": {field: value}}},
     )
 
 
@@ -197,14 +197,14 @@ def _interval_generator(field: str, value: DeepValue) -> ConfigGenerator:
 def test_args_accepts_non_negative_scheduler_intervals(field: str, value: int | str) -> None:
     args = _interval_generator(field, value).args
 
-    assert deep_get(args, keys=f"Main.Scheduler.{field}.value") == value
+    assert deep_get(args, keys=f"Restart.Scheduler.{field}.value") == value
 
 
 @pytest.mark.parametrize("value", [-1, 1.5, True, "30", "60-30", "30-x"])
 def test_args_rejects_invalid_scheduler_intervals(value: DeepValue) -> None:
     generator = _interval_generator("SuccessInterval", value)
 
-    with pytest.raises((TypeError, ValueError), match=r"Main\.Scheduler\.SuccessInterval"):
+    with pytest.raises((TypeError, ValueError), match=r"Restart\.Scheduler\.SuccessInterval"):
         _ = generator.args
 
 

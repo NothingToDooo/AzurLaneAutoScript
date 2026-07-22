@@ -21,7 +21,7 @@ from module.notify.configuration import (
 )
 from module.project_paths import PROJECT_ROOT
 from module.runtime.settings import FrozenTaskSettings, JsonValue, freeze_task_settings
-from module.task_registry import TASK_CATALOG, config_name_to_command
+from module.task_registry import TASK_SPECS, config_name_to_command
 
 if TYPE_CHECKING:
     from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue
@@ -287,7 +287,7 @@ class CompiledConfiguration:
         if not isinstance(device_serial, str) or not device_serial.strip():
             message = "device_serial must be a non-empty string"
             raise ValueError(message)
-        frozen_tasks, task_revisions = freeze_task_settings(tasks, task_ids=TASK_CATALOG)
+        frozen_tasks, task_revisions = freeze_task_settings(tasks, task_ids=TASK_SPECS)
         object.__setattr__(self, "_runtime_document", copy.deepcopy(runtime_document))
         object.__setattr__(self, "_tasks", frozen_tasks)
         object.__setattr__(self, "_task_revisions", task_revisions)
@@ -395,7 +395,7 @@ class WebConfigurationCompiler:
         tasks.update(self._activity(view))
         tasks.update(self._campaign(view))
         tasks.update(self._opsi(view))
-        expected = set(TASK_CATALOG)
+        expected = set(TASK_SPECS)
         if set(tasks) != expected:
             missing = sorted(expected - set(tasks))
             unknown = sorted(set(tasks) - expected)
@@ -1130,8 +1130,8 @@ class WebConfigurationCompiler:
         )
         tasks: dict[str, JsonValue] = {}
         for command in commands:
-            definition = TASK_CATALOG[command]
-            name = definition.config_name
+            spec = TASK_SPECS[command]
+            name = spec.config_name
             pack_id = view.value(name, "Campaign", "Event", expected=str)
             stage_name = view.value(name, "Campaign", "Name", expected=str).lower()
             if command in {"event_a", "event_b", "event_c", "event_d"}:
@@ -1145,7 +1145,7 @@ class WebConfigurationCompiler:
             stop = view.mapping(name, "StopCondition")
             event_limit = 0
             event_deadline: JsonValue = None
-            if definition.config_scopes:
+            if spec.config_scopes:
                 event_limit = view.value("EventGeneral", "EventGeneral", "PtLimit", expected=int)
                 raw_deadline = view.value("EventGeneral", "EventGeneral", "TimeLimit", expected=str)
                 deadline = datetime.fromisoformat(raw_deadline)
@@ -1176,7 +1176,7 @@ class WebConfigurationCompiler:
                 "failure_retry_seconds": self._retry_seconds(view, name),
                 "resource_retry_seconds": 7_200,
                 "limits": limits,
-                "task_balancer": self._balancer(view) if definition.config_scopes else None,
+                "task_balancer": self._balancer(view) if spec.config_scopes else None,
             }
             if command == "gems_farming":
                 task["gems_farming"] = {

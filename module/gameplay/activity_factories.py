@@ -158,7 +158,7 @@ class _MinigameTaskFactory:
         if not isinstance(context, TaskBuildContext):
             message = "context must be a TaskBuildContext"
             raise TypeError(message)
-        if context.definition.command != ActivityCommand.MINIGAME.value:
+        if context.spec.command != ActivityCommand.MINIGAME.value:
             message = "minigame factory requires the minigame task definition"
             raise ValueError(message)
         decoder = SettingsDecoder(context.settings, path="$.tasks.minigame")
@@ -417,7 +417,7 @@ class _EncounterTaskFactory:
         if not isinstance(context, TaskBuildContext):
             message = "context must be a TaskBuildContext"
             raise TypeError(message)
-        if context.definition.command != self._command.value:
+        if context.spec.command != self._command.value:
             message = f"encounter factory requires the {self._command.value} task definition"
             raise ValueError(message)
         decoder = SettingsDecoder(context.settings, path=f"$.tasks.{self._command.value}")
