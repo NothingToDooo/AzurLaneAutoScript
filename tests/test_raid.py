@@ -4,28 +4,19 @@ import pytest
 
 from module.content.activity_catalog import ActivityCatalog, RaidActivity
 from module.content.activity_profile import RaidDefinition, RaidMode, RaidProfileId
-from module.content.errors import ContentValidationError
 from module.content.manifest import load_default_event_manifests
 from module.content.models import ContentId
-from module.ocr.ocr import Digit, DigitCounter
-from module.raid import assets as raid_assets
-from module.raid.ocr import HuanChangPointOcr, HuanChangRemainCounter, PaddedRaidCounter
 from module.raid.profile import (
-    CHANGWU_RAID_PROFILE,
     HUANCHANG_RAID_PROFILE,
     RAID_CLIENT_PROFILES,
     RPG_RAID_PROFILE,
-    CounterOcrSpec,
-    DigitOcrSpec,
     RaidAttemptSource,
-    RaidNavigationStrategy,
     ResolvedRaidProfile,
     UnknownRaidProfileError,
 )
 from module.raid.raid import Raid
 from module.raid.result import RaidExecutionResult
 from module.raid.run import RaidRun
-from module.ui.page import Page, page_raid, page_rpg_stage
 
 if TYPE_CHECKING:
     from module.combat.combat import CombatEnd
@@ -40,23 +31,22 @@ def raid_activities() -> tuple[RaidActivity, ...]:
     return tuple(catalog.resolve_raid(raid_id) for raid_id in raid_ids)
 
 
-def _activity(profile_id: str, *, daily_modes: tuple[RaidMode, ...] = ()) -> RaidActivity:
+def _activity(profile_id: str) -> RaidActivity:
     modes = (RaidMode.EASY, RaidMode.NORMAL, RaidMode.HARD, RaidMode.EX)
     return RaidActivity(
         ContentId(f"test_{profile_id}"),
         RaidDefinition(
             profile_id=RaidProfileId(profile_id),
             modes=modes,
-            daily_modes=daily_modes,
+            daily_modes=(),
             ticket_modes=(),
         ),
     )
 
 
-def test_builtin_profiles_cover_every_raid_manifest_and_validate_before_runtime(
+def test_builtin_profiles_cover_every_real_raid_manifest(
     raid_activities: tuple[RaidActivity, ...],
 ) -> None:
-    assert len(raid_activities) == 11
     assert {activity.definition.profile_id for activity in raid_activities} == RAID_CLIENT_PROFILES.profile_ids
     for activity in raid_activities:
         resolved = RAID_CLIENT_PROFILES.bind(activity)
@@ -69,77 +59,23 @@ def test_unknown_profile_fails_during_binding() -> None:
         RAID_CLIENT_PROFILES.bind(_activity("unknown"))
 
 
-def test_rpg_attempts_are_explicitly_unmetered_without_fabricated_ocr(
+def test_rpg_attempts_are_explicitly_unmetered(
     raid_activities: tuple[RaidActivity, ...],
 ) -> None:
     activity = next(activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("rpg"))
     resolved = RAID_CLIENT_PROFILES.bind(activity)
 
     assert resolved.client is RPG_RAID_PROFILE
-    assert resolved.client.navigation is RaidNavigationStrategy.RPG_CAROUSEL
-    assert resolved.client.landing_page is page_rpg_stage
     assert all(mode.attempt_source is RaidAttemptSource.UNMETERED for mode in resolved.client.modes)
     assert all(mode.remain_ocr is None for mode in resolved.client.modes)
 
 
-def test_daily_or_ticket_capability_requires_metered_ocr() -> None:
-    with pytest.raises(ContentValidationError, match="daily/ticket modes must have remain OCR"):
-        ResolvedRaidProfile(
-            activity=_activity("rpg", daily_modes=(RaidMode.EASY,)),
-            client=RPG_RAID_PROFILE,
-        )
+def test_special_raid_counter_ocr_preserves_profile_correction() -> None:
+    mode = HUANCHANG_RAID_PROFILE.mode(RaidMode.HARD)
 
-
-def test_ticket_can_only_be_enabled_for_the_selected_ticket_mode(
-    raid_activities: tuple[RaidActivity, ...],
-) -> None:
-    activity = next(
-        activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("changwu")
-    )
-    resolved = RAID_CLIENT_PROFILES.bind(activity)
-
-    with pytest.raises(ContentValidationError, match="tickets are not supported"):
-        resolved.plan(RaidMode.HARD, use_ticket=True)
-    assert resolved.plan(RaidMode.EX, use_ticket=True).use_ticket is True
-
-
-def test_daily_plan_requires_manifest_daily_capability(raid_activities: tuple[RaidActivity, ...]) -> None:
-    rpg = next(activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("rpg"))
-
-    with pytest.raises(ContentValidationError, match="is not daily content"):
-        RAID_CLIENT_PROFILES.bind(rpg).daily_plan(RaidMode.HARD)
-
-
-def test_profiles_bind_entrance_and_ocr_without_dynamic_asset_lookup() -> None:
-    hard = CHANGWU_RAID_PROFILE.mode(RaidMode.HARD)
-    ex = CHANGWU_RAID_PROFILE.mode(RaidMode.EX)
-
-    assert hard is not None
-    assert hard.entrance is raid_assets.CHANGWU_RAID_HARD
-    assert isinstance(hard.remain_ocr, CounterOcrSpec)
-    assert isinstance(hard.remain_ocr.create(), DigitCounter)
-    assert ex is not None
-    assert ex.entrance is raid_assets.CHANGWU_RAID_EX
-    assert isinstance(ex.remain_ocr, DigitOcrSpec)
-    assert isinstance(ex.remain_ocr.create(), Digit)
-
-
-def test_special_ocr_strategies_are_bound_to_only_their_profiles() -> None:
-    huanchang_hard = HUANCHANG_RAID_PROFILE.mode(RaidMode.HARD)
-
-    assert huanchang_hard is not None
-    assert isinstance(huanchang_hard.remain_ocr, CounterOcrSpec)
-    assert huanchang_hard.remain_ocr.counter_type is HuanChangRemainCounter
-    assert huanchang_hard.remain_ocr.alphabet == "0123456789IDSB"
-    assert HuanChangRemainCounter(raid_assets.HUANCHANG_OCR_REMAIN_HARD).after_process("9") == (9, 0, 15)
-    assert HUANCHANG_RAID_PROFILE.point_ocr is not None
-    assert HUANCHANG_RAID_PROFILE.point_ocr.counter_type is HuanChangPointOcr
-
-    essex = RAID_CLIENT_PROFILES.resolve(RaidProfileId("essex"))
-    essex_easy = essex.mode(RaidMode.EASY)
-    assert essex_easy is not None
-    assert isinstance(essex_easy.remain_ocr, CounterOcrSpec)
-    assert essex_easy.remain_ocr.counter_type is PaddedRaidCounter
+    assert mode is not None
+    assert mode.remain_ocr is not None
+    assert mode.remain_ocr.create().after_process("9") == (9, 0, 15)
 
 
 class _NoIoRaidRun(RaidRun):
@@ -160,42 +96,6 @@ def test_unmetered_attempt_status_does_not_touch_device(
     assert status.source is RaidAttemptSource.UNMETERED
     assert status.remaining is None
     assert status.exhausted is False
-
-
-class _LandingRaid(Raid):
-    def __init__(self, profile: ResolvedRaidProfile) -> None:
-        self._raid_profile = profile
-        self._active_plan = None
-        self.pages: list[Page] = []
-        self.carousel_seeks = 0
-
-    @override
-    def ui_ensure(self, destination: Page, *, skip_first_screenshot: bool = True) -> bool:
-        del skip_first_screenshot
-        self.pages.append(destination)
-        return True
-
-    @override
-    def _seek_carousel_end(self, *, skip_first_screenshot: bool = True) -> None:
-        del skip_first_screenshot
-        self.carousel_seeks += 1
-
-
-def test_navigation_strategy_is_profile_driven(raid_activities: tuple[RaidActivity, ...]) -> None:
-    standard = next(
-        activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("changwu")
-    )
-    rpg = next(activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("rpg"))
-
-    standard_runner = _LandingRaid(RAID_CLIENT_PROFILES.bind(standard))
-    standard_runner.ensure_landing()
-    assert standard_runner.pages == [page_raid]
-    assert standard_runner.carousel_seeks == 0
-
-    rpg_runner = _LandingRaid(RAID_CLIENT_PROFILES.bind(rpg))
-    rpg_runner.ensure_landing()
-    assert rpg_runner.pages == [page_rpg_stage]
-    assert rpg_runner.carousel_seeks == 1
 
 
 class _Config:

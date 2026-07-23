@@ -1,12 +1,4 @@
-from dataclasses import dataclass
-
 from module.content.errors import ContentValidationError
-
-
-@dataclass(frozen=True, slots=True)
-class ValidationIssue:
-    location: str
-    message: str
 
 
 def require_non_empty_identifier(value: str, *, field_name: str) -> None:

@@ -22,6 +22,10 @@ class RunRepository(Protocol):
     def finalize_run(self, result: TaskResult) -> None: ...
 
 
+class TaskErrorRecovery(Protocol):
+    def recover(self, context: TaskContext, error: Exception) -> TaskResult | None: ...
+
+
 def _validate_execute_arguments(
     task_id: TaskId,
     mode: ExecutionMode,
@@ -45,6 +49,14 @@ def _validate_execute_arguments(
 def _validate_abort(abort: AbortToken | None) -> None:
     if abort is not None and not isinstance(abort, AbortToken):
         message = "abort must be an AbortToken or None"
+        raise TypeError(message)
+
+
+def _validate_error_recovery(error_recovery: TaskErrorRecovery | None) -> None:
+    if error_recovery is not None and (
+        isinstance(error_recovery, type) or not callable(getattr(error_recovery, "recover", None))
+    ):
+        message = "error_recovery must implement recover() or be None"
         raise TypeError(message)
 
 
@@ -93,11 +105,34 @@ def _validate_state_effects(task_id: TaskId, result: TaskResult) -> None:
         raise ValueError(message)
 
 
-class RunCoordinator:
-    __slots__ = ("repository",)
+def _recover_task_error(
+    task_id: TaskId,
+    mode: ExecutionMode,
+    context: TaskContext,
+    error: Exception,
+    error_recovery: TaskErrorRecovery | None,
+) -> TaskResult:
+    if error_recovery is None:
+        return TaskResult(outcome=Faulted(error))
+    try:
+        recovered = error_recovery.recover(context, error)
+        if recovered is None:
+            return TaskResult(outcome=Faulted(error))
+        result = _require_task_result(recovered)
+        _validate_scheduled_result(task_id, mode, result)
+        _validate_state_effects(task_id, result)
+    except Exception as recovery_error:  # ruff:ignore[blind-except] - 恢复策略仍处于 task fault boundary 内。
+        return TaskResult(outcome=Faulted(recovery_error))
+    return result
 
-    def __init__(self, repository: RunRepository) -> None:
+
+class RunCoordinator:
+    __slots__ = ("_error_recovery", "repository")
+
+    def __init__(self, repository: RunRepository, *, error_recovery: TaskErrorRecovery | None = None) -> None:
+        _validate_error_recovery(error_recovery)
         self.repository = repository
+        self._error_recovery = error_recovery
 
     def execute(
         self,
@@ -134,7 +169,7 @@ class RunCoordinator:
         except AbortRequested as error:
             result = TaskResult(outcome=Cancelled(error.reason or _DEFAULT_ABORT_REASON))
         except Exception as error:  # ruff:ignore[blind-except] - coordinator 是任务 fault boundary，必须将任意任务异常持久化为 Faulted。
-            result = TaskResult(outcome=Faulted(error))
+            result = _recover_task_error(task_id, mode, context, error, self._error_recovery)
 
         self.repository.finalize_run(result)
         return result

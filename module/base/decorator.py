@@ -26,7 +26,6 @@ __all__ = (
     "function_drop",
     "has_cached_property",
     "run_once",
-    "set_cached_property",
 )
 
 
@@ -37,10 +36,6 @@ def del_cached_property(obj: _HasInstanceDict, name: str) -> None:
 
 def has_cached_property(obj: _HasInstanceDict, name: str) -> bool:
     return name in obj.__dict__
-
-
-def set_cached_property[T](obj: _HasInstanceDict, name: str, value: T) -> None:
-    obj.__dict__[name] = value
 
 
 def function_drop[R, **P](

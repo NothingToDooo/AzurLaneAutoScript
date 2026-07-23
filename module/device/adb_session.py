@@ -130,8 +130,6 @@ class AdbDeviceWithStatus(AdbDevice):
 
 
 class AdbSession(ConnectionAttr):
-    _serial_bound_cached_properties = ("cpu_abi", "sdk_ver")
-
     def adb_reconnect(self) -> None:
         message = f"adb_reconnect() is not implemented for {type(self).__name__}"
         raise NotImplementedError(message)
@@ -280,27 +278,6 @@ class AdbSession(ConnectionAttr):
         logger.critical(f"Resolution not supported: {width}x{height}")
         logger.critical("Please set emulator resolution to 1280x720")
         raise HumanTakeoverRequiredError
-
-    @cached_property
-    @retry
-    def cpu_abi(self) -> str:
-        """可能值为 arm64-v8a、armeabi-v7a、x86 或 x86_64。"""
-        abi = self.adb_getprop("ro.product.cpu.abi")
-        if not len(abi):
-            logger.error(f'CPU ABI invalid: "{abi}"')
-        return abi
-
-    @cached_property
-    @retry
-    def sdk_ver(self) -> int:
-        """Android SDK/API 等级，见 https://apilevels.com/。"""
-        sdk = self.adb_getprop("ro.build.version.sdk")
-        try:
-            return int(sdk)
-        except ValueError:
-            logger.error(f"SDK version invalid: {sdk}")
-
-        return 0
 
     def adb_forward(self, remote: str) -> int:
         """复用同 remote 的唯一 TCP forward，否则从 FORWARD_PORT_RANGE 分配端口。

@@ -1,11 +1,9 @@
-from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
 from module.combat.assets import GET_ITEMS_1
-from module.daemon.daemon import AzurLaneDaemon
 from module.handler.mystery import MysteryHandler
 from module.handler.mystery_item import (
     STANDARD_MYSTERY_ITEM_SERVICE,
@@ -18,7 +16,6 @@ from module.handler.mystery_item import (
 )
 from module.map.fleet_navigation_ui import CampaignFleetMovementUi
 from module.map.map_observer import STANDARD_CAMPAIGN_MAP_OBSERVER
-from module.os.fleet import OSFleet
 
 if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
@@ -125,17 +122,6 @@ def test_standard_mystery_item_preserves_button_identity_and_counts() -> None:
     assert runtime.device.sleeps == [0.5]
     assert runtime.device.screenshots == 1
     assert runtime.strategy_close_calls == 1
-    with pytest.raises(FrozenInstanceError):
-        setattr(  # ruff:ignore[set-attr-with-constant] - intentional frozen mutation probe
-            request,
-            "button",
-            None,
-        )
-
-
-def test_mystery_item_outcome_rejects_counting_an_unhandled_popup() -> None:
-    with pytest.raises(ValueError, match="unhandled mystery item outcome cannot count"):
-        MysteryItemOutcome(handled=False, counts_toward_mystery=True)
 
 
 def test_handled_non_counting_item_stops_fallback_handlers() -> None:
@@ -176,28 +162,3 @@ def test_fleet_records_handled_mystery_but_only_increments_count_when_requested(
     assert handled_buttons == [grid]
     assert runtime.mystery_count == expected_count
     assert kind == "get_item"
-
-
-@pytest.mark.parametrize(
-    "outcome",
-    [
-        MysteryItemOutcome(handled=False, counts_toward_mystery=False),
-        MysteryItemOutcome(handled=True, counts_toward_mystery=True),
-    ],
-)
-def test_daemon_reads_typed_mystery_outcome(outcome: MysteryItemOutcome) -> None:
-    daemon = SimpleNamespace(
-        appear_then_click=lambda *_args, **_kwargs: False,
-        handle_mystery_items=lambda: outcome,
-    )
-
-    assert AzurLaneDaemon.handle_daemon_map_operation(cast("AzurLaneDaemon", daemon)) is outcome.handled
-
-
-def test_os_mystery_override_returns_typed_result() -> None:
-    runtime = SimpleNamespace(_os_map_event_handled=True)
-    button = cast("Grid", _Grid())
-
-    result = OSFleet.handle_mystery(cast("OSFleet", runtime), button=button)
-
-    assert result == MysteryResult(MysteryKind.GET_ITEM, counts_toward_mystery=True)

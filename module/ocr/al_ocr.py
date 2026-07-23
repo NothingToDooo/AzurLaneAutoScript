@@ -1,7 +1,7 @@
 from collections.abc import Collection, Sequence
 from math import isfinite
 from numbers import Real
-from typing import TYPE_CHECKING, ClassVar, Protocol, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, ClassVar, Protocol, cast
 
 import cv2
 import numpy as np
@@ -19,18 +19,9 @@ if TYPE_CHECKING:
 
     from module.base.type_alias import ImageArray
 
-type CnOcrImage = str | Path | Image.Image | Tensor | np.ndarray
 type CnOcrLineImage = str | Path | Tensor | np.ndarray
 type _CnOcrResultPayload = dict[str, str | Real | np.ndarray]
 type _ModelArguments = tuple[str, Collection[str] | str | None, str]
-
-
-class OcrDetectionOptions(TypedDict, total=False):
-    resized_shape: int | tuple[int, int]
-    preserve_aspect_ratio: bool
-    min_box_size: int
-    box_score_thresh: float
-    batch_size: int
 
 
 class _AlphabetModel(Protocol):
@@ -108,25 +99,6 @@ class AlOcr(CnOcr):
             self.init(*self._args)
             self._model_loaded = True
 
-    def ocr_texts(
-        self,
-        img_fp: CnOcrImage,
-        rec_batch_size: int = 1,
-        *,
-        return_cropped_image: bool = False,
-        **det_kwargs: Unpack[OcrDetectionOptions],
-    ) -> list[str]:
-        self.ensure_loaded()
-        return [
-            self._extract_raw_result(item).text
-            for item in super().ocr(
-                img_fp,
-                rec_batch_size=rec_batch_size,
-                return_cropped_image=return_cropped_image,
-                **det_kwargs,
-            )
-        ]
-
     def ocr_for_single_lines_raw(
         self,
         img_list: Sequence[CnOcrLineImage],
@@ -149,13 +121,6 @@ class AlOcr(CnOcr):
     ) -> list[RawOcrResult]:
         self.set_cand_alphabet(cand_alphabet)
         return self.ocr_for_single_lines_raw(img_list)
-
-    def atomic_ocr_for_single_lines(
-        self,
-        img_list: Sequence[CnOcrLineImage],
-        cand_alphabet: Collection[str] | str | None = None,
-    ) -> list[str]:
-        return [result.text for result in self.atomic_ocr_for_single_lines_raw(img_list, cand_alphabet=cand_alphabet)]
 
     @staticmethod
     def _preprocess_img_array(img: ImageArray) -> NDArray[np.float32]:

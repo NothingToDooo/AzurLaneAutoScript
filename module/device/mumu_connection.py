@@ -107,9 +107,10 @@ class MumuTcpConnection(AppPackage):
         if self._bind_available_endpoint(devices):
             return True
 
-        self._probe_configured_instance()
-        devices = self._list_adb_devices()
-        if self._bind_available_endpoint(devices):
-            return True
+        for _ in range(3):
+            self._probe_configured_instance()
+            devices = self._list_adb_devices()
+            if self._bind_available_endpoint(devices):
+                return True
 
         return self._raise_emulator_not_running(configured.instance_id, devices)

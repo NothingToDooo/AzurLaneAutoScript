@@ -266,15 +266,6 @@ def test_minitouch_retry_hands_over_when_minitouch_missing(monkeypatch: pytest.M
     assert logger.criticals == ["missing"]
 
 
-def test_minitouch_release_resource_clears_cached_builder() -> None:
-    device = MinitouchController(_MinitouchSessionDouble())
-    device.__dict__["_minitouch_builder"] = object()
-
-    device.release_resource()
-
-    assert "_minitouch_builder" not in device.__dict__
-
-
 def test_minitouch_rebind_excludes_old_pid_from_new_device_restart() -> None:
     old_serial = "127.0.0.1:16384"
     new_serial = "127.0.0.1:16385"

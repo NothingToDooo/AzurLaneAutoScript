@@ -118,6 +118,8 @@ class DeviceSession(MinitouchSession, RetrySession, Protocol):
 
     def list_known_packages(self, *, show_log: bool = True) -> list[str]: ...
 
+    def bind_serial(self, serial: str) -> bool: ...
+
 
 class CaptureRuntime(Protocol):
     @property

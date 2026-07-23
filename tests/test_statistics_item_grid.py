@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from module.base.button import Button
-from module.statistics.item import Item, ItemGrid, ItemGridAreas, ItemPredictOptions, item_grid_areas
+from module.statistics.item import Item, ItemGrid, ItemPredictOptions
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -109,10 +109,3 @@ def test_item_grid_predict_keeps_disabled_stages_untouched() -> None:
     assert item.cost == "DefaultCost"
     assert item.price == 0
     assert item.tag is None
-
-
-def test_item_grid_area_settings_override_options() -> None:
-    areas = item_grid_areas(ItemGridAreas(amount_area=(1, 2, 3, 4)), {"price_area": (5, 6, 7, 8)})
-
-    assert areas.amount_area == (1, 2, 3, 4)
-    assert areas.price_area == (5, 6, 7, 8)

@@ -168,7 +168,6 @@ class DailyTask(Task):
         if not isinstance(report, DailyReport):
             message = "DailyWorkflow.execute() must return a DailyReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
 
         if report.stop_reason is DailyStopReason.IN_PROGRESS:
             return TaskResult(
@@ -308,7 +307,6 @@ class HardTask(Task):
         if not isinstance(report, HardReport):
             message = "HardWorkflow.execute() must return a HardReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
 
         if report.stop_reason is HardStopReason.RESOURCE_LIMIT:
             return TaskResult(
@@ -462,7 +460,6 @@ class ExerciseTask(Task):
         if not isinstance(report, ExerciseReport):
             message = "ExerciseWorkflow.execute() must return an ExerciseReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         if report.opponent_refreshes_used > self._settings.opponent_refresh_limit:
             message = "opponent_refreshes_used must not exceed opponent_refresh_limit"
             raise ValueError(message)

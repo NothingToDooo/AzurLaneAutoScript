@@ -644,14 +644,6 @@ class GemsFarmingPolicy:
         return self.vanguard_change is not GemsVanguardChange.DISABLED
 
     @property
-    def transfers_flagship_equipment(self) -> bool:
-        return self.flagship_change is GemsFlagshipChange.SHIP_AND_EQUIPMENT
-
-    @property
-    def transfers_vanguard_equipment(self) -> bool:
-        return self.vanguard_change is GemsVanguardChange.SHIP_AND_EQUIPMENT
-
-    @property
     def level_cap(self) -> int:
         return 32
 

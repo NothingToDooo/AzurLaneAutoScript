@@ -35,14 +35,6 @@ class GridShape:
             message = "grid rows must be a positive integer"
             raise ContentValidationError(message)
 
-    @property
-    def cell_count(self) -> int:
-        return self.columns * self.rows
-
-    @property
-    def last_cell(self) -> CellId:
-        return CellId(self.columns - 1, self.rows - 1)
-
     def contains(self, cell: CellId) -> bool:
         return 0 <= cell.x < self.columns and 0 <= cell.y < self.rows
 

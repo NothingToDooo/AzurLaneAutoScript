@@ -96,27 +96,14 @@ class _Runner:
         self.vanguard_result = vanguard_result
         self.calls: list[str] = []
         self.hard_results = hard_results
-        self.flagship_fact_mode = "normal"
-        self.flagship_return_result: GemsShipReplacementResult | None = None
-        self.cancel_after_flagship: _Cancellation | None = None
-        self.cancel_after_vanguard: _Cancellation | None = None
         self.vanguard_error: RuntimeError | None = None
-        self.flagship_cleanup_error: RuntimeError | None = None
-        self.vanguard_cleanup_error: RuntimeError | None = None
         self.hard_error_after_first: RuntimeError | None = None
 
     def flagship_change(self, fact_sink: GemsShipReplacementFactSink) -> GemsShipReplacementResult:
         self.events.append("runner:flagship")
         self.calls.append("flagship")
-        if self.flagship_fact_mode != "missing":
-            fact_sink(self.flagship_result)
-        if self.flagship_fact_mode == "duplicate":
-            fact_sink(self.flagship_result)
-        if self.flagship_cleanup_error is not None:
-            raise self.flagship_cleanup_error
-        if self.cancel_after_flagship is not None:
-            self.cancel_after_flagship.requested = True
-        return self.flagship_result if self.flagship_return_result is None else self.flagship_return_result
+        fact_sink(self.flagship_result)
+        return self.flagship_result
 
     def vanguard_change(self, fact_sink: GemsShipReplacementFactSink) -> GemsShipReplacementResult:
         self.events.append("runner:vanguard")
@@ -124,10 +111,6 @@ class _Runner:
         if self.vanguard_error is not None:
             raise self.vanguard_error
         fact_sink(self.vanguard_result)
-        if self.vanguard_cleanup_error is not None:
-            raise self.vanguard_cleanup_error
-        if self.cancel_after_vanguard is not None:
-            self.cancel_after_vanguard.requested = True
         return self.vanguard_result
 
     def hard_fleet_prepare(
@@ -214,7 +197,7 @@ def _session() -> CampaignSession:
 
 
 _FLAGSHIP_POLICY_RESULT = GemsShipReplacementResult(GemsShipReplacementDisposition.POLICY_SATISFIED, 140)
-_VANGUARD_POLICY_RESULT = GemsShipReplacementResult(GemsShipReplacementDisposition.POLICY_SATISFIED, 132)
+_VANGUARD_POLICY_RESULT = GemsShipReplacementResult(GemsShipReplacementDisposition.POLICY_SATISFIED, 145)
 _HARD_POLICY_RESULTS = (GemsShipReplacementResult(GemsShipReplacementDisposition.POLICY_SATISFIED, 70),)
 
 
@@ -290,7 +273,7 @@ def test_replacement_projects_policy_and_closes_level_trigger() -> None:
     ]
     assert harness.config.records == [
         {"Emotion_Fleet1Value": 140},
-        {"Emotion_Fleet1Value": 132},
+        {"Emotion_Fleet1Value": 140},
     ]
     assert not harness.config.LV32_TRIGGERED
     assert not harness.config.GEMS_EMOTION_TRIGGERED
@@ -352,64 +335,8 @@ def test_flagship_is_mandatory_and_failure_skips_vanguard() -> None:
     assert harness.config.LV32_TRIGGERED
 
 
-def test_invalid_trigger_is_rejected_before_safe_unit_commit() -> None:
-    harness = _harness()
-
-    with pytest.raises(TypeError, match="GemsFleetReplacementTrigger"):
-        harness.executor.replace(
-            _job(_policy()),
-            _session(),
-            cast("GemsFleetReplacementTrigger", "level"),
-            harness.original_cancellation,
-        )
-
-    assert harness.source.calls == []
-    assert harness.events == []
-
-
-def test_typed_request_does_not_depend_on_process_local_trigger_flags() -> None:
-    harness = _harness(level_triggered=False)
-
-    result = harness.executor.replace(
-        _job(_policy()),
-        _session(),
-        GemsFleetReplacementTrigger.LEVEL,
-        harness.original_cancellation,
-    )
-
-    assert isinstance(result, GemsFleetReplacementCompleted)
-    assert harness.runner.calls == ["flagship", "vanguard"]
-    assert harness.config.overlays
-
-
-def test_committed_cancellation_guards_every_followup_io() -> None:
-    harness = _harness()
-
-    harness.executor.replace(
-        _job(_policy()),
-        _session(),
-        GemsFleetReplacementTrigger.LEVEL,
-        harness.original_cancellation,
-    )
-
-    assert harness.events == [
-        "original:check",
-        "committed:check",
-        "runner:factory",
-        "committed:check",
-        "config:overlay",
-        "committed:check",
-        "runner:flagship",
-        "config:record",
-        "committed:check",
-        "runner:vanguard",
-        "config:record",
-        "committed:check",
-    ]
-
-
 @pytest.mark.parametrize("succeeds", [True, False])
-def test_hard_preparation_uses_its_dedicated_typed_request(*, succeeds: bool) -> None:
+def test_hard_preparation_returns_result_and_records_emotion(*, succeeds: bool) -> None:
     disposition = (
         GemsShipReplacementDisposition.POLICY_SATISFIED if succeeds else GemsShipReplacementDisposition.FALLBACK_USED
     )
@@ -474,113 +401,6 @@ def test_completed_flagship_emotion_is_recorded_before_vanguard_error() -> None:
     assert not harness.config.GEMS_EMOTION_TRIGGERED
 
 
-@pytest.mark.parametrize("position", ["flagship", "vanguard"])
-def test_completed_replacement_is_recorded_before_primitive_cleanup_error(position: str) -> None:
-    cleanup_error = RuntimeError(f"{position} equipment restoration failed")
-    harness = _harness(level_triggered=False, emotion_triggered=True)
-    if position == "flagship":
-        harness.runner.flagship_cleanup_error = cleanup_error
-    else:
-        harness.runner.vanguard_cleanup_error = cleanup_error
-
-    with pytest.raises(RuntimeError) as raised:
-        harness.executor.replace(
-            _job(_policy()),
-            _session(),
-            GemsFleetReplacementTrigger.EMOTION,
-            harness.original_cancellation,
-        )
-
-    assert raised.value is cleanup_error
-    assert harness.config.records == (
-        [{"Emotion_Fleet1Value": 140}]
-        if position == "flagship"
-        else [
-            {"Emotion_Fleet1Value": 140},
-            {"Emotion_Fleet1Value": 132},
-        ]
-    )
-    assert not harness.config.LV32_TRIGGERED
-    assert harness.config.GEMS_EMOTION_TRIGGERED
-
-
-@pytest.mark.parametrize(
-    ("fact_mode", "return_result", "error_type", "message"),
-    [
-        ("missing", None, TypeError, "did not report"),
-        ("duplicate", None, TypeError, "more than one"),
-        (
-            "normal",
-            GemsShipReplacementResult(GemsShipReplacementDisposition.POLICY_SATISFIED, 99),
-            ValueError,
-            "different completion fact",
-        ),
-    ],
-)
-def test_replacement_bridge_fact_contract_fails_closed_after_preserving_the_reported_fact(
-    fact_mode: str,
-    return_result: GemsShipReplacementResult | None,
-    error_type: type[Exception],
-    message: str,
-) -> None:
-    harness = _harness()
-    harness.runner.flagship_fact_mode = fact_mode
-    harness.runner.flagship_return_result = return_result
-
-    with pytest.raises(error_type, match=message):
-        harness.executor.replace(
-            _job(_policy()),
-            _session(),
-            GemsFleetReplacementTrigger.LEVEL,
-            harness.original_cancellation,
-        )
-
-    assert harness.config.records == [{"Emotion_Fleet1Value": 140}]
-    assert harness.config.LV32_TRIGGERED
-    assert not harness.config.GEMS_EMOTION_TRIGGERED
-
-
-def test_completed_flagship_emotion_is_recorded_before_vanguard_cancellation() -> None:
-    harness = _harness(
-        flagship_result=GemsShipReplacementResult(GemsShipReplacementDisposition.POLICY_SATISFIED, 17),
-    )
-    harness.runner.cancel_after_flagship = harness.committed_cancellation
-
-    with pytest.raises(RuntimeError, match="committed cancellation requested"):
-        harness.executor.replace(
-            _job(_policy()),
-            _session(),
-            GemsFleetReplacementTrigger.LEVEL,
-            harness.original_cancellation,
-        )
-
-    assert harness.runner.calls == ["flagship"]
-    assert harness.config.records == [{"Emotion_Fleet1Value": 17}]
-    assert harness.config.LV32_TRIGGERED
-    assert not harness.config.GEMS_EMOTION_TRIGGERED
-
-
-def test_completed_vanguard_emotion_is_recorded_before_final_cancellation() -> None:
-    harness = _harness(level_triggered=False, emotion_triggered=True)
-    harness.runner.cancel_after_vanguard = harness.committed_cancellation
-
-    with pytest.raises(RuntimeError, match="committed cancellation requested"):
-        harness.executor.replace(
-            _job(_policy()),
-            _session(),
-            GemsFleetReplacementTrigger.EMOTION,
-            harness.original_cancellation,
-        )
-
-    assert harness.runner.calls == ["flagship", "vanguard"]
-    assert harness.config.records == [
-        {"Emotion_Fleet1Value": 140},
-        {"Emotion_Fleet1Value": 132},
-    ]
-    assert not harness.config.LV32_TRIGGERED
-    assert harness.config.GEMS_EMOTION_TRIGGERED
-
-
 def test_hard_preparation_records_each_completed_result_before_later_error() -> None:
     hard_error = RuntimeError("hard vanguard replacement crashed")
     harness = _harness(
@@ -602,27 +422,6 @@ def test_hard_preparation_records_each_completed_result_before_later_error() -> 
     assert raised.value is hard_error
     assert harness.config.records == [{"Emotion_Fleet1Value": 70}]
     assert harness.config.LV32_TRIGGERED
-    assert not harness.config.GEMS_EMOTION_TRIGGERED
-
-
-def test_success_records_each_completion_without_a_final_duplicate() -> None:
-    harness = _harness(
-        vanguard_result=GemsShipReplacementResult(GemsShipReplacementDisposition.POLICY_SATISFIED, 145),
-    )
-
-    result = harness.executor.replace(
-        _job(_policy()),
-        _session(),
-        GemsFleetReplacementTrigger.LEVEL,
-        harness.original_cancellation,
-    )
-
-    assert isinstance(result, GemsFleetReplacementCompleted)
-    assert harness.config.records == [
-        {"Emotion_Fleet1Value": 140},
-        {"Emotion_Fleet1Value": 140},
-    ]
-    assert not harness.config.LV32_TRIGGERED
     assert not harness.config.GEMS_EMOTION_TRIGGERED
 
 

@@ -136,7 +136,6 @@ class ResearchTask(Task):
         if not isinstance(report, ResearchReport):
             message = "ResearchWorkflow.execute() must return a ResearchReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
 
         if report.available_slots == 5:
             return TaskResult(
@@ -240,7 +239,6 @@ class CommissionTask(Task):
         if not isinstance(report, CommissionReport):
             message = "CommissionWorkflow.execute() must return a CommissionReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
 
         nearest_finish = min(report.finish_times, default=None)
         if nearest_finish is None:
@@ -380,7 +378,6 @@ class TacticalTask(Task):
         if not isinstance(report, TacticalReport):
             message = "TacticalWorkflow.execute() must return a TacticalReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
 
         if report.finish_at is None:
             return TaskResult(

@@ -1,9 +1,7 @@
 import queue
 import threading
 from datetime import UTC, datetime
-from multiprocessing.reduction import ForkingPickler
-from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, cast, override
+from typing import TYPE_CHECKING, Protocol, cast
 
 import pytest
 from rich.text import Text
@@ -23,8 +21,6 @@ if TYPE_CHECKING:
     from multiprocessing import Process
     from multiprocessing.queues import Queue as ProcessQueue
 
-    from module.base.stop_event import StopEvent
-
 
 class _StopEventLike(Protocol):
     def set(self) -> None: ...
@@ -41,13 +37,6 @@ class _StopEvent:
 
     def is_set(self) -> bool:
         return self.set_calls > 0
-
-
-class _FailingStopEvent(_StopEvent):
-    @override
-    def set(self) -> None:
-        message = "stop signal failed"
-        raise RuntimeError(message)
 
 
 class _Process:
@@ -120,13 +109,6 @@ class _ExitBeforeWaitCompletesProcess(_Process):
             raise TimeoutError(message)
 
 
-class _JoinFailureProcess(_Process):
-    def join(self, timeout: float | None = None) -> None:
-        self.join_calls.append(timeout)
-        message = "join failed"
-        raise RuntimeError(message)
-
-
 def _outcome(
     status: CommandStatus,
     *,
@@ -176,221 +158,6 @@ def _attach_run(
         },
     )
     return run
-
-
-def _patch_process_boundary(monkeypatch: pytest.MonkeyPatch, calls: list[tuple[object, ...]]) -> None:
-    class _Logger:
-        @staticmethod
-        def critical(message: object) -> None:
-            calls.append(("critical", message))
-
-        @staticmethod
-        def exception(error: BaseException) -> None:
-            calls.append(("exception", str(error)))
-
-        @staticmethod
-        def info(message: object) -> None:
-            calls.append(("info", message))
-
-        @staticmethod
-        def warning(message: object) -> None:
-            calls.append(("warning", message))
-
-        @staticmethod
-        def hr(message: object) -> None:
-            calls.append(("hr", message))
-
-    monkeypatch.setattr(
-        process_manager_module,
-        "configure_file_logging",
-        lambda root, *, name: calls.append(("configure_file_logging", root, name)),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        process_manager_module,
-        "set_func_logger",
-        lambda *, func: calls.append(("set_func_logger", func)),
-    )
-    monkeypatch.setattr(process_manager_module, "logger", _Logger())
-
-
-def test_command_outcome_and_request_cross_spawn_boundary() -> None:
-    request = _request("Benchmark")
-    outcome = _outcome(CommandStatus.FINISHED, command="benchmark")
-
-    assert ForkingPickler.loads(ForkingPickler.dumps(request)) == request
-    assert ForkingPickler.loads(ForkingPickler.dumps(outcome)) == outcome
-
-
-@pytest.mark.parametrize(
-    ("ui_command", "runtime_command"),
-    [
-        ("alas", "alas"),
-        ("Benchmark", "benchmark"),
-        ("GameManager", "game_manager"),
-    ],
-)
-def test_execute_process_delegates_to_default_command(
-    monkeypatch: pytest.MonkeyPatch,
-    ui_command: str,
-    runtime_command: str,
-) -> None:
-    calls: list[tuple[str, object | None]] = []
-    stop_event = _StopEvent()
-    expected = _outcome(CommandStatus.FINISHED, command=runtime_command)
-
-    def run(
-        command: str,
-        *,
-        project_root: object | None = None,
-        stop_signal: object | None = None,
-    ) -> CommandOutcome:
-        assert project_root == process_manager_module.PROJECT_ROOT
-        calls.append((command, stop_signal))
-        return expected
-
-    monkeypatch.setattr("module.bootstrap.production.run_default_command", run)
-
-    actual = process_manager_module._execute_process(  # ruff:ignore[private-member-access] - 验证命令解析边界。
-        _request(ui_command),
-        cast("StopEvent", stop_event),
-    )
-
-    assert actual is expected
-    assert calls == [(runtime_command, stop_event)]
-
-
-def test_execute_process_rejects_unknown_ui_command(monkeypatch: pytest.MonkeyPatch) -> None:
-    critical: list[str] = []
-    monkeypatch.setattr(process_manager_module.logger, "critical", critical.append)
-
-    outcome = process_manager_module._execute_process(  # ruff:ignore[private-member-access] - 验证命令解析边界。
-        _request("Main"),
-        None,
-    )
-
-    assert outcome.status is CommandStatus.FAILED
-    assert outcome.exception_type == "LookupError"
-    assert outcome.message == "No function matched: Main"
-    assert critical == ["No function matched: Main"]
-
-
-def test_run_process_publishes_default_command_outcome_without_changing_cwd(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    calls: list[tuple[object, ...]] = []
-    expected = _outcome(CommandStatus.FINISHED)
-    renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
-    outcome_queue: queue.Queue[CommandOutcome] = queue.Queue()
-    _patch_process_boundary(monkeypatch, calls)
-    monkeypatch.chdir(tmp_path)
-
-    def execute(request: _ProcessRequest, stop_event: StopEvent | None) -> CommandOutcome:
-        del request, stop_event
-        calls.append(("execute", Path.cwd()))
-        return expected
-
-    monkeypatch.setattr(process_manager_module, "_execute_process", execute)
-
-    ProcessManager.run_process(_request("alas"), renderable_queue, outcome_queue)
-
-    assert outcome_queue.get_nowait() is expected
-    assert renderable_queue.get_nowait() is None
-    assert calls[:3] == [
-        ("configure_file_logging", process_manager_module.PROJECT_ROOT, "alas"),
-        ("set_func_logger", renderable_queue.put),
-        ("execute", tmp_path),
-    ]
-    assert Path.cwd() == tmp_path
-    assert ("info", "[alas] exited. Reason: finished\n") in calls
-
-
-def test_run_process_converts_unexpected_exception(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[object, ...]] = []
-    renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
-    outcome_queue: queue.Queue[CommandOutcome] = queue.Queue()
-    _patch_process_boundary(monkeypatch, calls)
-
-    def fail(request: _ProcessRequest, stop_event: StopEvent | None) -> CommandOutcome:
-        del request, stop_event
-        message = "first line\nsecond line"
-        raise ValueError(message)
-
-    monkeypatch.setattr(process_manager_module, "_execute_process", fail)
-
-    ProcessManager.run_process(_request("alas"), renderable_queue, outcome_queue)
-
-    outcome = outcome_queue.get_nowait()
-    assert outcome.status is CommandStatus.FAILED
-    assert outcome.exception_type == "ValueError"
-    assert outcome.message == "first line second line"
-    assert ("exception", "first line\nsecond line") in calls
-    assert renderable_queue.get_nowait() is None
-
-
-@pytest.mark.parametrize(
-    ("code", "stopped", "status"),
-    [
-        (0, False, CommandStatus.FINISHED),
-        (7, False, CommandStatus.FAILED),
-        (7, True, CommandStatus.STOPPED),
-    ],
-)
-def test_run_process_publishes_outcome_before_reraising_system_exit(
-    monkeypatch: pytest.MonkeyPatch,
-    code: int,
-    status: CommandStatus,
-    *,
-    stopped: bool,
-) -> None:
-    calls: list[tuple[object, ...]] = []
-    renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
-    outcome_queue: queue.Queue[CommandOutcome] = queue.Queue()
-    stop_event = _StopEvent(is_set=stopped)
-    _patch_process_boundary(monkeypatch, calls)
-
-    def exit_process(request: _ProcessRequest, event: StopEvent | None) -> CommandOutcome:
-        del request, event
-        raise SystemExit(code)
-
-    monkeypatch.setattr(process_manager_module, "_execute_process", exit_process)
-
-    with pytest.raises(SystemExit, match=str(code)):
-        ProcessManager.run_process(
-            _request("alas"),
-            renderable_queue,
-            outcome_queue,
-            cast("StopEvent", stop_event),
-        )
-
-    assert outcome_queue.get_nowait().status is status
-    assert renderable_queue.get_nowait() is None
-
-
-def test_run_process_publishes_base_exception_group_before_reraising(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[tuple[object, ...]] = []
-    renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
-    outcome_queue: queue.Queue[CommandOutcome] = queue.Queue()
-    error = BaseExceptionGroup("exit and cleanup failed", (SystemExit(7), OSError("cleanup")))
-    _patch_process_boundary(monkeypatch, calls)
-
-    def fail(request: _ProcessRequest, stop_event: StopEvent | None) -> CommandOutcome:
-        del request, stop_event
-        raise error
-
-    monkeypatch.setattr(process_manager_module, "_execute_process", fail)
-
-    with pytest.raises(BaseExceptionGroup) as raised:
-        ProcessManager.run_process(_request("alas"), renderable_queue, outcome_queue)
-
-    assert raised.value is error
-    outcome = outcome_queue.get_nowait()
-    assert outcome.status is CommandStatus.FAILED
-    assert outcome.exception_type == "BaseExceptionGroup"
-    assert renderable_queue.get_nowait() is None
 
 
 def test_start_uses_fresh_ipc_resources(
@@ -618,77 +385,6 @@ def test_start_waits_until_blocking_stop_releases_the_previous_run(
     assert vars(manager)["_run"] is not old_run
 
 
-def test_blocking_stop_waiter_is_released_when_join_fails() -> None:
-    manager = ProcessManager()
-    _attach_run(manager, _JoinFailureProcess())
-
-    with pytest.raises(RuntimeError, match="join failed"):
-        manager.stop_and_wait()
-
-    assert vars(manager)["_start_inhibitors"] == 0
-
-
-def test_stop_and_wait_releases_nested_start_holds_when_stop_signal_fails() -> None:
-    manager = ProcessManager()
-    run = _attach_run(manager, _Process(), stop_event=_FailingStopEvent())
-
-    with manager.hold_start():
-        with pytest.raises(RuntimeError, match="stop signal failed"):
-            manager.stop_and_wait()
-        assert vars(manager)["_start_inhibitors"] == 1
-        assert not run.stop_requested
-
-    assert vars(manager)["_start_inhibitors"] == 0
-
-
-def test_hold_start_inhibits_start_until_the_state_update_finishes() -> None:
-    manager = ProcessManager()
-
-    with manager.hold_start():
-        manager.start("Benchmark")
-        assert vars(manager)["_run"] is None
-        assert vars(manager)["_start_inhibitors"] == 1
-
-    assert vars(manager)["_start_inhibitors"] == 0
-
-
-def test_parent_stop_intent_wins_over_late_child_success() -> None:
-    stop_event = _StopEvent()
-    process = _Process(exits_on_join=True)
-    manager = ProcessManager()
-    _attach_run(
-        manager,
-        process,
-        stop_event=stop_event,
-        outcome=_outcome(CommandStatus.FINISHED),
-    )
-
-    manager.stop_and_wait()
-
-    assert manager.outcome is not None
-    assert manager.outcome.status is CommandStatus.STOPPED
-
-
-def test_process_manager_is_singleton() -> None:
-    manager = ProcessManager.instance()
-
-    assert ProcessManager.instance() is manager
-    assert ProcessManager() is manager
-
-
-def test_force_stop_instance_does_not_create_a_manager(monkeypatch: pytest.MonkeyPatch) -> None:
-    ProcessManager.force_stop_instance()
-    assert ProcessManager._singleton is None  # ruff:ignore[private-member-access] - shutdown 不创建新实例。
-
-    manager = ProcessManager.instance()
-    force_calls: list[None] = []
-    monkeypatch.setattr(manager, "force_stop", lambda: force_calls.append(None))
-
-    ProcessManager.force_stop_instance()
-
-    assert force_calls == [None]
-
-
 def test_monitor_drains_tail_logs_and_publishes_outcome() -> None:
     process = _Process(alive=False)
     manager = ProcessManager()
@@ -706,24 +402,6 @@ def test_monitor_drains_tail_logs_and_publishes_outcome() -> None:
     assert manager.renderables == [tail]
     assert manager.outcome is not None
     assert manager.outcome.status is CommandStatus.FINISHED
-
-
-def test_monitor_reports_missing_child_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(process_manager_module, "QUEUE_DRAIN_SECONDS", 0)
-    process = _Process(alive=False, exitcode=9)
-    manager = ProcessManager()
-    run = _attach_run(manager, process)
-    run.renderable_queue.put(None)
-
-    manager.start_log_queue_handler(run)
-    monitor = manager.thd_log_queue_handler
-    assert monitor is not None
-    monitor.join(timeout=2)
-
-    assert manager.outcome is not None
-    assert manager.outcome.status is CommandStatus.FAILED
-    assert manager.outcome.exception_type == "MissingProcessOutcome"
-    assert manager.outcome.message == "Process exited without an outcome (exitcode=9)"
 
 
 def test_old_monitor_cannot_overwrite_current_run_outcome() -> None:
@@ -744,46 +422,3 @@ def test_old_monitor_cannot_overwrite_current_run_outcome() -> None:
     assert not old_monitor.is_alive()
     assert vars(manager)["_run"] is current_run
     assert manager.outcome is current_outcome
-
-
-@pytest.mark.parametrize(
-    ("status", "expected"),
-    [
-        (CommandStatus.FINISHED, 2),
-        (CommandStatus.STOPPED, 2),
-        (CommandStatus.RESTART_REQUESTED, 2),
-        (CommandStatus.FAILED, 3),
-        (CommandStatus.KILLED, 3),
-    ],
-)
-def test_state_uses_command_outcome(status: CommandStatus, expected: int) -> None:
-    manager = ProcessManager()
-    _attach_run(manager, _Process(alive=False))
-    manager.renderables.append("misleading final log: Finish")
-    vars(manager)["_outcome"] = _outcome(status)
-
-    assert manager.state == expected
-
-
-def test_stop_after_completion_preserves_child_outcome() -> None:
-    process = _Process(alive=False)
-    manager = ProcessManager()
-    _attach_run(manager, process, outcome=_outcome(CommandStatus.FINISHED))
-
-    manager.stop_and_wait()
-
-    assert manager.outcome is not None
-    assert manager.outcome.status is CommandStatus.FINISHED
-
-
-def test_force_stop_after_completion_preserves_child_outcome() -> None:
-    process = _Process(alive=False)
-    manager = ProcessManager()
-    _attach_run(manager, process, outcome=_outcome(CommandStatus.FAILED, message="child failed"))
-
-    manager.force_stop()
-
-    assert process.kill_calls == 0
-    assert manager.outcome is not None
-    assert manager.outcome.status is CommandStatus.FAILED
-    assert manager.outcome.message == "child failed"

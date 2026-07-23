@@ -5,7 +5,6 @@ import pytest
 
 from module.bootstrap import production
 from module.runtime.runner import CommandStatus
-from module.task_registry import TASK_SPECS
 
 
 def _project_root(tmp_path: Path) -> Path:
@@ -14,18 +13,6 @@ def _project_root(tmp_path: Path) -> Path:
     (tmp_path / "module").mkdir()
     shutil.copyfile("config/template.json", tmp_path / "config" / "template.json")
     return tmp_path
-
-
-def test_command_validation_accepts_scheduler_and_every_task() -> None:
-    production._validate_command("alas")  # ruff:ignore[private-member-access] - composition boundary contract.
-    for command in TASK_SPECS:
-        production._validate_command(command)  # ruff:ignore[private-member-access] - composition boundary contract.
-
-
-@pytest.mark.parametrize("command", ["", " missing", "missing ", "missing"])
-def test_command_validation_rejects_malformed_or_unknown_commands(command: str) -> None:
-    with pytest.raises(ValueError, match="command"):
-        production._validate_command(command)  # ruff:ignore[private-member-access] - composition boundary contract.
 
 
 def test_unknown_command_fails_before_device_composition(

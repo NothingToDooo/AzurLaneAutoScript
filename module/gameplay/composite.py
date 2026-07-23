@@ -187,7 +187,6 @@ class DormTask(Task):
         if not isinstance(report, DormReport):
             message = "DormWorkflow.execute() must return a DormReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         if report.furniture_checked is not furniture_due:
             message = "DormReport.furniture_checked must match the requested furniture check"
             raise ValueError(message)
@@ -313,7 +312,6 @@ class MeowfficerTask(Task):
         if not isinstance(report, MeowfficerReport):
             message = "MeowfficerWorkflow.execute() must return a MeowfficerReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
 
         training = self._settings.training
         if report.training_active and training is None:
@@ -440,7 +438,6 @@ class GuildTask(Task):
         if not isinstance(report, GuildReport):
             message = "GuildWorkflow.execute() must return a GuildReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         self._validate_report_shape(report)
 
         succeeded = report.logistics_succeeded is not False and report.operation_succeeded is not False
@@ -528,7 +525,6 @@ class RewardTask(Task):
         if not isinstance(report, RewardReport):
             message = "RewardWorkflow.execute() must return a RewardReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         return TaskResult(
             outcome=Succeeded(),
             effects=(RescheduleSelf(report.observed_at + self._delay_sampler.sample(self._settings.success_delay)),),
@@ -783,7 +779,6 @@ class PrivateQuartersTask(Task):
         if not isinstance(report, PrivateQuartersReport):
             message = "PrivateQuartersWorkflow.execute() must return a PrivateQuartersReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         self._validate_report_shape(report)
         if report.observed_at < context.started_at:
             message = "private-quarters observation must not precede the run start"

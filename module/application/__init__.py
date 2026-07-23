@@ -9,6 +9,7 @@ from module.application.coordinator import (
     RunCoordinator,
     RunRepository,
     ScheduledTaskDidNotAdvanceError,
+    TaskErrorRecovery,
 )
 from module.application.daily_schedule import DailySchedule
 from module.application.delay import DelayRange, DelaySampler, runtime_delay_sampler
@@ -25,7 +26,16 @@ from module.application.effects import (
 from module.application.identifiers import TaskId
 from module.application.metadata import RunMetadata
 from module.application.notifications import OperatorNotificationKind, OperatorNotificationRequest
-from module.application.outcomes import Blocked, Cancelled, Deferred, Faulted, Retryable, RunOutcome, Succeeded
+from module.application.outcomes import (
+    Blocked,
+    Cancelled,
+    Deferred,
+    Faulted,
+    RecoverableFault,
+    Retryable,
+    RunOutcome,
+    Succeeded,
+)
 from module.application.scheduler import (
     ScheduleItem,
     SchedulePlanner,
@@ -56,6 +66,7 @@ __all__ = [
     "Faulted",
     "OperatorNotificationKind",
     "OperatorNotificationRequest",
+    "RecoverableFault",
     "RequestAppRestart",
     "RescheduleSelf",
     "RescheduleTask",
@@ -77,6 +88,7 @@ __all__ = [
     "Succeeded",
     "Task",
     "TaskContext",
+    "TaskErrorRecovery",
     "TaskId",
     "TaskResult",
     "UpsertTaskState",

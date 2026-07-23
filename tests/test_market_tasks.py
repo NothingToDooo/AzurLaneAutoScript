@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, time
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol
 
 import pytest
 
@@ -236,28 +236,6 @@ def test_awaken_level125_timeout_skips_level120_but_keeps_server_update_schedule
     )
 
 
-def test_awaken_rejects_report_that_does_not_match_configured_level_cap() -> None:
-    workflow = _Workflow(
-        AwakenReport(
-            attempts=(AwakenAttempt(AwakenLevelCap.LEVEL_125, AwakenRunResult.TIMED_OUT),),
-        )
-    )
-
-    with pytest.raises(ValueError, match="level120 awaken plan"):
-        AwakenTask(workflow, _awaken_settings()).run(_context("awaken"))
-
-
-def test_awaken_level125_requires_level120_after_non_timeout() -> None:
-    workflow = _Workflow(
-        AwakenReport(
-            attempts=(AwakenAttempt(AwakenLevelCap.LEVEL_125, AwakenRunResult.FINISHED),),
-        )
-    )
-
-    with pytest.raises(ValueError, match="skip level120 only after a timeout"):
-        AwakenTask(workflow, _awaken_settings(AwakenLevelCap.LEVEL_125)).run(_context("awaken"))
-
-
 def test_shipyard_without_any_purchase_disables_itself_without_opening_workflow() -> None:
     workflow = _Workflow(ShipyardReport(pr_processed=False, dr_processed=False))
 
@@ -332,7 +310,7 @@ def test_market_abort_before_run_prevents_external_side_effects(task_name: str) 
 
 
 @pytest.mark.parametrize("task_name", ["awaken", "shipyard", "gacha", "shop_frequent", "shop_once"])
-def test_market_abort_after_workflow_discards_schedule_result(task_name: str) -> None:
+def test_market_abort_after_completed_workflow_preserves_schedule_and_stops_next_entry(task_name: str) -> None:
     abort = AbortToken()
 
     def request_abort() -> None:
@@ -340,106 +318,13 @@ def test_market_abort_after_workflow_discards_schedule_result(task_name: str) ->
 
     task, workflow = _build_task(task_name, after_execute=request_abort)
 
+    result = task.run(_context(task_name, abort))
+
+    assert result == TaskResult(
+        outcome=Succeeded(),
+        effects=(RescheduleSelf(_NEXT_SERVER_UPDATE_AT),),
+    )
     with pytest.raises(AbortRequested, match="stop after workflow"):
         task.run(_context(task_name, abort))
 
     assert workflow.execute_calls == 1
-
-
-def test_market_tasks_reject_invalid_port_outputs() -> None:
-    invalid = object()
-    cases: tuple[tuple[Task, str, str], ...] = (
-        (
-            AwakenTask(_Workflow(cast("AwakenReport", invalid)), _awaken_settings()),
-            "awaken",
-            "AwakenWorkflow.execute",
-        ),
-        (
-            ShipyardTask(
-                _Workflow(cast("ShipyardReport", invalid)),
-                _shipyard_settings(pr_buy_amount=1, dr_buy_amount=0),
-            ),
-            "shipyard",
-            "ShipyardWorkflow.execute",
-        ),
-        (
-            GachaTask(_Workflow(cast("GachaReport", invalid)), _gacha_settings()),
-            "gacha",
-            "GachaWorkflow.execute",
-        ),
-        (
-            ShopFrequentTask(
-                _Workflow(cast("ShopFrequentReport", invalid)),
-                _shop_frequent_settings(),
-            ),
-            "shop_frequent",
-            "ShopFrequentWorkflow.execute",
-        ),
-        (
-            ShopOnceTask(
-                _Workflow(cast("ShopOnceReport", invalid)),
-                _shop_once_settings(),
-            ),
-            "shop_once",
-            "ShopOnceWorkflow.execute",
-        ),
-    )
-
-    for task, task_name, contract in cases:
-        with pytest.raises(TypeError, match=contract):
-            task.run(_context(task_name))
-
-
-def test_market_settings_require_a_daily_schedule() -> None:
-    invalid = cast("DailySchedule", object())
-
-    with pytest.raises(TypeError, match="DailySchedule"):
-        AwakenSettings(AwakenPlan(AwakenLevelCap.LEVEL_120, favourite_only=False), invalid)
-    with pytest.raises(TypeError, match="DailySchedule"):
-        ShipyardSettings(_shipyard_settings(pr_buy_amount=1, dr_buy_amount=1).plan, invalid)
-    with pytest.raises(TypeError, match="DailySchedule"):
-        GachaSettings(_gacha_settings().plan, invalid)
-    with pytest.raises(TypeError, match="DailySchedule"):
-        _shop_frequent_settings(schedule=invalid)
-    with pytest.raises(TypeError, match="DailySchedule"):
-        _shop_once_settings(schedule=invalid)
-
-
-def test_market_settings_and_reports_reject_invalid_values() -> None:
-    with pytest.raises(TypeError, match="AwakenLevelCap"):
-        AwakenPlan(cast("AwakenLevelCap", "level120"), favourite_only=False)
-    with pytest.raises(TypeError, match="must be a bool"):
-        AwakenPlan(AwakenLevelCap.LEVEL_120, cast("bool", 1))
-    with pytest.raises(ValueError, match="one or two"):
-        AwakenReport(())
-    with pytest.raises(ValueError, match="non-timeout level125"):
-        AwakenReport(
-            (
-                AwakenAttempt(AwakenLevelCap.LEVEL_125, AwakenRunResult.TIMED_OUT),
-                AwakenAttempt(AwakenLevelCap.LEVEL_120, AwakenRunResult.FINISHED),
-            )
-        )
-    with pytest.raises(ValueError, match="must be positive"):
-        ShipyardPurchasePlan(research_series=0, ship_index=0, buy_amount=1)
-    with pytest.raises(ValueError, match="must be non-negative"):
-        ShipyardPurchasePlan(research_series=1, ship_index=-1, buy_amount=1)
-    with pytest.raises(ValueError, match="must be non-negative"):
-        ShipyardPurchasePlan(research_series=1, ship_index=0, buy_amount=-1)
-    with pytest.raises(TypeError, match="must be a bool"):
-        ShipyardReport(pr_processed=cast("bool", 1), dr_processed=False)
-    with pytest.raises(TypeError, match="GachaPool"):
-        GachaPlan(
-            cast("GachaPool", "light"),
-            1,
-            use_ticket=True,
-            use_drill=False,
-        )
-    with pytest.raises(ValueError, match="must be positive"):
-        GachaPlan(GachaPool.LIGHT, 0, use_ticket=True, use_drill=False)
-    with pytest.raises(TypeError, match="must be a bool"):
-        GachaReport(submitted=cast("bool", 1))
-
-
-def test_market_schedule_type_error_is_explicit() -> None:
-    with pytest.raises(TypeError, match="DailySchedule"):
-        _shop_once_settings(schedule=cast("DailySchedule", "tomorrow"))

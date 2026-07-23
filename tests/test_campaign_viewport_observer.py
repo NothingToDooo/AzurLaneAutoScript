@@ -12,10 +12,7 @@ from module.adapters.campaign_map_observer import (
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
-from module.adapters.campaign_runtime_profile import (
-    CampaignRuntimeProfileError,
-    CampaignRuntimeProfileManager,
-)
+from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
 from module.content.manifest import load_default_event_manifests
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -293,15 +290,3 @@ def test_unmatched_focus_rules_preserve_normalized_location_and_sight_for_fallba
     assert runtime.standard_requests[0] is request
     assert runtime.standard_requests[0].location == (5, 5)
     assert runtime.standard_requests[0].sight is sight
-
-
-def test_focus_rules_profile_rejects_obsolete_string_operation() -> None:
-    profile = _focus_profile(
-        {
-            "operations": ["in_sight"],
-            "rules": [{"when": {"cell": "E3"}, "focus_cell": "E3"}],
-        }
-    )
-
-    with pytest.raises(CampaignRuntimeProfileError, match=r"unknown option: operations"):
-        CampaignRuntimeProfileManager(profile, load_default_campaign_runtime_executor_registry())

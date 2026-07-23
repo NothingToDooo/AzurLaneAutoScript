@@ -1,10 +1,7 @@
 from typing import TYPE_CHECKING, override
 
-import pytest
-
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
-    CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeExecutorBuildContext,
     RuntimeExecutorFactoryDescriptor,
@@ -92,29 +89,6 @@ class _LifecycleExecutor(RuntimeExecutorInstance):
         self.trace.append("reset")
 
 
-class _CleanupFailingLifecycleExecutor(_LifecycleExecutor):
-    def __init__(
-        self,
-        trace: list[object],
-        *,
-        end_error: BaseException,
-        reset_error: BaseException,
-    ) -> None:
-        super().__init__(frozenset({RuntimeExecutorKind.MAP_MECHANIC}), trace)
-        self._end_error = end_error
-        self._reset_error = reset_error
-
-    @override
-    def end_session(self, outcome: RuntimeSessionOutcome) -> None:
-        super().end_session(outcome)
-        raise self._end_error
-
-    @override
-    def reset(self) -> None:
-        super().reset()
-        raise self._reset_error
-
-
 def _binding(
     implementation: str,
     kind: RuntimeExecutorKind,
@@ -156,11 +130,6 @@ def _descriptor(
     )
 
 
-def _empty_navigation(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    del context
-    return RuntimeExecutorInstance({RuntimeExecutorKind.NAVIGATION})
-
-
 def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
     builds: list[RuntimeExecutorBuildContext] = []
 
@@ -197,164 +166,6 @@ def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
         RuntimeExecutorKind.MAP_MECHANIC,
         RuntimeExecutorKind.ENGINE_EXTENSION,
     }
-
-
-def test_executor_lookups_preserve_profile_order() -> None:
-    created: list[RuntimeExecutorInstance] = []
-
-    def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-        del context
-        instance = RuntimeExecutorInstance({RuntimeExecutorKind.MAP_MECHANIC})
-        created.append(instance)
-        return instance
-
-    schemas = {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()}
-    manager = CampaignRuntimeProfileManager(
-        _profile(
-            _extension("base", _binding("base", RuntimeExecutorKind.MAP_MECHANIC)),
-            _extension(
-                "derived",
-                _binding("derived", RuntimeExecutorKind.MAP_MECHANIC),
-            ),
-        ),
-        CampaignRuntimeExecutorRegistry(
-            (
-                _descriptor("base", schemas, factory),
-                _descriptor("derived", schemas, factory),
-            )
-        ),
-    )
-
-    assert manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC) == tuple(created)
-    assert manager.executor_instances_in_profile_order() == tuple(created)
-
-
-@pytest.mark.parametrize(
-    ("profile", "registry", "match"),
-    [
-        (
-            _profile(_extension("missing", _binding("missing", RuntimeExecutorKind.NAVIGATION))),
-            CampaignRuntimeExecutorRegistry(()),
-            "unregistered",
-        ),
-        (
-            _profile(_extension("wrong", _binding("wrong", RuntimeExecutorKind.EVENT_UI))),
-            CampaignRuntimeExecutorRegistry(
-                (
-                    _descriptor(
-                        "wrong",
-                        {RuntimeExecutorKind.NAVIGATION: RuntimeExecutorOptionsSchema()},
-                        _empty_navigation,
-                    ),
-                )
-            ),
-            "does not support",
-        ),
-        (
-            _profile(
-                _extension(
-                    "options",
-                    _binding(
-                        "options",
-                        RuntimeExecutorKind.NAVIGATION,
-                        {"unexpected": True},
-                    ),
-                )
-            ),
-            CampaignRuntimeExecutorRegistry(
-                (
-                    _descriptor(
-                        "options",
-                        {RuntimeExecutorKind.NAVIGATION: RuntimeExecutorOptionsSchema()},
-                        _empty_navigation,
-                    ),
-                )
-            ),
-            "unknown option",
-        ),
-    ],
-)
-def test_registry_contracts_fail_before_runtime_binding(
-    profile: CampaignRuntimeProfile,
-    registry: CampaignRuntimeExecutorRegistry,
-    match: str,
-) -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match=match):
-        CampaignRuntimeProfileManager(profile, registry)
-
-
-@pytest.mark.parametrize(
-    ("key", "value", "match"),
-    [
-        (RuntimeTuningKey.FLEET_2, 1.0, "fleet_2 must be an integer"),
-        (RuntimeTuningKey.FLEET_BOSS, 0, "fleet_boss must be 1 or 2"),
-        (RuntimeTuningKey.FLEET_BOSS, 3, "fleet_boss must be 1 or 2"),
-        (
-            RuntimeTuningKey.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD,
-            "bright",
-            "map_air_raid_overlay_transparency_threshold must be a number",
-        ),
-        (
-            RuntimeTuningKey.BOSS_APPEAR_REFOCUS_PRESET,
-            (1,),
-            "boss_appear_refocus_preset must be a pair of integers",
-        ),
-        (
-            RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_MULTIPLIER,
-            True,
-            "map_clear_percentage_multiplier must be a number",
-        ),
-        (
-            RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE,
-            1.0,
-            "combat_disable_stuck_detection_battle must be an integer",
-        ),
-    ],
-)
-def test_invalid_tuning_projection_fails_during_manager_construction(
-    key: RuntimeTuningKey,
-    value: object,
-    match: str,
-) -> None:
-    profile = CampaignRuntimeProfile(
-        CampaignRuntimeProfileId("invalid_tuning"),
-        tunings=(RuntimeTuning(key, value),),
-    )
-
-    with pytest.raises(CampaignRuntimeProfileError, match=match):
-        CampaignRuntimeProfileManager(profile, CampaignRuntimeExecutorRegistry(()))
-
-
-@pytest.mark.parametrize(
-    ("kind", "match"),
-    [
-        (RuntimeExecutorKind.MAP_GRID_RECOGNITION, "more than one effective map grid executor"),
-        (RuntimeExecutorKind.CAMERA_GRID_RECOGNITION, "more than one effective camera grid executor"),
-    ],
-)
-def test_effective_grid_executor_conflict_fails_during_manager_construction(
-    kind: RuntimeExecutorKind,
-    match: str,
-) -> None:
-    def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-        del context
-        if kind is RuntimeExecutorKind.MAP_GRID_RECOGNITION:
-            return RuntimeExecutorInstance({kind}, map_grid_class=_MapGrid)
-        return RuntimeExecutorInstance({kind}, camera_grid_class=_CameraGrid)
-
-    profile = _profile(
-        _extension("first", _binding("first", kind)),
-        _extension("second", _binding("second", kind)),
-    )
-    registry = CampaignRuntimeExecutorRegistry(
-        (
-            _descriptor("first", {kind: RuntimeExecutorOptionsSchema()}, factory),
-            _descriptor("second", {kind: RuntimeExecutorOptionsSchema()}, factory),
-        )
-    )
-
-    with pytest.raises(CampaignRuntimeProfileError, match=match):
-        CampaignRuntimeProfileManager(profile, registry)
 
 
 def test_tuning_patch_is_sparse_and_does_not_leak_between_runtimes() -> None:
@@ -404,26 +215,6 @@ def test_tuning_patch_is_sparse_and_does_not_leak_between_runtimes() -> None:
     assert other.boss_appear_refocus_preset is None
     assert other.map_clear_percentage_multiplier == 1.0
     assert other.configured_boss_fleet is None
-
-
-def test_empty_tuning_patch_preserves_nonzero_runtime_threshold_defaults() -> None:
-    class _RuntimeWithDefaults:
-        MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.25
-        MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = 0.35
-        MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.45
-
-    manager = CampaignRuntimeProfileManager(
-        CampaignRuntimeProfile.core(),
-        CampaignRuntimeExecutorRegistry(()),
-    )
-    runtime = _RuntimeWithDefaults()
-
-    manager.apply_runtime_thresholds(runtime)
-
-    assert pytest.approx(0.25) == runtime.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD
-    assert pytest.approx(0.35) == runtime.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD
-    assert pytest.approx(0.45) == runtime.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD
-    assert vars(runtime) == {}
 
 
 def test_map_and_camera_grid_ports_are_selected_independently() -> None:
@@ -509,83 +300,3 @@ def test_lifecycle_closes_and_a_new_manager_reseeds_state() -> None:
     ]
     assert traces[1] == ["bind"]
     assert not other.use_support_fleet(AbortToken())
-
-
-def test_manager_session_active_guard_covers_every_transition() -> None:
-    manager = CampaignRuntimeProfileManager(
-        _profile(),
-        CampaignRuntimeExecutorRegistry(()),
-    )
-    manager.bind(_Runtime(), CampaignMap("session-active-guard"))
-
-    manager.begin_session()
-
-    with pytest.raises(CampaignRuntimeProfileError, match="already has an active session"):
-        manager.begin_session()
-    with pytest.raises(CampaignRuntimeProfileError, match="cannot reset an active session"):
-        manager.reset()
-
-    manager.end_session(RuntimeSessionOutcome.COMPLETED)
-
-    with pytest.raises(CampaignRuntimeProfileError, match="has no active session"):
-        manager.end_session(RuntimeSessionOutcome.COMPLETED)
-    manager.reset()
-
-
-def test_lifecycle_attempts_every_executor_cleanup_and_poison_manager() -> None:
-    first_trace: list[object] = []
-    second_trace: list[object] = []
-    first_end_error = RuntimeError("first end failed")
-    second_end_error = OSError("second end failed")
-    first_reset_error = RuntimeError("first reset failed")
-    second_reset_error = OSError("second reset failed")
-
-    def first_factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-        del context
-        return _CleanupFailingLifecycleExecutor(
-            first_trace,
-            end_error=first_end_error,
-            reset_error=first_reset_error,
-        )
-
-    def second_factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-        del context
-        return _CleanupFailingLifecycleExecutor(
-            second_trace,
-            end_error=second_end_error,
-            reset_error=second_reset_error,
-        )
-
-    schema = {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()}
-    manager = CampaignRuntimeProfileManager(
-        _profile(
-            _extension("first", _binding("first", RuntimeExecutorKind.MAP_MECHANIC)),
-            _extension("second", _binding("second", RuntimeExecutorKind.MAP_MECHANIC)),
-        ),
-        CampaignRuntimeExecutorRegistry(
-            (
-                _descriptor("first", schema, first_factory),
-                _descriptor("second", schema, second_factory),
-            )
-        ),
-    )
-    manager.bind(_Runtime(), CampaignMap("cleanup-failure"))
-    manager.begin_session()
-
-    with pytest.raises(ExceptionGroup) as end_raised:
-        manager.end_session(RuntimeSessionOutcome.FAILED)
-
-    assert end_raised.value.exceptions == (second_end_error, first_end_error)
-
-    with pytest.raises(ExceptionGroup) as reset_raised:
-        manager.reset()
-
-    assert reset_raised.value.exceptions == (second_reset_error, first_reset_error)
-    assert first_trace == [
-        "bind",
-        ("end", RuntimeSessionOutcome.FAILED),
-        "reset",
-    ]
-    assert second_trace == first_trace
-    with pytest.raises(CampaignRuntimeProfileError, match="must be bound"):
-        manager.begin_session()

@@ -20,3 +20,14 @@ class UnknownTaskError(RuntimeCompositionError):
 
 class InvalidTaskFactoryError(RuntimeCompositionError):
     """Task factory 没有返回有效的 Task。"""
+
+
+class RecoveryLimitExceededError(RuntimeError):
+    """同一调度任务连续耗尽可恢复失败预算。"""
+
+    def __init__(self, task_id: str, attempts: int, last_error: Exception) -> None:
+        self.task_id = task_id
+        self.attempts = attempts
+        self.last_error = last_error
+        super().__init__(f"Task {task_id!r} failed {attempts} consecutive times; recovery limit exhausted")
+        self.__cause__ = last_error

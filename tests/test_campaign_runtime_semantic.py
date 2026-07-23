@@ -219,19 +219,6 @@ def test_clear_mode_overlay_applies_for_configured_condition(
         }
 
 
-def test_clear_mode_overlay_rejects_obsolete_operations_option() -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match=r"unknown option: operations"):
-        _manager(
-            "engine/clear_mode_config_overlay",
-            RuntimeExecutorKind.ENGINE_EXTENSION,
-            {
-                "operations": ["handle_clear_mode_config_cover"],
-                "condition": "always",
-                "overrides": {"MAP_HAS_MISSILE_ATTACK": True},
-            },
-        )
-
-
 def test_event_animation_expected_end_delegates_outside_configured_battle() -> None:
     manager = _manager(
         "event_ui/event_animation_expected_end",
@@ -269,16 +256,6 @@ def test_default_enemy_scale_balance_runs_before_map_control_initialization() ->
     assert runtime.config.overlays == [
         {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"},
     ]
-
-
-@pytest.mark.parametrize("obsolete_option", ["operations", "overrides", "phase"])
-def test_default_enemy_scale_balance_rejects_obsolete_options(obsolete_option: str) -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match=rf"unknown option: {obsolete_option}"):
-        _manager(
-            "engine/default_enemy_scale_balance",
-            RuntimeExecutorKind.ENGINE_EXTENSION,
-            {obsolete_option: []},
-        )
 
 
 def test_semantic_executor_rejects_unknown_option_value_before_binding() -> None:

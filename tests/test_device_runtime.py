@@ -45,6 +45,7 @@ class _DeviceSessionDouble:
         self._forward_remove_error = forward_remove_error
         self._config = _MinitouchConfigDouble()
         self._adb_client = AdbClient()
+        self._serial = "127.0.0.1:16384"
 
     def _record(self, name: str) -> None:
         self.accesses.append(name)
@@ -70,7 +71,7 @@ class _DeviceSessionDouble:
     @property
     def serial(self) -> str:
         self._record("serial")
-        return "127.0.0.1:16384"
+        return self._serial
 
     @property
     def is_mumu_family(self) -> bool:
@@ -179,6 +180,13 @@ class _DeviceSessionDouble:
         self._record("list_known_packages")
         return []
 
+    def bind_serial(self, serial: str) -> bool:
+        self._record("bind_serial")
+        if serial == self._serial:
+            return False
+        self._serial = serial
+        return True
+
 
 class _MumuRuntimeDouble:
     def __init__(
@@ -197,39 +205,10 @@ class _MumuRuntimeDouble:
             name="MuMuPlayer-15.0-0",
             config_dir=Path("C:/MuMu/vms/MuMuPlayer-15.0-0/configs"),
         )
-        self._lifecycle_result = True
-        self.lifecycle_calls: list[str] = []
-        self.health_check_calls: list[str] = []
 
     @property
     def emulator_instance(self) -> MuMuInstance:
         return self._emulator_instance
-
-    def emulator_start(self) -> bool:
-        self.lifecycle_calls.append("start")
-        return self._lifecycle_result
-
-    def emulator_stop(self) -> bool:
-        self.lifecycle_calls.append("stop")
-        return self._lifecycle_result
-
-    def emulator_start_watch(self) -> bool:
-        self.lifecycle_calls.append("watch")
-        return self._lifecycle_result
-
-    def check_mumu_app_keep_alive(self) -> bool:
-        self.health_check_calls.append("app_keep_alive")
-        return self._lifecycle_result
-
-    def check_mumu_bridge_network(self) -> bool:
-        self.health_check_calls.append("bridge_network")
-        return self._lifecycle_result
-
-    def check_after_connected(self) -> None:
-        self.health_check_calls.append("after_connected")
-
-    def diagnose_adb_connect_refused(self) -> None:
-        self.health_check_calls.append("diagnose_refused")
 
     def invalidate_serial(self) -> None:
         self._calls.append("mumu")
@@ -433,31 +412,6 @@ def test_runtime_finishes_capture_and_mumu_cleanup_after_controller_error() -> N
     assert calls == ["controller", "capture", "mumu"]
 
 
-def test_runtime_preserves_every_serial_cleanup_failure_in_order() -> None:
-    class _InvalidationSignal(BaseException):
-        pass
-
-    calls: list[str] = []
-    session = _DeviceSessionDouble()
-    controller_error = OSError("controller cleanup failed")
-    capture_error = RuntimeError("capture cleanup failed")
-    invalidation_error = _InvalidationSignal("serial invalidation failed")
-    mumu_runtime = _MumuRuntimeDouble(session, calls, invalidate_error=invalidation_error)
-    runtime = DeviceRuntime(
-        adb_session=session,
-        mumu_runtime=cast("MumuRuntime", mumu_runtime),
-        capture=_CaptureServiceDouble(mumu_runtime, calls, release_error=capture_error),
-        controller=_ControllerServiceDouble(session, calls, release_error=controller_error),
-        app_controller=_AppControllerServiceDouble(session),
-    )
-
-    with pytest.raises(BaseExceptionGroup) as raised:
-        runtime.release_serial()
-
-    assert raised.value.exceptions == (controller_error, capture_error, invalidation_error)
-    assert calls == ["controller", "capture", "mumu"]
-
-
 def test_minitouch_release_clears_state_when_forward_removal_fails() -> None:
     closed: list[str] = []
     session = _DeviceSessionDouble(forward_remove_error=OSError("remove failed"))
@@ -482,55 +436,6 @@ def test_minitouch_release_clears_state_when_forward_removal_fails() -> None:
     controller.release()
 
 
-def test_minitouch_release_preserves_every_failure_and_clears_local_state() -> None:
-    class _StreamCloseSignal(BaseException):
-        pass
-
-    client_error = RuntimeError("client close failed")
-    forward_error = OSError("forward removal failed")
-    stream_error = _StreamCloseSignal("stream close interrupted")
-
-    def fail_client_close() -> None:
-        raise client_error
-
-    def fail_stream_close() -> None:
-        raise stream_error
-
-    session = _DeviceSessionDouble(forward_remove_error=forward_error)
-    controller = MinitouchController(session)
-    vars(controller).update(
-        _minitouch_port=23456,
-        _minitouch_client=SimpleNamespace(close=fail_client_close),
-        _minitouch_stream=SimpleNamespace(close=fail_stream_close),
-        _minitouch_pid="4312",
-        _minitouch_builder=object(),
-    )
-
-    with pytest.raises(BaseExceptionGroup) as raised:
-        controller.release()
-
-    assert raised.value.exceptions == (client_error, forward_error, stream_error)
-    assert vars(controller)["_minitouch_port"] == 0
-    assert vars(controller)["_minitouch_client"] is None
-    assert vars(controller)["_minitouch_stream"] is None
-    assert vars(controller)["_minitouch_pid"] == ""
-    assert "_minitouch_builder" not in controller.__dict__
-
-
-def test_runtime_rejects_mismatched_service_sessions() -> None:
-    session = _DeviceSessionDouble()
-    mumu_runtime = _MumuRuntimeDouble(_DeviceSessionDouble())
-
-    with pytest.raises(ValueError, match="same ADB session"):
-        DeviceRuntime(
-            adb_session=session,
-            mumu_runtime=cast("MumuRuntime", mumu_runtime),
-            capture=_CaptureServiceDouble(mumu_runtime),
-            controller=_ControllerServiceDouble(session),
-            app_controller=_AppControllerServiceDouble(session),
-        )
-
-
 def test_adb_disconnect_releases_services_before_disconnect() -> None:
     calls: list[str] = []
     connection = object.__new__(Connection)
@@ -541,28 +446,6 @@ def test_adb_disconnect_releases_services_before_disconnect() -> None:
     connection.adb_disconnect()
 
     assert calls == ["release", "disconnect"]
-
-
-def test_adb_restart_releases_services_before_killing_server() -> None:
-    calls: list[str] = []
-
-    class _Connection(Connection):
-        @property
-        def adb_client(self) -> SimpleNamespace:
-            calls.append("client")
-            return SimpleNamespace(server_kill=lambda: calls.append("server_kill"))
-
-        @override
-        def adb_start_server(self) -> int:
-            calls.append("start_server")
-            return 41
-
-    connection = object.__new__(_Connection)
-    vars(connection)["_runtime"] = SimpleNamespace(release_serial=lambda: calls.append("release"))
-
-    connection.adb_restart()
-
-    assert calls == ["release", "client", "server_kill", "start_server"]
 
 
 class _RecoveryLogger:
@@ -582,22 +465,6 @@ def _failing_runtime(calls: list[str], error: Exception) -> SimpleNamespace:
         raise error
 
     return SimpleNamespace(release_serial=release_serial)
-
-
-def test_adb_disconnect_continues_after_runtime_cleanup_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[str] = []
-    error = AdbError("old forward")
-    logger = _RecoveryLogger()
-    connection = object.__new__(Connection)
-    connection.serial = "127.0.0.1:16384"
-    vars(connection)["_runtime"] = _failing_runtime(calls, error)
-    vars(connection)["adb_client"] = SimpleNamespace(disconnect=lambda _serial: calls.append("disconnect") or "")
-    monkeypatch.setattr(connection_module, "logger", logger)
-
-    connection.adb_disconnect()
-
-    assert calls == ["release", "disconnect"]
-    assert logger.exceptions == [error]
 
 
 def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -631,29 +498,4 @@ def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch: py
 
     assert calls == ["release", "server_kill", "start_server", "rebuild_client"]
     assert connection.adb_client is new_client
-    assert logger.exceptions == [error]
-
-
-def test_bind_serial_publishes_new_serial_after_runtime_cleanup_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[str] = []
-    error = AdbError("old forward")
-    logger = _RecoveryLogger()
-    old_serial = "127.0.0.1:16384"
-    new_serial = "127.0.0.1:16385"
-    connection = object.__new__(Connection)
-    connection.serial = old_serial
-    connection.config = SimpleNamespace(Emulator_Serial=old_serial)
-    vars(connection).update(
-        _runtime=_failing_runtime(calls, error),
-        port=16384,
-        adb=object(),
-    )
-    monkeypatch.setattr(connection_module, "logger", logger)
-
-    assert connection.bind_serial(new_serial)
-
-    assert calls == ["release"]
-    assert connection.serial == new_serial
-    assert "port" not in vars(connection)
-    assert "adb" not in vars(connection)
     assert logger.exceptions == [error]

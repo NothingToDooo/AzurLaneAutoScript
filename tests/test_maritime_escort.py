@@ -1,5 +1,3 @@
-from dataclasses import FrozenInstanceError
-
 import pytest
 
 from module.exception import CampaignEnd
@@ -41,11 +39,3 @@ def test_execute_once_reports_exhausted_attempts_without_withdrawal(monkeypatch:
     result = object.__new__(MaritimeEscort).execute_once()
 
     assert result == MaritimeEscortExecutionResult(MaritimeEscortExecutionStatus.ATTEMPTS_EXHAUSTED)
-
-
-def test_execution_result_is_immutable() -> None:
-    result = MaritimeEscortExecutionResult(MaritimeEscortExecutionStatus.WITHDRAWAL_COMPLETED)
-    field_name = "status"
-
-    with pytest.raises(FrozenInstanceError):
-        setattr(result, field_name, MaritimeEscortExecutionStatus.ATTEMPTS_EXHAUSTED)

@@ -41,21 +41,11 @@ def test_decoder_decodes_a_daily_schedule_and_consumes_the_whole_object() -> Non
         (_schedule(triggers=("04:00:00",)), "must be HH:MM"),
         (_schedule(triggers=("12:00", "04:00")), "unique and sorted"),
         (_schedule(triggers=("04:00", "04:00")), "unique and sorted"),
+        (MappingProxyType({"triggers": ("04:00",)}), "missing required setting"),
+        (MappingProxyType({"timezone": "UTC"}), "missing required setting"),
+        (_schedule(unknown=True), "unknown settings"),
     ],
 )
 def test_decoder_rejects_invalid_daily_schedule(schedule: object, match: str) -> None:
-    with pytest.raises(SettingsDocumentError, match=match):
-        _decoder(schedule).daily_schedule("schedule")
-
-
-@pytest.mark.parametrize(
-    ("schedule", "match"),
-    [
-        (MappingProxyType({"triggers": ("04:00",)}), "missing required setting"),
-        (MappingProxyType({"timezone": "UTC"}), "missing required setting"),
-        (_schedule(removed=True), "unknown settings"),
-    ],
-)
-def test_decoder_rejects_missing_or_unknown_daily_schedule_fields(schedule: object, match: str) -> None:
     with pytest.raises(SettingsDocumentError, match=match):
         _decoder(schedule).daily_schedule("schedule")

@@ -867,7 +867,6 @@ class OperationSirenTask(Task):
         if not isinstance(report, WorldTaskReport):
             message = "OperationSirenWorkflow.execute() must return a WorldTaskReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         self._validate_report_checkpoint(report)
         return self._merge_schedule_intents(self._resolve(report, context), report)
 

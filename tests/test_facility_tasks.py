@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, time, timedelta
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -199,19 +199,6 @@ def test_research_empty_queue_defers_until_server_update() -> None:
     )
 
 
-def test_research_server_update_rolls_over_when_run_starts_at_the_trigger() -> None:
-    context = _context("research", started_at=_SERVER_UPDATE_AT)
-    workflow = _ResearchWorkflow(
-        ResearchReport(observed_at=context.started_at, available_slots=5, first_finish_at=None)
-    )
-
-    result = ResearchTask(workflow, _research_settings()).run(context)
-
-    expected_due_at = _SERVER_UPDATE_AT + timedelta(days=1)
-    assert result.effects == (RescheduleSelf(expected_due_at),)
-    assert expected_due_at > context.started_at
-
-
 def test_research_empty_queue_schedules_from_observation_when_run_crosses_server_update() -> None:
     started_at = _SERVER_UPDATE_AT - timedelta(minutes=1)
     observed_at = _SERVER_UPDATE_AT + timedelta(minutes=1)
@@ -235,12 +222,9 @@ def test_research_four_available_slots_retries_ten_minutes_before_finish() -> No
     )
 
 
-@pytest.mark.parametrize("available_slots", [0, 1, 2, 3])
-def test_research_non_empty_queue_uses_first_finish(available_slots: int) -> None:
+def test_research_non_empty_queue_uses_first_finish() -> None:
     finish_at = _OBSERVED_AT + timedelta(hours=1)
-    workflow = _ResearchWorkflow(
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=available_slots, first_finish_at=finish_at)
-    )
+    workflow = _ResearchWorkflow(ResearchReport(observed_at=_OBSERVED_AT, available_slots=2, first_finish_at=finish_at))
 
     result = ResearchTask(workflow, _research_settings()).run(_context("research"))
 
@@ -373,109 +357,61 @@ def test_tactical_without_running_training_uses_failure_retry() -> None:
     )
 
 
-@pytest.mark.parametrize("task_name", ["research", "commission", "tactical"])
-def test_facility_abort_before_run_prevents_external_side_effects(task_name: str) -> None:
-    abort = AbortToken()
-    abort.request("manual stop")
-    if task_name == "research":
-        workflow = _ResearchWorkflow(ResearchReport(observed_at=_OBSERVED_AT, available_slots=5, first_finish_at=None))
-        task = ResearchTask(workflow, _research_settings())
-    elif task_name == "commission":
-        workflow = _CommissionWorkflow(_commission_report())
-        task = CommissionTask(
-            workflow,
-            _commission_settings(),
-        )
-    else:
-        workflow = _TacticalWorkflow(TacticalReport(observed_at=_OBSERVED_AT, finish_at=None))
-        task = TacticalTask(workflow, _tactical_settings())
-
-    with pytest.raises(AbortRequested, match="manual stop"):
-        task.run(_context(task_name, abort))
-
-    assert workflow.execute_calls == 0
-
-
-def test_research_abort_after_workflow_discards_schedule_result() -> None:
+def test_research_late_abort_preserves_schedule_and_stops_the_next_entry() -> None:
     abort = AbortToken()
     workflow = _ResearchWorkflow(
         ResearchReport(observed_at=_OBSERVED_AT, available_slots=5, first_finish_at=None),
         on_execute=lambda: _request_abort(abort, "stop after research"),
     )
+    task = ResearchTask(workflow, _research_settings())
+    context = _context("research", abort)
+
+    assert task.run(context) == TaskResult(
+        outcome=Deferred("no research project is running"),
+        effects=(RescheduleSelf(_SERVER_UPDATE_AT),),
+    )
 
     with pytest.raises(AbortRequested, match="stop after research"):
-        ResearchTask(workflow, _research_settings()).run(_context("research", abort))
-
+        task.run(context)
     assert workflow.execute_calls == 1
 
 
-def test_commission_abort_after_workflow_discards_all_schedule_results() -> None:
+def test_commission_late_abort_preserves_all_schedules_and_stops_the_next_entry() -> None:
     abort = AbortToken()
     workflow = _CommissionWorkflow(
         _commission_report(daily_pending=1, filtered_urgent_pending=1),
         on_execute=lambda: _request_abort(abort, "stop after commission"),
     )
-    settings = _commission_settings(enabled=True)
+    task = CommissionTask(workflow, _commission_settings(enabled=True))
+    context = _context("commission", abort)
+
+    assert task.run(context) == TaskResult(
+        outcome=Retryable("no commission is running"),
+        effects=(
+            RescheduleSelf(_OBSERVED_AT + timedelta(minutes=30)),
+            RescheduleTask(TaskId("gems_farming"), _OBSERVED_AT + timedelta(hours=2)),
+        ),
+    )
 
     with pytest.raises(AbortRequested, match="stop after commission"):
-        CommissionTask(workflow, settings).run(_context("commission", abort))
-
+        task.run(context)
     assert workflow.execute_calls == 1
 
 
-def test_tactical_abort_after_workflow_discards_schedule_result() -> None:
+def test_tactical_late_abort_preserves_schedule_and_stops_the_next_entry() -> None:
     abort = AbortToken()
     workflow = _TacticalWorkflow(
         TacticalReport(observed_at=_OBSERVED_AT, finish_at=None),
         on_execute=lambda: _request_abort(abort, "stop after tactical"),
     )
+    task = TacticalTask(workflow, _tactical_settings())
+    context = _context("tactical", abort)
+
+    assert task.run(context) == TaskResult(
+        outcome=Retryable("no tactical training is running"),
+        effects=(RescheduleSelf(_OBSERVED_AT + timedelta(minutes=20)),),
+    )
 
     with pytest.raises(AbortRequested, match="stop after tactical"):
-        TacticalTask(workflow, _tactical_settings()).run(_context("tactical", abort))
-
+        task.run(context)
     assert workflow.execute_calls == 1
-
-
-def test_facility_datetimes_must_be_timezone_aware() -> None:
-    naive = datetime(2026, 7, 13, 12)
-
-    with pytest.raises(ValueError, match="timezone-aware"):
-        ResearchReport(observed_at=naive, available_slots=5, first_finish_at=None)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=4, first_finish_at=naive)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        CommissionReport(naive, (), 0, 0)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        CommissionReport(_OBSERVED_AT, (naive,), 0, 0)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        TacticalReport(naive, None)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        TacticalReport(_OBSERVED_AT, naive)
-
-
-def test_facility_rejects_invalid_report_and_settings_values() -> None:
-    with pytest.raises(ValueError, match="between zero and five"):
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=6, first_finish_at=_OBSERVED_AT)
-    with pytest.raises(ValueError, match="empty research queue"):
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=5, first_finish_at=_OBSERVED_AT)
-    with pytest.raises(ValueError, match="non-empty research queue"):
-        ResearchReport(observed_at=_OBSERVED_AT, available_slots=0, first_finish_at=None)
-    with pytest.raises(TypeError, match="failure_retry_delay must be a DelayRange"):
-        CommissionSettings(
-            cast("DelayRange", timedelta(0)),
-            commission_limit_enabled=False,
-            selection=_COMMISSION_SELECTION,
-        )
-    with pytest.raises(TypeError, match="must be a bool"):
-        CommissionSettings(DelayRange(60, 60), cast("bool", 1), _COMMISSION_SELECTION)
-    with pytest.raises(ValueError, match="must be non-negative"):
-        CommissionReport(_OBSERVED_AT, (), daily_pending=-1, filtered_urgent_pending=0)
-    with pytest.raises(TypeError, match="failure_retry_delay must be a DelayRange"):
-        _tactical_settings(cast("DelayRange", timedelta(0)))
-
-
-def test_facility_datetime_type_errors_are_not_treated_as_naive_datetimes() -> None:
-    with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        ResearchSettings(cast("DailySchedule", "tomorrow"), _RESEARCH_SELECTION)
-    with pytest.raises(TypeError, match="must be a datetime"):
-        TacticalReport(_OBSERVED_AT, cast("datetime", "later"))

@@ -275,25 +275,3 @@ def test_ryza_event_ui_stops_when_the_event_entrance_is_unavailable() -> None:
 def test_special_early_descriptors_reject_unknown_options() -> None:
     with pytest.raises(CampaignRuntimeProfileError, match="unknown option: unexpected"):
         _t4_manager(unexpected=True)
-
-
-def test_t4_observer_rejects_obsolete_operations_field() -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match="unknown option: operations"):
-        _manager(
-            _binding(
-                _T4_IMPLEMENTATION,
-                RuntimeExecutorKind.MAP_OBSERVATION,
-                ["catch_camera_repositioning"],
-            )
-        )
-
-
-def test_ryza_event_ui_rejects_obsolete_operations_field() -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match="unknown option: operations"):
-        _manager(
-            _binding(
-                _RYZA_IMPLEMENTATION,
-                RuntimeExecutorKind.EVENT_UI,
-                [],
-            ),
-        )

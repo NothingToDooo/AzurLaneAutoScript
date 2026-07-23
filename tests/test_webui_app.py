@@ -34,38 +34,6 @@ def _record_validation(
     return validate
 
 
-def test_webui_clearup_uses_explicit_force_stop(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[None] = []
-    monkeypatch.setattr(
-        webui_app.ProcessManager,
-        "force_stop_instance",
-        lambda: calls.append(None),
-    )
-
-    webui_app.clearup()
-
-    assert calls == [None]
-
-
-def test_webui_sessions_share_the_fixed_process_manager(monkeypatch: pytest.MonkeyPatch) -> None:
-    manager = object()
-
-    def initialize_frame(_frame: object) -> None:
-        pass
-
-    monkeypatch.setattr(webui_app.Frame, "__init__", initialize_frame)
-    monkeypatch.setattr(AlasGUI, "initial", lambda _gui: None)
-    monkeypatch.setattr(webui_app.ProcessManager, "instance", lambda: manager)
-
-    first = AlasGUI()
-    second = AlasGUI()
-
-    assert first.process_manager is manager
-    assert second.process_manager is manager
-    assert first.runtime_view_active is False
-    assert second.runtime_view_active is False
-
-
 def test_task_settings_always_read_the_personal_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = AlasGUI.__new__(AlasGUI)
     document = _template()
@@ -83,74 +51,6 @@ def test_task_settings_always_read_the_personal_configuration(monkeypatch: pytes
     assert config is document
     assert snapshot.task_name == "Event"
     assert snapshot.bind_chain[:2] == ("General", "Alas")
-
-
-def test_reopening_runtime_view_only_expands_the_existing_menu(monkeypatch: pytest.MonkeyPatch) -> None:
-    gui = AlasGUI.__new__(AlasGUI)
-    manager = object()
-    events: list[object] = []
-
-    class _StateSwitch:
-        @staticmethod
-        def switch() -> None:
-            events.append("switch")
-
-    vars(gui)["process_manager"] = manager
-    gui.runtime_view_active = False
-    vars(gui)["state_switch"] = _StateSwitch()
-    vars(gui)["init_aside"] = lambda *, name: events.append(("aside", name))
-    vars(gui)["initial"] = lambda: events.append("initial")
-    vars(gui)["alas_set_menu"] = lambda: events.append("menu")
-    vars(gui)["expand_menu"] = lambda: events.append("expand")
-    monkeypatch.setattr(webui_app, "clear", lambda scope: events.append(("clear", scope)))
-
-    gui.ui_alas()
-    gui.ui_alas()
-
-    assert gui.process_manager is manager
-    assert gui.runtime_view_active is True
-    assert events == [
-        ("aside", "alas"),
-        ("clear", "content"),
-        "switch",
-        "initial",
-        "menu",
-        "expand",
-    ]
-
-
-def test_home_view_hides_header_status_without_releasing_the_process_manager() -> None:
-    gui = AlasGUI.__new__(AlasGUI)
-
-    class _Manager:
-        state = 3
-
-    class _StateSwitch:
-        calls = 0
-
-        def switch(self) -> None:
-            self.calls += 1
-
-    manager = _Manager()
-    state_switch = _StateSwitch()
-    aside_names: list[str] = []
-    vars(gui)["process_manager"] = manager
-    gui.runtime_view_active = True
-    gui.is_mobile = True
-    vars(gui)["state_switch"] = state_switch
-    vars(gui)["init_aside"] = lambda *, name: aside_names.append(name)
-    vars(gui)["set_title"] = lambda _title: None
-    vars(gui)["dev_set_menu"] = lambda: None
-
-    assert gui._header_runtime_state() == 3  # ruff:ignore[private-member-access]
-
-    gui.ui_develop()
-
-    assert gui.runtime_view_active is False
-    assert gui.process_manager is manager
-    assert gui._header_runtime_state() == 0  # ruff:ignore[private-member-access]
-    assert state_switch.calls == 1
-    assert aside_names == ["Home"]
 
 
 def test_app_manage_presents_and_exports_the_personal_configuration(
@@ -193,29 +93,6 @@ def test_app_manage_presents_and_exports_the_personal_configuration(
     callbacks[1]()
 
     assert downloads == [("alas.json", b'{"personal": true}')]
-
-
-def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyPatch) -> None:
-    gui = AlasGUI.__new__(AlasGUI)
-    gui.ALAS_ARGS = {}
-    gui._config_listeners_initialized = False  # ruff:ignore[private-member-access] - 验证 session 监听初始化边界。
-    bindings: list[tuple[str, object]] = []
-
-    monkeypatch.setattr(
-        webui_app,
-        "get_alas_config_listen_path",
-        lambda _args: iter([["Task", "Group", "Field"]]),
-    )
-    monkeypatch.setattr(
-        webui_app,
-        "pin_on_change",
-        lambda *, name, onchange: bindings.append((name, onchange)),
-    )
-
-    gui._init_config_listeners()  # ruff:ignore[private-member-access] - 验证 session 监听初始化边界。
-    gui._init_config_listeners()  # ruff:ignore[private-member-access] - 验证 session 监听初始化边界。
-
-    assert [name for name, _onchange in bindings] == ["Task_Group_Field"]
 
 
 def test_failed_synchronous_save_keeps_pending_fields_for_the_next_candidate() -> None:

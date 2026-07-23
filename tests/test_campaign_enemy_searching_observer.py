@@ -10,17 +10,10 @@ from module.adapters.campaign_map_observer import (
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
-from module.adapters.campaign_runtime_profile import (
-    CampaignRuntimeProfileError,
-    CampaignRuntimeProfileManager,
-)
+from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
 from module.content.manifest import load_default_event_manifests
 from module.content.runtime_profile import (
-    CampaignRuntimeExtension,
-    CampaignRuntimeExtensionId,
     CampaignRuntimeProfile,
-    CampaignRuntimeProfileId,
-    RuntimeExecutorBinding,
     RuntimeExecutorKind,
     RuntimeImplementationId,
 )
@@ -137,23 +130,3 @@ def test_real_profiles_wire_red_overlay_with_their_effective_threshold(
         )
         is expected_visible
     )
-
-
-def test_red_overlay_profile_rejects_obsolete_string_operation() -> None:
-    extension = CampaignRuntimeExtension(
-        CampaignRuntimeExtensionId("obsolete-red-overlay-test"),
-        (
-            RuntimeExecutorBinding(
-                RuntimeExecutorKind.MAP_OBSERVATION,
-                _IMPLEMENTATION,
-                {"operations": ["enemy_searching_appear"]},
-            ),
-        ),
-    )
-    profile = CampaignRuntimeProfile(
-        CampaignRuntimeProfileId("obsolete-red-overlay-test"),
-        (extension,),
-    )
-
-    with pytest.raises(CampaignRuntimeProfileError, match=r"unknown option: operations"):
-        CampaignRuntimeProfileManager(profile, load_default_campaign_runtime_executor_registry())

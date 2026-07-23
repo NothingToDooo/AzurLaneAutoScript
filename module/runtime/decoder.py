@@ -1,5 +1,4 @@
 import datetime as datetime_module
-import math
 import re
 from collections.abc import Mapping
 from enum import StrEnum
@@ -85,48 +84,6 @@ class SettingsDecoder:
         if value is None:
             return None
         return self._integer_value(value, name=name, minimum=minimum, maximum=maximum)
-
-    def integer_tuple(
-        self,
-        name: str,
-        *,
-        length: int | None = None,
-        minimum: int | None = None,
-        maximum: int | None = None,
-    ) -> tuple[int, ...]:
-        value = self._take(name)
-        if not isinstance(value, tuple):
-            message = f"{self._path}.{name} must be an array of integers"
-            raise SettingsDocumentError(message)
-        if length is not None and len(value) != length:
-            message = f"{self._path}.{name} must contain exactly {length} integers"
-            raise SettingsDocumentError(message)
-        items = cast("tuple[FrozenJsonValue, ...]", value)
-        return tuple(
-            self._integer_value(
-                item,
-                name=f"{name}[{index}]",
-                minimum=minimum,
-                maximum=maximum,
-            )
-            for index, item in enumerate(items)
-        )
-
-    def number(self, name: str, *, minimum: float | None = None, maximum: float | None = None) -> float:
-        value = self._take(name)
-        if type(value) is not float:
-            message = f"{self._path}.{name} must be a float"
-            raise SettingsDocumentError(message)
-        if not math.isfinite(value):
-            message = f"{self._path}.{name} must be finite"
-            raise SettingsDocumentError(message)
-        if minimum is not None and value < minimum:
-            message = f"{self._path}.{name} must be at least {minimum}"
-            raise SettingsDocumentError(message)
-        if maximum is not None and value > maximum:
-            message = f"{self._path}.{name} must be at most {maximum}"
-            raise SettingsDocumentError(message)
-        return value
 
     def string(self, name: str) -> str:
         value = self._take(name)

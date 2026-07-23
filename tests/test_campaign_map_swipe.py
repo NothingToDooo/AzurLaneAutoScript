@@ -191,18 +191,6 @@ def test_request_and_policy_are_frozen_and_policy_requires_a_canonical_box() -> 
         MapSwipePolicy(default_box=cast("MapSwipeBox", (1, 2, 3)))
 
 
-@pytest.mark.parametrize(
-    ("option", "value"),
-    [("operations", ["_map_swipe", "fleet_preparation"]), ("state", ["use_support_fleet"])],
-)
-def test_support_executor_rejects_obsolete_operation_and_state_schema(
-    option: str,
-    value: list[str],
-) -> None:
-    with pytest.raises(CampaignRuntimeProfileError, match=f"unknown option: {option}"):
-        _manager(_support_binding({option: value}))
-
-
 @pytest.fixture(scope="module")
 def packs_by_id() -> Mapping[str, EventPack]:
     return MappingProxyType({str(pack.pack_id): pack for pack in load_default_event_manifests()})

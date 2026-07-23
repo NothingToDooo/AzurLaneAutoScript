@@ -1,4 +1,3 @@
-from dataclasses import FrozenInstanceError
 from typing import TYPE_CHECKING
 
 import pytest
@@ -38,9 +37,6 @@ def test_resolve_mumu_instance_uses_configured_path_and_serial_instance_id_while
     )
     assert instance.manager_executable == executable.with_name("MuMuManager.exe").resolve()
     assert instance.config_path("customer_config.json") == expected_folder / "configs" / "customer_config.json"
-    field_name = "name"
-    with pytest.raises(FrozenInstanceError):
-        setattr(instance, field_name, "changed")
 
 
 def test_resolve_mumu_instance_rejects_missing_configured_executable(tmp_path: Path) -> None:
@@ -92,22 +88,3 @@ def test_resolve_mumu_instance_rejects_duplicate_instance_id_with_observed_names
     message = str(exc_info.value)
     assert "MuMu instance id 1 is ambiguous" in message
     assert "observed names: MuMuPlayer-12.0-1, MuMuPlayer-15.0-1" in message
-
-
-def test_resolve_mumu_instance_ignores_historical_nemu_files(tmp_path: Path) -> None:
-    executable, vms = _installation(tmp_path)
-    folder = vms / "MuMuPlayer-15.0-1"
-    folder.mkdir()
-    (folder / "MuMuPlayer-12.0-1.nemu").write_text(
-        '<Forwarding hostport="16416" guestport="5555"/>',
-        encoding="utf-8",
-    )
-    (folder / "MuMuPlayer-15.0-1.nemu").write_text(
-        '<Forwarding hostport="16416" guestport="5555"/>',
-        encoding="utf-8",
-    )
-
-    instance = resolve_mumu_instance(executable.as_posix(), "127.0.0.1:16416")
-
-    assert instance.instance_id == 1
-    assert instance.name == folder.name

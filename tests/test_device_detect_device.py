@@ -5,6 +5,7 @@ from adbutils import AdbClient
 
 from module.device.adb_session import AdbDeviceWithStatus
 from module.device.connection import Connection
+from module.device.mumu import mumu12_endpoint_candidates
 from module.device.mumu_connection import MumuEndpointAmbiguousError, select_mumu_endpoint
 from module.exception import EmulatorNotRunningError
 from module.map.map_grids import SelectedGrids
@@ -92,6 +93,19 @@ def test_adb_connect_binds_unique_neighbor_after_cleanup_without_changing_config
     assert client.connect_calls == []
 
 
+def test_adb_connect_retries_after_first_sweep_only_displaces_old_server() -> None:
+    configured_serial = "127.0.0.1:16384"
+    connection, client, events = _make_connection(
+        [[], [], [_device(configured_serial)]],
+        configured_serial=configured_serial,
+    )
+
+    assert connection.adb_connect()
+    assert client.connect_calls.count(configured_serial) == 2
+    assert connection.serial == configured_serial
+    assert events == []
+
+
 def test_adb_connect_diagnoses_bridge_before_reporting_no_same_instance_endpoint() -> None:
     configured_serial = "127.0.0.1:16384"
     connection, client, events = _make_connection([[], []], configured_serial=configured_serial)
@@ -100,13 +114,7 @@ def test_adb_connect_diagnoses_bridge_before_reporting_no_same_instance_endpoint
         connection.adb_connect()
 
     assert events == [("diagnose", configured_serial)]
-    assert client.connect_calls == [
-        "127.0.0.1:16384",
-        "127.0.0.1:16385",
-        "127.0.0.1:16383",
-        "127.0.0.1:16386",
-        "127.0.0.1:16382",
-    ]
+    assert client.connect_calls == list(mumu12_endpoint_candidates(configured_serial)) * 3
 
 
 def test_adb_connect_rejects_ambiguous_same_instance_neighbors() -> None:

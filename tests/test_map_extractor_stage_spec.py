@@ -1,10 +1,8 @@
 import importlib
-import sys
 from typing import TYPE_CHECKING, Protocol
 
 import pytest
 
-from dev_tools import utils as dev_utils
 from module.content.battle_policy import BossStrategy, ClearBoss
 from module.content.campaign_session import CampaignRunVariant, CampaignSession
 from module.content.errors import ContentValidationError
@@ -20,19 +18,6 @@ if TYPE_CHECKING:
 
 def _import_extractor() -> ModuleType:
     return importlib.import_module("dev_tools.map_extractor")
-
-
-def test_import_does_not_load_external_lua_files(monkeypatch: pytest.MonkeyPatch) -> None:
-    sys.modules.pop("dev_tools.map_extractor", None)
-
-    def unexpected_loader(*_args: object, **_kwargs: object) -> None:
-        pytest.fail("导入 map_extractor 时不应读取外部 Lua 仓库")
-
-    monkeypatch.setattr(dev_utils, "LuaLoader", unexpected_loader)
-
-    module = _import_extractor()
-
-    assert hasattr(module, "MapData")
 
 
 def _map_data(monkeypatch: pytest.MonkeyPatch) -> tuple[ModuleType, Any]:
@@ -235,15 +220,6 @@ def test_stage_writer_owns_only_yaml_and_check_never_writes(
     assert strategy_path.read_bytes() == strategy_bytes
 
 
-def test_stage_writer_never_creates_strategy_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _module, stage = _map_data(monkeypatch)
-    stages_root = tmp_path / "event_future_cn" / "stages"
-
-    stage.write_stage(stages_root, overwrite=True)
-
-    assert not (stages_root.parent / "strategy.py").exists()
-
-
 def test_generated_stage_yaml_is_accepted_by_native_loader(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -298,26 +274,20 @@ def test_early_boss_generation_uses_declarative_spawn_and_typed_default(
     assert "strategy: fleet_boss" in stage.render_stage_yaml()
     assert stage.write_stage(stages_root)
     assert (stages_root / "t1.yaml").is_file()
-    assert not (stages_root.parent / "strategy.py").exists()
 
 
-def test_boss_at_zero_compiles_without_touching_unrelated_legacy_strategy_file(
+def test_boss_at_zero_compiles_to_typed_battle_plan(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _module, stage = _map_data(monkeypatch)
     _make_early_boss(stage, boss_battle=0)
-    repository_root = tmp_path
-    events_root = repository_root / "content" / "events"
+    events_root = tmp_path / "events"
     pack_id = "event_early_cn"
     stages_root = events_root / pack_id / "stages"
     stages_root.mkdir(parents=True)
     stage_path = stages_root / "t1.yaml"
     stage_path.write_text("placeholder: true\n", encoding="utf-8", newline="\n")
-    strategy_path = repository_root / "campaign" / pack_id / "strategy.py"
-    strategy_path.parent.mkdir(parents=True)
-    strategy_bytes = b"# hand-written early boss strategy\n"
-    strategy_path.write_bytes(strategy_bytes)
     manifest = events_root / f"{pack_id}.yaml"
     manifest.write_text(
         """schema_version: 1
@@ -342,13 +312,11 @@ stages:
     spec = pack.stages[0]
 
     assert stage.write_stage(stages_root, overwrite=True) is True
-    assert strategy_path.read_bytes() == strategy_bytes
     definition = StageSpecLoader(content_root=events_root).load(spec)
     session = CampaignSession(definition, CampaignRunVariant.NORMAL)
 
     assert "strategy: fleet_boss" in stage_path.read_text(encoding="utf-8")
     assert session.battle_plan(0).intents == (ClearBoss(BossStrategy.FLEET_BOSS),)
-    assert strategy_path.read_bytes() == strategy_bytes
 
 
 def test_extractor_unknown_grid_sentinel_is_rejected_by_native_loader(

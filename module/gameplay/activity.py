@@ -311,7 +311,6 @@ class ActivityTask(Task):
         if not isinstance(report, ActivityReport):
             message = "ActivityWorkflow.execute() must return an ActivityReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         self._validate_report(context, execution_spec, report)
         progress = self._progress_after_report(context, execution_spec, report)
         return self._result_from_report(context, execution_spec, report, progress)
@@ -1080,7 +1079,6 @@ class EncounterTask(Task):
         if not isinstance(report, EncounterReport):
             message = "EncounterWorkflow.execute() must return an EncounterReport"
             raise TypeError(message)
-        context.abort.raise_if_requested()
         self._validate_report(context, execution_spec, report)
         progress = self._progress_after_report(context, execution_spec, report)
         return self._result_from_report(context, execution_spec, report, progress)
